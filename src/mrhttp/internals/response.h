@@ -25,6 +25,8 @@ typedef struct {
   PyObject* headers;
   PyObject* cookies;
 
+  int mtype; // mime type 0 html 1 plain 2 json
+
   char* buffer;
   size_t buffer_len;
 } Response;

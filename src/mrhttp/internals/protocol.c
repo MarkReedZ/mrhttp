@@ -314,6 +314,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   Py_INCREF(self->app);
 
   Route *r = router_getRoute( &self->router, self->request );
+  printf("Setting mtype %d\n", r->mtype);
   if ( r == NULL ) {
     // TODO pipeline..?
     protocol_write_error_response(self, 404,"Not Found","The requested page was not found");
@@ -325,6 +326,11 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   if ( r->session ) {
     DBG printf("Route requires a session\n"); 
     //TODO
+  }
+
+  if ( r->mtype ) {
+    printf("Setting mtype %d\n", r->mtype);
+    self->response->mtype = r->mtype;
   }
 
   if ( r->iscoro || !PIPELINE_EMPTY(self)) {
@@ -434,12 +440,10 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
 
   long int rlen, t;
   DBG_RESP printf("protocol write response\n");
-  DBG printf(" DELME resp object:\n");
-  DBG PyObject_Print(resp, stdout, 0); 
-  DBG printf("\n");
   char *rbuf = self->response->rbuf;
 
-  int headerLen = 145;
+  int headerLen = response_updateHeaders(self->response); // Add user headers 
+  if (!headerLen) return NULL;
 
   // TODO Would unicode to bytes (PyUnicode_AsEncodedString) then concatenate body and header be faster? Could check those functions
   char *r = PyUnicode_AsUTF8AndSize( resp, &rlen ); 
@@ -541,8 +545,8 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
       PyErr_Clear();
 
       printf("Unhandled exception:\n");
-      PyObject_Print( type, stdout, 0 );
-      PyObject_Print( value, stdout, 0 );
+      PyObject_Print( type, stdout, 0 ); printf("\n");
+      PyObject_Print( value, stdout, 0 ); printf("\n");
   
       protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
       return self;

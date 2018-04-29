@@ -38,16 +38,10 @@ int router_init (Router* self, void* protocol) {
     rte->func = handler;
     if ( !(o = PyDict_GetItemString( r, "path" )) ) goto error;
     rte->path = PyUnicode_AsUTF8AndSize( o, &(rte->len) );
-    if ( Py_True == PyDict_GetItemString( r, "iscoro" ) ) {
-      rte->iscoro = true;
-    } else {
-      rte->iscoro = false;
-    }
-    if ( Py_True == PyDict_GetItemString( r, "session" ) ) {
-      rte->session = true;
-    } else {
-      rte->session = false;
-    }
+    if ( Py_True == PyDict_GetItemString( r, "iscoro"  ) ) rte->iscoro = true;
+    if ( Py_True == PyDict_GetItemString( r, "session" ) ) rte->session = true;
+    o = PyDict_GetItemString( r, "type"  );
+    if (o) rte->mtype = PyLong_AsLong(o);
 
     DBG printf(" path %.*s func ptr %p\n", (int)rte->len, rte->path, rte->func);
   }
@@ -78,6 +72,8 @@ int router_init (Router* self, void* protocol) {
     rte->session = false;
     if ( Py_True == PyDict_GetItemString( r, "iscoro"  ) ) rte->iscoro = true;
     if ( Py_True == PyDict_GetItemString( r, "session" ) ) rte->session = true;
+    o = PyDict_GetItemString( r, "type"  );
+    if (o) rte->mtype = PyLong_AsLong(o);
 
     // Segs
     int numSegs = numInString( '/', rte->path, rte->len );
@@ -139,7 +135,6 @@ Route* router_getRoute(Router* self, Request* request) {
   request_decodePath( request );
   int plen = request->path_len;
   DBG printf("path >%.*s<\n", plen, request->path );
-   
  
   Route *r = self->staticRoutes;
   for (int i = 0; i<self->numStaticRoutes; i++,r++ ) {

@@ -66,7 +66,7 @@ class Application:
     def prehandler(self):
       pass
 
-    def add_route(self, handler, uri, methods=['GET'], tools=[]):
+    def add_route(self, handler, uri, methods=['GET'], tools=[],type="html"):
       if asyncio.iscoroutinefunction(handler) and router.is_pointless_coroutine(handler):
         handler = router.coroutine_to_func(handler)
 
@@ -81,6 +81,10 @@ class Application:
       r["path"]    = uri
       r["methods"] = methods
       r["sortlen"] = len(uri.replace("{}",""))
+      r["type"] = 0
+      if type == "text": r["type"] = 1
+      if type == "json": r["type"] = 2
+      print (r["type"])
       if "session" in tools: r["session"] = True
       # Static routes
       if not "{" in uri:
@@ -105,7 +109,7 @@ class Application:
 
 
     # Decorator
-    def route(self, uri, methods=["GET"], tools=[]):
+    def route(self, uri, methods=["GET"], tools=[], type="html"):
       if not uri.startswith('/'): uri = '/' + uri
       def response(func): 
         if "session" in tools:
@@ -117,10 +121,10 @@ class Application:
             except Exception as e:
               print(e)
             return func(*args, **kwds)
-          self.add_route( wrapper, uri, methods, tools )
+          self.add_route( wrapper, uri, methods, tools, type )
           return wrapper
         else:
-          self.add_route( func, uri, methods, tools )
+          self.add_route( func, uri, methods, tools, type )
           return func
       return response
 

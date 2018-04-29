@@ -3,6 +3,9 @@
 #include "response.h"
 #include "common.h"
 
+static char *resp_plain = "text/plain\r\n\r\n";
+static char *resp_json  = "application/json\r\n\r\n";
+
 PyObject* Response_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
   Response* self = NULL;
@@ -38,6 +41,7 @@ int Response_init(Response* self, PyObject *args, PyObject* kw)
   self->rbuf_size = 128*1024;
   self->errbuf = malloc(4*1024);
   self->errbuf_size = 4*1024;
+  self->mtype = 0;
   if ( !self->rbuf ) {
     PyErr_NoMemory();
     return -1;
@@ -55,6 +59,52 @@ PyObject *response_updateDate(Response *self, PyObject *date) {
   p += 6;
   memcpy(p, d, l);
   Py_RETURN_NONE;
+}
+
+// Returns the header length
+int response_updateHeaders(Response *self) {
+  int ret = 145;
+
+  if ( self->mtype ) {
+    char *p = self->rbuf;
+    if      ( self->mtype == 1 ) { memcpy( p+117, resp_plain, 14 ); ret = 131; }
+    else if ( self->mtype == 2 ) { memcpy( p+117, resp_json,  20 ); ret = 137; }
+  } 
+/*
+  Py_ssize_t num;
+  if((num = PyDict_Size(self->headers)) < 0) return 0;
+
+  if(!num) goto skip_headers;
+
+  PyObject *name, *value;
+  Py_ssize_t pos = 0;
+
+  while (PyDict_Next(self->headers, &pos, &name, &value)) {
+    const char* k, v;
+    Py_ssize_t klen, vlen;
+
+    if(!(k = PyUnicode_AsUTF8AndSize(name, &name_len))) return 0;
+
+    memcpy(self->buffer + buffer_offset, cname, (size_t)name_len);
+    buffer_offset += (size_t)name_len;
+
+    *(self->buffer + buffer_offset) = ':';
+    buffer_offset++;
+    *(self->buffer + buffer_offset) = ' ';
+    buffer_offset++;
+
+    if(!(cvalue = PyUnicode_AsUTF8AndSize(value, &value_len)))
+      goto error;
+
+    memcpy(self->buffer + buffer_offset, cvalue, (size_t)value_len);
+    buffer_offset += (size_t)value_len;
+
+    CRLF
+  }
+
+skip_headers:
+*/
+  return ret;
 }
 
 PyObject* Response_get_headers(Response* self, void* closure)
