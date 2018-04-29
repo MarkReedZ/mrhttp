@@ -26,7 +26,10 @@ from mrhttp import Response
 from mrhttp import router
 
 from mrhttp import Client
-import aiomcache
+try:
+  import aiomcache
+except ImportError:
+  pass
 import mrjson
 #import mrmemcache
 
