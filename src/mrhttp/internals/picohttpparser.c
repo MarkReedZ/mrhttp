@@ -369,7 +369,7 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
 static __inline__ unsigned long long rdtsc(void)
 {
   unsigned long long int h, l;
-  asm volatile("rdtsc"  : "=d"(h), "=a" (l));
+  __asm__ volatile("rdtsc"  : "=d"(h), "=a" (l));
   return ((unsigned long long int)h << 32) | l;
      //__asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
      //return x;
