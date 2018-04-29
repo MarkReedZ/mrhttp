@@ -30,7 +30,11 @@ try:
   import aiomcache
 except ImportError:
   pass
-import mrjson
+try:
+  import mrjson as json
+except ImportError:
+  import ujson as json
+
 #import mrmemcache
 
 import uvloop
@@ -120,7 +124,7 @@ class Application:
           async def wrapper(*args, **kwds):
             try:
               uj = await self.mc.get(b"session_key")
-              self.request.user = mrjson.loads(uj)
+              self.request.user = json.loads(uj)
             except Exception as e:
               print(e)
             return func(*args, **kwds)
