@@ -30,6 +30,8 @@ int router_init (Router* self, void* protocol) {
   Route *rte = self->staticRoutes;
   for (int i = 0; i<l; i++,rte++ ) {
     r = PyList_GetItem(sroutes, i);
+    rte->iscoro  = false;
+    rte->session = false;
 
     PyObject *handler = PyLong_AsVoidPtr(PyDict_GetItemString( r, "handler" ));
     //if ( handler ) {
@@ -38,7 +40,7 @@ int router_init (Router* self, void* protocol) {
     rte->func = handler;
     if ( !(o = PyDict_GetItemString( r, "path" )) ) goto error;
     rte->path = PyUnicode_AsUTF8AndSize( o, &(rte->len) );
-    if ( Py_True == PyDict_GetItemString( r, "iscoro"  ) ) rte->iscoro = true;
+    if ( Py_True == PyDict_GetItemString( r, "iscoro"  ) ) rte->iscoro  = true;
     if ( Py_True == PyDict_GetItemString( r, "session" ) ) rte->session = true;
     o = PyDict_GetItemString( r, "type"  );
     if (o) rte->mtype = PyLong_AsLong(o);

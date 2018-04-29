@@ -1,5 +1,4 @@
 
-
 #include "perproc.h"
 
 #include "protocol.h"
@@ -314,7 +313,6 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   Py_INCREF(self->app);
 
   Route *r = router_getRoute( &self->router, self->request );
-  printf("Setting mtype %d\n", r->mtype);
   if ( r == NULL ) {
     // TODO pipeline..?
     protocol_write_error_response(self, 404,"Not Found","The requested page was not found");
@@ -329,7 +327,6 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   }
 
   if ( r->mtype ) {
-    printf("Setting mtype %d\n", r->mtype);
     self->response->mtype = r->mtype;
   }
 

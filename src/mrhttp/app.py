@@ -91,7 +91,6 @@ class Application:
       r["type"] = 0
       if type == "text": r["type"] = 1
       if type == "json": r["type"] = 2
-      print (r["type"])
       if "session" in tools: r["session"] = True
       # Static routes
       if not "{" in uri:
