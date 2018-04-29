@@ -1,0 +1,141 @@
+
+http1.1 pipelining
+copy request for pipeline
+
+test partial request / disconnects
+
+PyUnicode_Check in coro also needs handle bytes with warning + test
+
+jsonbundleq
+- take in json, queue up 10 then send to mrq
+  What happens if more don't come in. How to flush the Q
+
+?? ip = cherrypy.request.remote.ip
+Allow setting custom error pages 
+
+
+
+simple exception in page handler - make sure we print out exception for the user
+  Can we stop on the first exception and get rid of the rest
+     ValueError: Page handler did not return a string
+     The above exception was the direct cause of the following exception:
+  Add a test for this
+  def hello():
+    return app.request.cookies()
+
+Add memcache bench to tests
+
+
+Add cookies bench to tests
+benchmarks
+cookies
+@app.route('/')
+def test(request):
+    text =""
+
+    if request.cookies:
+        text += "\nCookies:\n"
+        for name, value in request.cookies.items():
+            text += "      {0}: {1}\n".format(name, value)
+
+    return response.text(text)
+wrk -t2 -c16 -d5s http://localhost:8080/misc -H "Cookie: last_write=9392597662310--zAhJdToJVGltZQ0ghhyAULskpAo6DW5hbm9fbnVtaQJ8AjoNbmFub19kZW5pBjoNc3VibWljcm8iB2NgOgtvZmZzZXRp%2FoCPOgl6b25lSSIIUFNUBjoGRVQ%3D--b761d36723502350717cef0d7d2e4858732264a2; __utmc=1; _octo=MH1.1.407662308.3472312943; tz=America%2FNew_York; user_session=zwHPFVsweWHORd6SuaeYcBEhqRW94NEIU0njSybiET7niLkO; __Host-user_session_same_site=ZwHPFVsweWHO234RF6SuaeYcBEhqRWo4NEIU0njSybiET7niLkO; logged_in=yes; dotcom_user=MarkReedZ; _gh_sess=R2I1bjhqdDZ0THNKckJqd3FlcFlRbjNJRUpiU084dU9UbVF4ZC81ZUsxVEgzMmhwSnBkWGR3TExzbmxuWnpoNDNkc1RUVXMr3kJmQ2svVHZBRkxZYkFUeXJIaTNraVV5YVM4anpCWnp4VG1XeD41d1J3Vm92U3laMkVXa1Nta2wySzFzUTZHNFVGMWtsN21Xc3FIQ1hERWF0RllNUUxpSFh6OUZJWS9TUzFzZjRCTjljQ1F3STgvYTA1SHc4O29QOGpEdzC2Y1hMbjlYbEtDU2pQOFJUZCEWmdrTUJtL3hpa3lPb244QVpHN1VjREpIL3pQcjhjZ2xTbVk4cXptODlVNlViWk1EY1l5dmVrQ1BrS2tRRmJYNTkvTjREOGVoV25aNmNBWCtreFM3MWs9LS1uZjBdfslJU1grUEsrOS9EaFpwaFRnPT0%3D--91cb95044f6813e14f1a4420826e27626c8e6666"
+
+sanic:
+Requests/sec:  18661.47
+
+Japronto:
+Running 5s test @ http://localhost:8080/misc
+  2 threads and 16 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency   515.22us  403.11us   2.25ms   79.40%
+    Req/Sec    17.30k     2.80k   21.10k    58.82%
+  175585 requests in 5.10s, 180.18MB read
+Requests/sec:  34431.93
+Transfer/sec:     35.33MB
+
+
+// clients
+async def open_connection(host=None, port=None, *,
+                          limit, loop=None,
+                          parser=None, **kwds):
+    # XXX: parser is not used (yet)
+    if loop is None:
+        loop = asyncio.get_event_loop()
+    reader = StreamReader(limit=limit, loop=loop)
+    protocol = asyncio.StreamReaderProtocol(reader, loop=loop)
+    transport, _ = await loop.create_connection(
+        lambda: protocol, host, port, **kwds)
+    writer = asyncio.StreamWriter(transport, protocol, reader, loop)
+    return reader, writer
+
+
+- Make the loop avail with thread pool executor?
+import asyncio
+import time
+from concurrent.futures import ProcessPoolExecutor
+
+def cpu_bound_operation(x):
+    time.sleep(x) # This is some operation that is CPU-bound
+
+@asyncio.coroutine
+def main():
+    # Run cpu_bound_operation in the ProcessPoolExecutor
+    # This will make your coroutine block, but won't block
+    # the event loop; other coroutines can run in meantime.
+    yield from loop.run_in_executor(p, cpu_bound_operation, 5)
+
+
+loop = asyncio.get_event_loop()
+p = ProcessPoolExecutor(2) # Create a ProcessPool with 2 processes
+loop.run_until_complete(main())
+
+
+Benchmark tests
+  await 
+  db threads
+
+
+
+We can do this all in C.  Just have a mysql query based on a json post
+
+    # Make sure you can't keep voting
+    ip = cherrypy.request.remote.ip
+    k = "laughvote"+ip+str(jid)
+    check = g.mc.get(k)
+    if check != None:
+      return "Already voted"
+    g.mc.set(k, 1, 2590000) #temp expire in 30 days
+
+    q = "update jokes set "
+    q += "ups=ups+1" if dir == "1" else "downs=downs+1"
+    q += " where id=%s"
+
+
+tutorials?
+Flask:
+https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world
+
+
+In a separate benchmark my string parsing code A is twice as fast as B, but when that code is run in a production system both A and B take the same amount of time.  
+
+According to rdtsc A takes 1700 cycles in the benchmark while in production A and B both take about 3400 cycles.  Is my benchmark broken? 
+
+    #define REQ3 \
+      "GET /r/python/ HTTP/1.1\r\n" \
+
+I'm simply defining 10 different strings then parsing all ten strings each loop.  Timing the benchmark shows me A is almost 2x as fast as B. 
+
+    for (i = 0; i < 100000; i++) {
+      ret = parse(REQ1, strlen(REQ1)-1)
+      // 2 ... 10
+
+A is my http parser and B is [picohttparser](https://github.com/h2o/picohttpparser).  B uses cmpestri to find the first ':' while HTTP headers have a small set of header values so my parser does things like if 'c' then
+
+    if ( buf[10] == ':' ) { // Connection: 
+    if ( buf[12] == ':' ) { // Content-Type:
+
+My code is a lot longer, but I do expect it to be faster? I use the same compile flags as in the benchmark. Branch prediction? I$? Do we lose these guys if we go off and other stuff before coming back?
+
+
+aiomcache:  Connection closed, response dropped

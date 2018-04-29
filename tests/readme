@@ -1,0 +1,6 @@
+
+set methods on pages
+test not returning a string from a page ( regular and coro )
+test pipeline coro
+
+redirect.py make tests url and code

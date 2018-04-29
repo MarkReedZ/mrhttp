@@ -1,0 +1,42 @@
+#pragma once
+
+#include <Python.h>
+#include <stdbool.h>
+
+
+#define RESPONSE_INITIAL_BUFFER_LEN 1024
+
+typedef struct {
+  PyObject_HEAD
+
+  char* rbuf;
+  unsigned long rbuf_size;
+  char *errbuf;
+  unsigned long errbuf_size;
+
+  //bool opaque;
+  //int minor_version;
+  //KEEP_ALIVE keep_alive;
+
+  //PyObject* code;
+  PyObject* mime_type;
+  //PyObject* body;
+  //PyObject* encoding;
+  PyObject* headers;
+  PyObject* cookies;
+
+  char* buffer;
+  size_t buffer_len;
+} Response;
+
+PyObject* Response_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
+int Response_init(Response* self, PyObject *args, PyObject *kwds);
+void Response_dealloc(Response* self);
+
+PyObject *response_updateDate(Response *self, PyObject *date);
+
+PyObject* Response_get_headers(Response* self, void* closure);
+PyObject* Response_get_cookies(Response* self, void* closure);
+
+PyObject* response_getRedirectResponse(Response *self, int code, char *url );
+PyObject* response_getErrorResponse(   Response *self, int code, char *reason, char *msg );
