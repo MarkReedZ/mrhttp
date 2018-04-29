@@ -367,13 +367,13 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
         Py_XDECREF(msg);
         return self;
       }
-      Py_DECREF(value);
     }
     PyErr_Clear();
     printf("Unhandled exception:\n");
     PyObject_Print( type, stdout, 0 ); printf("\n");
     PyObject_Print( value, stdout, 0 ); printf("\n");
    
+    Py_XDECREF(value);
     protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
     return self;
     //PyErr_Restore(type, value, traceback);
