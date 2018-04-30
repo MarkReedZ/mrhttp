@@ -128,6 +128,12 @@ void router_dealloc (Router* self) {
     Py_DECREF(r->func);
   }
   free (self->staticRoutes);
+  r = self->routes;
+  for (int i = 0; i<self->numRoutes; i++,r++ ) {
+    free(r->segs);
+    free(r->segLens);
+  }
+  free (self->routes);
 }
 
 // /foo/bar/ - staticRoutes

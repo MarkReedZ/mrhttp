@@ -40,6 +40,7 @@ PyObject * Protocol_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 void Protocol_dealloc(Protocol* self)
 {
+  parser_dealloc(&self->parser);
   router_dealloc(&self->router);
   Py_XDECREF(self->app);
   Py_XDECREF(self->transport);
@@ -64,7 +65,7 @@ int Protocol_init(Protocol* self, PyObject *args, PyObject *kw)
   if(!(socket_str = PyUnicode_FromString("socket"))) return -1;
 
   if ( !router_init(&self->router, self) ) return -1;
-  if ( !parser_init(&self->parser, self)   ) return -1;
+  if ( !parser_init(&self->parser, self) ) return -1;
 
   PyObject* loop = NULL;
   if(!(loop = PyObject_GetAttrString(self->app, "_loop"  ))) return -1;
@@ -126,7 +127,7 @@ PyObject* Protocol_connection_made(Protocol* self, PyObject* transport)
   if(!(self->writelines = PyObject_GetAttrString(transport, "writelines"))) return NULL;
 
   if(!(connections = PyObject_GetAttrString(self->app, "_connections"))) return NULL;
-  if(PySet_Add(connections, (PyObject*)self) == -1) return NULL;
+  if(PySet_Add(connections, (PyObject*)self) == -1) { Py_XDECREF(connections); return NULL; }
   DBG printf("connection made num %ld\n", PySet_GET_SIZE(connections));
   Py_XDECREF(connections);
 
@@ -164,6 +165,7 @@ PyObject* Protocol_eof_received(Protocol* self) {
 }
 PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
 {
+  Py_XDECREF(self->task_done);
   DBG printf("conn lost\n");
   self->closed = true;
 
@@ -258,7 +260,7 @@ Protocol* Protocol_on_headers(Protocol* self, char* method, size_t method_len,
 }
 
 PyObject *protocol_callPageHandler( Protocol* self, PyObject *func ) {
-  //PyObject* result = NULL;
+  PyObject* ret = NULL;
 
   int numArgs = self->request->numArgs;
   if ( numArgs ) {
@@ -275,19 +277,20 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func ) {
       //if (rc) return NULL;
     }
     switch (numArgs) {
-      case 1: return PyObject_CallFunctionObjArgs(func, args[0], NULL);
-      case 2: return PyObject_CallFunctionObjArgs(func, args[0], args[1], NULL);
-      case 3: return PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], NULL);
-      case 4: return PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], args[3], NULL);
-      case 5: return PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], args[3], args[4], NULL);
-      case 6: return PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], args[3], args[4], args[5], NULL);
+      case 1: ret = PyObject_CallFunctionObjArgs(func, args[0], NULL); break;
+      case 2: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], NULL); break;
+      case 3: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], NULL); break;
+      case 4: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], args[3], NULL); break;
+      case 5: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], args[3], args[4], NULL); break;
+      case 6: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], args[3], args[4], args[5], NULL); break;
     }
+    free(args);
     //return PyObject_CallFunctionObjArgs(func, args, NULL);
   } else {
     return PyObject_CallFunctionObjArgs(func, NULL);
   }
   //TODO num args > 6 or fail at start 
-  return NULL;
+  return ret;
 }
 
 Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
