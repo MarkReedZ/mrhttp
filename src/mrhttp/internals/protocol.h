@@ -86,10 +86,7 @@ static inline bool pipeline_is_task(PipelineRequest r)
 static inline void pipeline_DECREF(PipelineRequest r)
 {
     Py_DECREF(r.request);
-    // if not real task this was response,
-    // that was inside request that was already freed above
-    if(r.is_task)
-      Py_XDECREF(r.task);
+    if(r.is_task) Py_XDECREF(r.task);
 }
 
 static inline void pipeline_INCREF(PipelineRequest r)

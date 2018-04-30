@@ -61,6 +61,7 @@ class Application:
       self.static_routes = []
       self.routes = []
       self.config = {}
+      self.listeners = { "before_start":[]}
       self.mc = None
       
 
@@ -72,6 +73,22 @@ class Application:
 
     def prehandler(self):
       pass
+
+    # Decorator
+    def on(self, event):
+      """Call the decorated function on one of the following events:
+         ["before_start"]
+      """
+      def decorator(func):
+        self.listeners[event].append(func)
+        return func
+      return decorator
+
+    def trigger_event(self, event):
+      for func in self.listeners[event]:
+        result = func()
+        if inspect.isawaitable(result):
+          self.loop.run_until_complete(result)
 
     def add_route(self, handler, uri, methods=['GET'], tools=[],type="html"):
       if asyncio.iscoroutinefunction(handler) and router.is_pointless_coroutine(handler):
@@ -215,7 +232,8 @@ class Application:
         server_coro = loop.create_server( lambda: self._protocol_factory(self), sock=sock)
         server = loop.run_until_complete(server_coro)
 
-        self._appStart()
+        self.trigger_event("before_start")
+        self._appStart() # TODO remove
         #self.mc = Client("127.0.0.1",7000, self.loop)
         #z = loop.getLoopPtr()
         #print(hex(z))

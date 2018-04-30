@@ -63,10 +63,13 @@ PyObject* Request_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 void Request_dealloc(Request* self) {
-  Py_TYPE(self)->tp_free((PyObject*)self);
+
+  //TODO these two are not incref'd, but we don't create/destroy requests currently  
   Py_XDECREF(self->transport);
   Py_XDECREF(self->app);
+
   Py_XDECREF(self->py_headers);
+  Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 
@@ -338,6 +341,8 @@ static inline PyObject* parseCookies( char *buf, size_t buflen ) {
         if (!value) printf("!value\n");
         state = 0;
         PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
+        Py_XDECREF(key);
+        Py_XDECREF(value);
         //PyObject_Print( cookies, stdout, 0 ); printf("\n");
         buf+=1;
       }
@@ -361,6 +366,8 @@ static inline PyObject* parseCookies( char *buf, size_t buflen ) {
       state = 0;
       PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
       //PyObject_Print( cookies, stdout, 0 ); printf("\n");
+      Py_XDECREF(key);
+      Py_XDECREF(value);
     }
     else if ( *buf == '=' ) {
       key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error

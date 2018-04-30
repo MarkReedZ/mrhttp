@@ -11,8 +11,6 @@
 #include <string.h>
 //#include "response.h"
 
-static PyObject* socket_str;
-
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
@@ -42,6 +40,8 @@ void Protocol_dealloc(Protocol* self)
 {
   parser_dealloc(&self->parser);
   router_dealloc(&self->router);
+  Py_XDECREF(self->request);
+  Py_XDECREF(self->response);
   Py_XDECREF(self->app);
   Py_XDECREF(self->transport);
   Py_XDECREF(self->write);
@@ -62,8 +62,6 @@ int Protocol_init(Protocol* self, PyObject *args, PyObject *kw)
   if(!(self->request  = (Request*) PyObject_GetAttrString(self->app, "request" ))) return -1;
   if(!(self->response = (Response*)PyObject_GetAttrString(self->app, "response"))) return -1;
 
-  if(!(socket_str = PyUnicode_FromString("socket"))) return -1;
-
   if ( !router_init(&self->router, self) ) return -1;
   if ( !parser_init(&self->parser, self) ) return -1;
 
@@ -74,6 +72,7 @@ int Protocol_init(Protocol* self, PyObject *args, PyObject *kw)
   self->queue_end = 0;
   if(!(self->task_done   = PyObject_GetAttrString((PyObject*)self, "task_done"  ))) return -1;
   if(!(self->create_task = PyObject_GetAttrString(loop, "create_task"))) return -1;
+  Py_XDECREF(loop);
   return 0;
 }
 
@@ -165,7 +164,6 @@ PyObject* Protocol_eof_received(Protocol* self) {
 }
 PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
 {
-  Py_XDECREF(self->task_done);
   DBG printf("conn lost\n");
   self->closed = true;
 
@@ -179,7 +177,11 @@ PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
   Py_XDECREF(connections);
   if ( rc == -1 ) return NULL;
 
-  //if(!Pipeline_cancel(&self->pipeline)) goto error;
+  //if(!Protocol_pipeline_cancel(self)) return NULL;
+
+  //Py_XDECREF(self->write);
+  //Py_XDECREF(self->writelines);
+  Py_XDECREF(self->task_done); // TODO Why is this helping
 
   Py_RETURN_NONE;
 }
@@ -240,10 +242,10 @@ PyObject* pipeline_queue(Protocol* self, PipelineRequest r)
   
   goto finally;
   
-  error: 
+error: 
   result = NULL;
   
-  finally:
+finally:
   Py_XDECREF(add_done_callback);
   return result;
 } 
@@ -284,6 +286,9 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func ) {
       case 5: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], args[3], args[4], NULL); break;
       case 6: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], args[3], args[4], args[5], NULL); break;
     }
+    for (int i=0; i<numArgs; i++) { 
+      Py_DECREF(args[i]);
+    }
     free(args);
     //return PyObject_CallFunctionObjArgs(func, args, NULL);
   } else {
@@ -311,13 +316,13 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   request->body_len = body_len;
 
   request->transport = self->transport;
-  Py_INCREF(self->transport);
   request->app = self->app;
-  Py_INCREF(self->app);
+  //Py_INCREF(self->transport);//TODO non static req
+  //Py_INCREF(self->app);//TODO non static req
 
   Route *r = router_getRoute( &self->router, self->request );
   if ( r == NULL ) {
-    // TODO pipeline..?
+    // TODO pipeline..? Add test for coro then 404
     protocol_write_error_response(self, 404,"Not Found","The requested page was not found");
     return self;
   }
@@ -335,7 +340,8 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
 
   if ( r->iscoro || !PIPELINE_EMPTY(self)) {
     //self->gather.enabled = false;
-    // clone request
+    // TODO We have a single request, if we pipeline they all share. Setup test to break this
+    //      as we don't currently create separate requests
   }
 
 
@@ -383,10 +389,9 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   }
 
   if ( r->iscoro ) {
-    DBG printf("protocol request is a coroutine\n");
+    DBG printf("protocol - Request is a coroutine\n");
     PyObject *task;
     if(!(task = PyObject_CallFunctionObjArgs(self->create_task, result, NULL))) return NULL;
-    DBG printf("after create task\n");
     PyObject *ret = pipeline_queue(self, (PipelineRequest){true, self->request, task});
     Py_XDECREF(task);
     Py_DECREF(result);
@@ -401,7 +406,6 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     return self;
   }
 
-
   if ( PyBytes_Check( result ) ) {
     result = PyUnicode_FromEncodedObject( result, "utf-8", "strict" );
     printf("WARNING: Page handler should return a string. Bytes object returned from the page handler is being converted to unicode using utf-8\n");
@@ -415,7 +419,6 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   }
 
   if(!protocol_write_response(self, self->request, result)) goto error;
-
 
   Py_DECREF(result);
   return self;
@@ -472,6 +475,7 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
   PyObject *o;
   if(!(o = PyObject_CallFunctionObjArgs(self->write, bytes, NULL))) return NULL;
   Py_DECREF(o);
+  Py_DECREF(bytes);
 
 
   return self;
@@ -483,6 +487,7 @@ static inline Protocol* protocol_write_redirect_response(Protocol* self, int cod
   PyObject *o;
   if(!(o = PyObject_CallFunctionObjArgs(self->write, bytes, NULL))) return NULL;
   Py_DECREF(o);
+  Py_DECREF(bytes);
   return self;
 }
 
@@ -493,6 +498,7 @@ static inline Protocol* protocol_write_error_response(Protocol* self, int code, 
   PyObject *o;
   if(!(o = PyObject_CallFunctionObjArgs(self->write, bytes, NULL))) return NULL;
   Py_DECREF(o);
+  Py_DECREF(bytes);
   return self;
 }
 
