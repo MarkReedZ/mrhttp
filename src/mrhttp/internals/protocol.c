@@ -574,7 +574,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
       goto error;
   } else {
     // TODO: Send that to protocol_error
-    printf("Connection closed, response dropped\n");
+    //printf("Connection closed, response dropped\n");
   }
 
   // important: this breaks a cycle in case of an exception
