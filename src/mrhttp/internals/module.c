@@ -55,19 +55,15 @@ PyMODINIT_FUNC
 PyInit_internals(void)
 {
 
-  //PyObject *rmod = PyImport_ImportModule("mrhttp.request");
-  //if (!rmod) return NULL;
-  //PyObject *pyreq = PyObject_GetAttrString(rmod, "PyRequest");
-  //if (!pyreq) return NULL;
-  //printf("YAY got pyreq\n");
-  //PyObject_Print( pyreq, stdout, 0 ); printf("\n");
-  
-
   PyObject* m = NULL;
   if (PyType_Ready(&ProtocolType) < 0) return NULL;
   if (PyType_Ready(&RequestType) < 0) return NULL;
+  if (PyType_Ready(&RouterType) < 0) return NULL;
+  if (PyType_Ready(&MrhttpAppType) < 0) return NULL;
+  if (PyType_Ready(&MrqClientType) < 0) return NULL;
   if (PyType_Ready(&ResponseType) < 0) return NULL;
   if (PyType_Ready(&MemcachedProtocolType) < 0) return NULL;
+  if (PyType_Ready(&MrqProtocolType) < 0) return NULL;
 
   m = PyModule_Create(&internals_module);
   if(!m) return NULL;
@@ -76,14 +72,19 @@ PyInit_internals(void)
   PyModule_AddObject(m, "Protocol", (PyObject*)&ProtocolType);
   Py_INCREF(&RequestType);
   PyModule_AddObject(m, "Request", (PyObject*)&RequestType);
+  Py_INCREF(&RouterType);
+  PyModule_AddObject(m, "Router", (PyObject*)&RouterType);
+  Py_INCREF(&MrhttpAppType);
+  PyModule_AddObject(m, "MrhttpApp", (PyObject*)&MrhttpAppType);
   Py_INCREF(&ResponseType);
   PyModule_AddObject(m, "Response", (PyObject*)&ResponseType);
+  Py_INCREF(&MrqClientType);
+  PyModule_AddObject(m, "MrqClient", (PyObject*)&MrqClientType);
 
   Py_INCREF(&MemcachedProtocolType);
   PyModule_AddObject(m, "MemcachedProtocol", (PyObject*)&MemcachedProtocolType);
-
-  //Py_INCREF(&MatcherType);
-  //PyModule_AddObject(m, "Matcher", (PyObject*)&MatcherType);
+  Py_INCREF(&MrqProtocolType);
+  PyModule_AddObject(m, "MrqProtocol", (PyObject*)&MrqProtocolType);
 
   return m;
 }

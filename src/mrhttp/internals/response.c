@@ -15,8 +15,11 @@ PyObject* Response_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
   return (PyObject*)self;
 }
 
+//void setupResponseBuffer(char* buf) {
+  //char *p = buf;//self->rbuf;
 static void setupResponseBuffer(Response *self) {
   char *p = self->rbuf;
+
   char *s;
   // Update updateDate and write_response if this changes
   s = "HTTP/1.1 200 OK\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
@@ -24,6 +27,7 @@ static void setupResponseBuffer(Response *self) {
   s = "Server: MrHTTP/0.1.1\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
   s = "Date: Thu, 05 Apr 2018 22:54:19 GMT\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
   s = "Content-Type: text/html; charset=utf-8\r\n\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
+  //DBG_RESP printf("Init resp buffer:\n%.*s", (int)(p-buf), buf);
   DBG_RESP printf("Init resp buffer:\n%.*s", (int)(p-self->rbuf), self->rbuf);
 }
 
@@ -36,7 +40,6 @@ void Response_dealloc(Response* self) {
 
 int Response_init(Response* self, PyObject *args, PyObject* kw)
 {
-  DBG printf( "Response init\n");
   self->rbuf = malloc(128*1024);
   self->rbuf_size = 128*1024;
   self->errbuf = malloc(4*1024);

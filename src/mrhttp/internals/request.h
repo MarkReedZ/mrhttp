@@ -27,9 +27,11 @@ typedef struct {
   char *args[16];
   int argLens[16];
   int numArgs;
+  bool inprog;
 
   //char* session_key;
   //char* session_value;
+  void *route;
 
   PyObject* py_method;
   PyObject* transport;
@@ -39,6 +41,7 @@ typedef struct {
   PyObject* py_body;
 
 } Request;
+
 
 PyObject* Request_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 int Request_init(Request* self, PyObject *args, PyObject *kwds);

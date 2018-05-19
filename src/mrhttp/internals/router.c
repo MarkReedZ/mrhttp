@@ -1,13 +1,49 @@
+
+
+
 #include <Python.h>
 #include <stdbool.h>
-
-
-
 
 #include "common.h"
 #include "router.h"
 #include "request.h"
-#include "protocol.h"
+#include "module.h"
+
+PyObject* Router_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
+{
+  Router* self = NULL;
+  self = (Router*)type->tp_alloc(type, 0);
+  return (PyObject*)self;
+}
+
+void Router_dealloc(Router* self) {
+  if ( self->staticRoutes ) {
+    Route *r = self->staticRoutes;
+    for (int i = 0; i<self->numStaticRoutes; i++,r++ ) {
+      Py_DECREF(r->func);
+    }
+    free (self->staticRoutes);
+  }
+  if ( self->routes ) {
+    Route *r = self->routes;
+    for (int i = 0; i<self->numRoutes; i++,r++ ) {
+      free(r->segs);
+      free(r->segLens);
+    }
+    free (self->routes);
+  }
+  Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+
+int Router_init(Router* self, PyObject *args, PyObject *kwargs)
+{
+  self->staticRoutes = NULL;
+  self->routes       = NULL;
+  self->numStaticRoutes = 0;
+  self->numRoutes = 0;
+  return 0;
+}
 
 static int numInString( char c, char* s, int len ) {
   int ret = 0;
@@ -17,9 +53,12 @@ static int numInString( char c, char* s, int len ) {
   return ret;
 }
 
-int router_init (Router* self, void* protocol) {
-  DBG printf("router init\n");
-  PyObject *sroutes = PyObject_GetAttrString(((Protocol*)protocol)->app, "static_routes");    
+
+PyObject *Router_setupRoutes (Router* self) {
+  //PyObject *sroutes = self->pyStaticRoutes; //PyObject_GetAttrString((PyObject*)self, "static_routes");    
+  //PyObject *routes  = self->pyRoutes; //PyObject_GetAttrString((PyObject*)self, "routes");    
+  PyObject *sroutes = PyObject_GetAttrString((PyObject*)self, "static_routes");    
+  PyObject *routes  = PyObject_GetAttrString((PyObject*)self, "routes");    
   int l = PyList_Size(sroutes);
 
   self->staticRoutes = malloc( l * sizeof(Route) );
@@ -53,8 +92,8 @@ int router_init (Router* self, void* protocol) {
     Py_INCREF(rte->func);
   }
 
-  PyObject *routes = PyObject_GetAttrString(((Protocol*)protocol)->app, "routes");    
-  l = PyList_Size(routes);
+  if ( routes != NULL ) l = PyList_Size(routes);
+  else          l = 0;
   DBG printf(" len routes %d\n", l );
 
   self->routes = malloc( l * sizeof(Route) );
@@ -111,29 +150,14 @@ int router_init (Router* self, void* protocol) {
     
   }
 
-
-
-  return 1;
+  Py_RETURN_NONE;
 error:
   printf("ERROR in router init\n");
   //r["handler"] = id(handler)
   //r["iscoro"]  = asyncio.iscoroutinefunction(handler)
   //r["path"]    = uri
   //r["methods"] = methods
-  return 0;
-}
-void router_dealloc (Router* self) {
-  Route *r = self->staticRoutes;
-  for (int i = 0; i<self->numStaticRoutes; i++,r++ ) {
-    Py_DECREF(r->func);
-  }
-  free (self->staticRoutes);
-  r = self->routes;
-  for (int i = 0; i<self->numRoutes; i++,r++ ) {
-    free(r->segs);
-    free(r->segLens);
-  }
-  free (self->routes);
+  return NULL;
 }
 
 // /foo/bar/ - staticRoutes
@@ -146,6 +170,7 @@ Route* router_getRoute(Router* self, Request* request) {
  
   Route *r = self->staticRoutes;
   for (int i = 0; i<self->numStaticRoutes; i++,r++ ) {
+    DBG printf("request path %.*s\n", (int)request->path_len, request->path);
     if ( plen == r->len && !memcmp(r->path, request->path, plen) ) {
       DBG printf("router found path %.*s == %.*s\n", (int)r->len, r->path, (int)request->path_len, request->path);
       return r;

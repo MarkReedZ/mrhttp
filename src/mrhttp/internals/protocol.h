@@ -10,6 +10,8 @@
 
 //MrMemcachedProtocol_CAPI
 
+
+
 typedef struct {
   bool is_task;
   Request* request;
@@ -29,16 +31,21 @@ typedef struct {
   // Http 1.1 Pipeline 
   PyObject* create_task;
   PyObject* task_done; 
-  PipelineRequest queue[10];
+  PipelineRequest queue[50];
   size_t queue_start;
   size_t queue_end;
 
   Request *request;
   Response *response;
-  Router router;
+  Router *router;
   Parser  parser;
   MemcachedProtocol *memprotocol;
 } Protocol;
+
+typedef struct {
+  Protocol *protocol;
+  Request  *request;
+} MemcachedCallbackData;
 
 PyObject * Protocol_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 int Protocol_init(Protocol* self, PyObject *args, PyObject *kw);
@@ -58,6 +65,9 @@ Protocol* Protocol_on_headers(Protocol* self, char* method, size_t method_len,
                               void* headers, size_t num_headers);
 Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len);
 Protocol* Protocol_on_error(Protocol* self, PyObject*);
+
+Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r);
+
 
 static inline Protocol* protocol_write_response(Protocol* self, Request *req, PyObject* resp);
 static inline Protocol* protocol_write_redirect_response(Protocol* self, int code, char *url);

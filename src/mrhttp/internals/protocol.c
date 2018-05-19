@@ -6,6 +6,8 @@
 #include "module.h"
 #include "request.h"
 #include "response.h"
+#include "router.h"
+
 #include "Python.h"
 #include <errno.h>
 #include <string.h>
@@ -13,6 +15,14 @@
 
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+
+void printErr() {
+  PyObject *type, *value, *traceback;
+  PyErr_Fetch(&type, &value, &traceback);
+  printf("Unhandled exception :\n");
+  PyObject_Print( type, stdout, 0 ); printf("\n");
+  PyObject_Print( value, stdout, 0 ); printf("\n");
+}
 
 PyObject * Protocol_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -39,9 +49,9 @@ PyObject * Protocol_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 void Protocol_dealloc(Protocol* self)
 {
   parser_dealloc(&self->parser);
-  router_dealloc(&self->router);
   Py_XDECREF(self->request);
   Py_XDECREF(self->response);
+  Py_XDECREF(self->router);
   Py_XDECREF(self->app);
   Py_XDECREF(self->transport);
   Py_XDECREF(self->write);
@@ -59,10 +69,11 @@ int Protocol_init(Protocol* self, PyObject *args, PyObject *kw)
   if(!PyArg_ParseTuple(args, "O", &self->app)) return -1;
   Py_INCREF(self->app);
 
+  //self->request = MrhttpApp_get_request( (MrhttpApp*)self->app );
   if(!(self->request  = (Request*) PyObject_GetAttrString(self->app, "request" ))) return -1;
   if(!(self->response = (Response*)PyObject_GetAttrString(self->app, "response"))) return -1;
+  if(!(self->router   = (Router*)  PyObject_GetAttrString(self->app, "router"  ))) return -1;
 
-  if ( !router_init(&self->router, self) ) return -1;
   if ( !parser_init(&self->parser, self) ) return -1;
 
   PyObject* loop = NULL;
@@ -130,13 +141,19 @@ PyObject* Protocol_connection_made(Protocol* self, PyObject* transport)
   DBG printf("connection made num %ld\n", PySet_GET_SIZE(connections));
   Py_XDECREF(connections);
 
-  //PyObject *mc = PyObject_GetAttrString(self->app, "mc");
-  //if ( !mc ) return NULL;
-  //self->memprotocol = (MemcachedProtocol*)PyObject_GetAttrString(mc, "conn");
-  //if(!self->memprotocol) {
-    //printf("DELME no mem proto \n");
-    //return NULL;
-  //}
+
+  // TODO only check if session enabled
+  PyObject *mc = PyObject_GetAttrString(self->app, "mmc");
+  if ( mc ) {
+    PyObject *getconn = PyObject_GetAttrString(mc, "getConnection");
+    self->memprotocol = (MemcachedProtocol*)PyObject_CallFunctionObjArgs(getconn, NULL);
+    if(!self->memprotocol) {
+      printf("TODO no mem proto \n");
+      return NULL;
+    }
+  } else {
+    PyErr_Clear();
+  }
 
   self->closed = false;
   Py_RETURN_NONE;
@@ -265,6 +282,7 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func ) {
   PyObject* ret = NULL;
 
   int numArgs = self->request->numArgs;
+  DBG printf("num args %d\n",numArgs);
   if ( numArgs ) {
     //PyObject *args = PyTuple_New( numArgs );
     PyObject **args = malloc( numArgs * sizeof(PyObject*) );
@@ -292,16 +310,23 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func ) {
     free(args);
     //return PyObject_CallFunctionObjArgs(func, args, NULL);
   } else {
+    DBG printf("num args is 0 so just call func %p\n",func);
     return PyObject_CallFunctionObjArgs(func, NULL);
   }
-  //TODO num args > 6 or fail at start 
+  //TODO num args > 6 fail at start 
   return ret;
+}
+
+void Protocol_on_memcached_reply( MemcachedCallbackData *mcd ) {
+  //printf("YAY saw reply\n");
+  Protocol *self = (Protocol*)mcd->protocol;
+  Request  *req  = mcd->request;
+  //free(mcd);
+  Protocol_handle_request( self, req, req->route );
 }
 
 Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   DBG printf("protocol - on body\n");
-
-  PyObject* result = NULL;
 
   //Protocol* result = self;
   //PyObject* response_text = NULL;
@@ -320,7 +345,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   //Py_INCREF(self->transport);//TODO non static req
   //Py_INCREF(self->app);//TODO non static req
 
-  Route *r = router_getRoute( &self->router, self->request );
+  Route *r = router_getRoute( self->router, self->request );
   if ( r == NULL ) {
     // TODO pipeline..? Add test for coro then 404
     protocol_write_error_response(self, 404,"Not Found","The requested page was not found");
@@ -331,8 +356,28 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   // from the backend.
   if ( r->session ) {
     DBG printf("Route requires a session\n"); 
+
+    self->request->route = r;
     //TODO
+    // We need to call asyncGet and save this request so when our CB is called we continue processing
+    MemcachedCallbackData *mcd = malloc( sizeof(MemcachedCallbackData));
+    mcd->protocol = self;
+    mcd->request  = self->request;
+    MemcachedProtocol_asyncGet( self->memprotocol, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+    return self;
+
+    //?  PyObject *ret = pipeline_queue(self, (PipelineRequest){true, self->request, task});
   }
+  // TODO for memcached
+  //  Need to set app->request or pass to page handlers
+  //  memcached CB needs to set the user based on the returned json  see aiomcache wrapper
+
+  return Protocol_handle_request( self, self->request, r );
+}
+
+Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
+  PyObject* result = NULL;
+  DBG printf("protocol handle request\n");
 
   if ( r->mtype ) {
     self->response->mtype = r->mtype;
@@ -340,18 +385,15 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
 
   if ( r->iscoro || !PIPELINE_EMPTY(self)) {
     //self->gather.enabled = false;
-    // TODO We have a single request, if we pipeline they all share. Setup test to break this
-    //      as we don't currently create separate requests
+    // TODO We have a single request object so if we pipeline they all share it. 
+    // Setup a test to break this as we don't currently create separate requests
   }
-
 
   if(!(result = protocol_callPageHandler(self, r->func)) ) {
   //if(!(result = PyObject_CallFunctionObjArgs(r->func, NULL))) {
     DBG printf("Page handler call failed with an exception\n");
     PyObject *type, *value, *traceback;
     PyErr_Fetch(&type, &value, &traceback);
-    Py_XDECREF(traceback);
-    Py_XDECREF(type);
     if (value) {
       PyObject *msg = PyObject_GetAttrString(value, "_message");
 
@@ -364,6 +406,8 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
         if(!protocol_write_error_response(self, code, PyUnicode_AsUTF8(reason), PyUnicode_AsUTF8(msg))) return NULL;
         Py_XDECREF(msg);
         Py_XDECREF(reason);
+        Py_XDECREF(traceback);
+        Py_XDECREF(type);
         return self;
       }
       // Check for HTTPRedirect
@@ -374,14 +418,39 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
         PyErr_Clear();
         if(!protocol_write_redirect_response(self, code, PyUnicode_AsUTF8(msg))) return NULL;
         Py_XDECREF(msg);
+        Py_XDECREF(traceback);
+        Py_XDECREF(type);
         return self;
       }
     }
     PyErr_Clear();
-    printf("Unhandled exception:\n");
+    printf("Unhandled exception :\n");
     PyObject_Print( type, stdout, 0 ); printf("\n");
     PyObject_Print( value, stdout, 0 ); printf("\n");
+    //PyObject_Print( traceback, stdout, 0 ); printf("\n");
+
+/*
+#include "frameobject.h"
+    PyThreadState *tstate = PyThreadState_GET();
+    if (NULL != tstate && NULL != tstate->frame) {
+      PyFrameObject *frame = tstate->frame;
+
+      printf("Python stack trace:\n");
+      while (NULL != frame) {
+        // int line = frame->f_lineno;
+         //frame->f_lineno will not always return the correct line number
+         //you need to call PyCode_Addr2Line().
+        int line = PyCode_Addr2Line(frame->f_code, frame->f_lasti);
+        const char *filename = PyUnicode_AsUTF8AndSize(frame->f_code->co_filename,NULL);
+        const char *funcname = PyUnicode_AsUTF8AndSize(frame->f_code->co_name,NULL);
+        printf("    %s(%d): %s\n", filename, line, funcname);
+        frame = frame->f_back;
+      }
+    }
+*/
    
+    Py_XDECREF(traceback);
+    Py_XDECREF(type);
     Py_XDECREF(value);
     protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
     return self;
@@ -392,7 +461,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     DBG printf("protocol - Request is a coroutine\n");
     PyObject *task;
     if(!(task = PyObject_CallFunctionObjArgs(self->create_task, result, NULL))) return NULL;
-    PyObject *ret = pipeline_queue(self, (PipelineRequest){true, self->request, task});
+    PyObject *ret = pipeline_queue(self, (PipelineRequest){true, request, task});
     Py_XDECREF(task);
     Py_DECREF(result);
     if ( !ret ) return NULL;
@@ -401,7 +470,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
 
   if(!PIPELINE_EMPTY(self))
   {
-    if(!pipeline_queue(self, (PipelineRequest){false, self->request, result})) goto error;
+    if(!pipeline_queue(self, (PipelineRequest){false, request, result})) goto error;
     Py_DECREF(result);
     return self;
   }
@@ -418,7 +487,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     goto error;
   }
 
-  if(!protocol_write_response(self, self->request, result)) goto error;
+  if(!protocol_write_response(self, request, result)) goto error;
 
   Py_DECREF(result);
   return self;
@@ -477,7 +546,7 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
   Py_DECREF(o);
   Py_DECREF(bytes);
 
-
+  req->inprog = false;
   return self;
 }
 

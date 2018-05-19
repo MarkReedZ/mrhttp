@@ -5,7 +5,10 @@ m1 = Extension(
     'mrhttp.internals',
      sources = [ 
       './src/mrhttp/internals/module.c',
+      './src/mrhttp/internals/app.c',
       './src/mrhttp/internals/protocol.c',
+      './src/mrhttp/internals/mrqprotocol.c',
+      './src/mrhttp/internals/mrqclient.c',
       './src/mrhttp/internals/memprotocol.c',
       './src/mrhttp/internals/parser.c',
       './src/mrhttp/internals/request.c',

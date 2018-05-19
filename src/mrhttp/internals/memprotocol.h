@@ -3,6 +3,13 @@
 #include "Python.h"
 #include <stdbool.h>
 
+typedef void (*tMemcachedCallback)(void*);
+
+typedef struct {
+  void *connection;
+  tMemcachedCallback *cb;
+} MemcachedRequest;
+
 typedef struct {
   PyObject_HEAD
   PyObject* app;
@@ -11,6 +18,10 @@ typedef struct {
   PyObject* transport;
   PyObject* write;
   PyObject* client;
+
+  MemcachedRequest queue[10];
+  int queue_start;
+  int queue_end;
 
 } MemcachedProtocol;
 

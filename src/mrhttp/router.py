@@ -1,6 +1,7 @@
 import dis
 import functools
 import types
+import mrhttp, asyncio, inspect
 
 FLAG_COROUTINE = 128
 
@@ -55,3 +56,48 @@ def coroutine_to_func(f):
     g.__kwdefaults__ = f.__kwdefaults__
 
     return g
+
+class Router(mrhttp.CRouter):
+
+  def __init__(self):
+    self.routes = []
+    self.static_routes = []
+    super().__init__()
+
+  def finalize_routes(self):
+    self.routes.sort(key=lambda x: x["sortlen"],reverse=True)
+
+  def add_route(self, handler, uri, methods=['GET'], tools=[],type="html"):
+    if asyncio.iscoroutinefunction(handler) and is_pointless_coroutine(handler):
+      handler = coroutine_to_func(handler)
+
+    numArgs = uri.count("{}")
+    if numArgs != len(inspect.signature(handler).parameters):
+      print( "ERROR: Number of function args {} not equal to route args {}".format( numArgs, len(inspect.signature(handler).parameters)) )
+      print( inspect.signature(handler), " vs ", uri )
+      raise ValueError("Number of route arguments not equal to function arguments")
+    r = {}
+    r["handler"] = id(handler)
+    r["iscoro"]  = asyncio.iscoroutinefunction(handler)
+    r["path"]    = uri
+    r["methods"] = methods
+    r["sortlen"] = len(uri.replace("{}",""))
+    r["type"] = 0
+    if type == "text": r["type"] = 1
+    if type == "json": r["type"] = 2
+    if "session" in tools: r["session"] = True
+    # Static routes
+    if not "{" in uri:
+      self.static_routes.append( r )
+    else:
+      spl = uri.split("/")[1:]
+      if uri.endswith("/"):
+        spl = uri.split("/")[1:-1]
+      seglens = []
+      segs = []
+      for s in spl:
+        segs.append( s.encode("utf-8") )
+        seglens.append( len(s) )
+      r["segs"] = segs
+      r["num_segs"] = len(segs)
+      self.routes.append( r )

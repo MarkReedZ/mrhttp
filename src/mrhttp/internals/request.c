@@ -1,4 +1,5 @@
 
+
 #include <stddef.h>
 #include <sys/param.h>
 #include <strings.h>
@@ -76,6 +77,7 @@ void Request_dealloc(Request* self) {
 int Request_init(Request* self, PyObject *args, PyObject* kw)
 {
   DBG printf( "Request_init\n");
+  self->inprog = false;
   return 0;
 }
 
@@ -329,7 +331,7 @@ static inline PyObject* parseCookies( char *buf, size_t buflen ) {
       // TODO write += found;  buf-last?
       //printf("fnd: %.*s\n", end-path, path);
       if ( *buf == '=' ) {
-        key = PyUnicode_FromStringAndSize(last, found); //TODO error
+        key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
         if (!key) printf("!key\n");
         state = 1;
         buf+=1;
@@ -337,7 +339,7 @@ static inline PyObject* parseCookies( char *buf, size_t buflen ) {
       } 
       else if ( *buf == ';' ) {
         if ( state == 0 ) key  = PyUnicode_FromString("");
-        value = PyUnicode_FromStringAndSize(last, found); //TODO error
+        value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
         if (!value) printf("!value\n");
         state = 0;
         PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;

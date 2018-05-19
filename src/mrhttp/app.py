@@ -15,7 +15,6 @@ from functools import partial
 from wsgiref.handlers import format_date_time
 from functools import wraps
 import inspect, copy
-from inspect import signature
 #from inspect import signature #getmodulename, isawaitable, signature, stack
 #from prof import profiler_start,profiler_stop
 
@@ -26,6 +25,7 @@ from mrhttp import Response
 from mrhttp import router
 
 from mrhttp import Client
+from mrhttp import MrqClient
 try:
   import aiomcache
 except ImportError:
@@ -44,7 +44,7 @@ signames = {
     int(v): v.name for k, v in signal.__dict__.items()
     if isinstance(v, signal.Signals)}
 
-class Application:
+class Application(mrhttp.CApp):
     def __init__(self, *, reaper_settings=None, log_request=None,
                  protocol_factory=None, debug=False):
       self._loop = None
@@ -56,13 +56,14 @@ class Application:
       self._protocol_factory = protocol_factory or Protocol
       self._debug = debug
       self.request = Request()
+      self.requests = [Request() for x in range(32)]
       self.response = Response()
+      self.router = router.Router()
       self.tasks = []
-      self.static_routes = []
-      self.routes = []
       self.config = {}
       self.listeners = { "before_start":[]}
       self.mc = None
+      self.uses_session = False
       
 
     @property
@@ -90,65 +91,29 @@ class Application:
         if inspect.isawaitable(result):
           self.loop.run_until_complete(result)
 
-    def add_route(self, handler, uri, methods=['GET'], tools=[],type="html"):
-      if asyncio.iscoroutinefunction(handler) and router.is_pointless_coroutine(handler):
-        handler = router.coroutine_to_func(handler)
-
-      numArgs = uri.count("{}")
-      if numArgs != len(signature(handler).parameters):
-        print( "ERROR: Number of function args {} not equal to route args {}".format( numArgs, len(signature(handler).parameters)) )
-        print( signature(handler), " vs ", uri )
-        raise ValueError("Number of route arguments not equal to function arguments")
-      r = {} 
-      r["handler"] = id(handler)
-      r["iscoro"]  = asyncio.iscoroutinefunction(handler)
-      r["path"]    = uri
-      r["methods"] = methods
-      r["sortlen"] = len(uri.replace("{}",""))
-      r["type"] = 0
-      if type == "text": r["type"] = 1
-      if type == "json": r["type"] = 2
-      if "session" in tools: r["session"] = True
-      # Static routes
-      if not "{" in uri:
-        self.static_routes.append( r )
-      else:
-        spl = uri.split("/")[1:]
-        if uri.endswith("/"):
-          spl = uri.split("/")[1:-1]
-        seglens = []
-        segs = []
-        for s in spl:
-          segs.append( s.encode("utf-8") )
-          seglens.append( len(s) )
-        r["segs"] = segs        
-        r["num_segs"] = len(segs)
-        #if uri.startswith("/{"):
-        self.routes.append( r )
-        #else:
-          #r["prefix"] = uri.split("{")[0]
-          #r["prefix_len"] = len(r["prefix"])
-          #self.prefix_routes.append( r )
-
-
     # Decorator
     def route(self, uri, methods=["GET"], tools=[], type="html"):
+      if "session" in tools:
+        self.uses_session = True
       if not uri.startswith('/'): uri = '/' + uri
       def response(func): 
-        if "session" in tools:
-          @wraps(func)
-          async def wrapper(*args, **kwds):
-            try:
-              uj = await self.mc.get(b"session_key")
-              self.request.user = json.loads(uj)
-            except Exception as e:
-              print(e)
-            return func(*args, **kwds)
-          self.add_route( wrapper, uri, methods, tools, type )
-          return wrapper
-        else:
-          self.add_route( func, uri, methods, tools, type )
-          return func
+        #if "ssession" in tools:
+          #@wraps(func)
+          #async def wrapper(*args, **kwds):
+            #try:
+              #k = self.request.cookies["key"]
+              #uj = await self.mc.get(k.encode("latin1"))#b"session_key")
+              #if uj:
+                #self.request.user = json.loads(uj)
+            #except Exception as e:
+              #print(e)
+            #return func(*args, **kwds)
+          #self.router.add_route( wrapper, uri, methods, tools, type )
+          ##self.router.add_route( wrapper, uri, methods, [], type )
+          #return wrapper
+        #else:
+        self.router.add_route( func, uri, methods, tools, type )
+        return func
       return response
 
 
@@ -232,9 +197,15 @@ class Application:
         server_coro = loop.create_server( lambda: self._protocol_factory(self), sock=sock)
         server = loop.run_until_complete(server_coro)
 
+        self.cinit()
+        self.router.setupRoutes()
+        self.router.finalize_routes()
         self.trigger_event("before_start")
         self._appStart() # TODO remove
-        #self.mc = Client("127.0.0.1",7000, self.loop)
+
+        #self.mmc = Client("127.0.0.1",7000, self.loop)
+        if self.uses_session:
+          self.mmc = Client( [("127.0.0.1",11211)], self.loop)
         #z = loop.getLoopPtr()
         #print(hex(z))
         #mrhttp.init(z)
@@ -280,7 +251,11 @@ class Application:
     def _appStart(self):
       #self.loop.call_soon(self.updateDateString)
       if "memcache" in self.config:
-        self.mc = aiomcache.Client(self.config["memcache"][0], self.config["memcache"][1], loop=self.loop, pool_size=4)
+        try:
+          self.mc = aiomcache.Client(self.config["memcache"][0], self.config["memcache"][1], loop=self.loop, pool_size=1)
+        except:
+          print("aiomcache must be installed to use sessions")
+          exit(0)
       self.appStart()
 
 
@@ -294,7 +269,6 @@ class Application:
         sock.bind((host, port))
         os.set_inheritable(sock.fileno(), True)
 
-        self.routes.sort(key=lambda x: x["sortlen"],reverse=True)
 
         workers = set()
 
