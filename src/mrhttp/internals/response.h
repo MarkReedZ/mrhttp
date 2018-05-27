@@ -44,4 +44,5 @@ PyObject* Response_get_cookies(Response* self, void* closure);
 PyObject* response_getRedirectResponse(Response *self, int code, char *url );
 PyObject* response_getErrorResponse(   Response *self, int code, char *reason, char *msg );
 
-//void setupResponseBuffer(char* buf);
+void setupResponseBuffer(char* buf);
+char *getResponseBuffer();

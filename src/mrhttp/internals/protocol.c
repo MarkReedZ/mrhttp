@@ -1,6 +1,5 @@
 
 #include "perproc.h"
-
 #include "protocol.h"
 #include "common.h"
 #include "module.h"
@@ -49,7 +48,7 @@ PyObject * Protocol_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 void Protocol_dealloc(Protocol* self)
 {
   parser_dealloc(&self->parser);
-  Py_XDECREF(self->request);
+  //Py_XDECREF(self->request);
   Py_XDECREF(self->response);
   Py_XDECREF(self->router);
   Py_XDECREF(self->app);
@@ -69,8 +68,8 @@ int Protocol_init(Protocol* self, PyObject *args, PyObject *kw)
   if(!PyArg_ParseTuple(args, "O", &self->app)) return -1;
   Py_INCREF(self->app);
 
-  //self->request = MrhttpApp_get_request( (MrhttpApp*)self->app );
-  if(!(self->request  = (Request*) PyObject_GetAttrString(self->app, "request" ))) return -1;
+  self->request = MrhttpApp_get_request( (MrhttpApp*)self->app );
+  //if(!(self->request  = (Request*) PyObject_GetAttrString(self->app, "request" ))) return -1;
   if(!(self->response = (Response*)PyObject_GetAttrString(self->app, "response"))) return -1;
   if(!(self->router   = (Router*)  PyObject_GetAttrString(self->app, "router"  ))) return -1;
 
@@ -183,6 +182,7 @@ PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
 {
   DBG printf("conn lost\n");
   self->closed = true;
+  //MrhttpApp_release_request( (MrhttpApp*)self->app, self->request );
 
   PyObject* connections = NULL;
 
@@ -216,11 +216,10 @@ PyObject* Protocol_data_received(Protocol* self, PyObject* data)
 //if self._header_fragment == b'Content-Length' \ and int(value) > self.request_max_size:
                 //exception = PayloadTooLarge('Payload Too Large')
 
-  if(parser_data_received(&self->parser, data) == -1) {
+  if(parser_data_received(&self->parser, data, self->request) == -1) {
     //  TODO Write a bad request 400 response
     return NULL; 
   }
-
 
   Py_RETURN_NONE;
 }
@@ -274,14 +273,14 @@ Protocol* Protocol_on_headers(Protocol* self, char* method, size_t method_len,
   DBG printf("on headers\n");
   Protocol* result = self;
   request_load( self->request, method, method_len, path, path_len, minor_version, headers, num_headers);
-  DBG printf("path >%.*s<\n", (int)self->request->path_len, self->request->path );
+  //DBG printf("path >%.*s<\n", (int)self->request->path_len, self->request->path );
   return result;
 }
 
-PyObject *protocol_callPageHandler( Protocol* self, PyObject *func ) {
+PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *request ) {
   PyObject* ret = NULL;
 
-  int numArgs = self->request->numArgs;
+  int numArgs = request->numArgs;
   DBG printf("num args %d\n",numArgs);
   if ( numArgs ) {
     //PyObject *args = PyTuple_New( numArgs );
@@ -292,17 +291,18 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func ) {
       //printf(" arg%d %.*s\n", i, self->request->argLens[i], self->request->args[i] );
 
       //PyObject *arg = PyUnicode_FromStringAndSize( self->request->args[i],  self->request->argLens[i] );
-      args[i] = PyUnicode_FromStringAndSize( self->request->args[i],  self->request->argLens[i] );
+      args[i] = PyUnicode_FromStringAndSize( request->args[i],  request->argLens[i] );
+      //TODO error?
       //int rc = PyTuple_SetItem( args, i, arg );
       //if (rc) return NULL;
     }
     switch (numArgs) {
-      case 1: ret = PyObject_CallFunctionObjArgs(func, args[0], NULL); break;
-      case 2: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], NULL); break;
-      case 3: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], NULL); break;
-      case 4: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], args[3], NULL); break;
-      case 5: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], args[3], args[4], NULL); break;
-      case 6: ret = PyObject_CallFunctionObjArgs(func, args[0], args[1], args[2], args[3], args[4], args[5], NULL); break;
+      case 1: ret = PyObject_CallFunctionObjArgs(func, request, args[0], NULL); break;
+      case 2: ret = PyObject_CallFunctionObjArgs(func, request, args[0], args[1], NULL); break;
+      case 3: ret = PyObject_CallFunctionObjArgs(func, request, args[0], args[1], args[2], NULL); break;
+      case 4: ret = PyObject_CallFunctionObjArgs(func, request, args[0], args[1], args[2], args[3], NULL); break;
+      case 5: ret = PyObject_CallFunctionObjArgs(func, request, args[0], args[1], args[2], args[3], args[4], NULL); break;
+      case 6: ret = PyObject_CallFunctionObjArgs(func, request, args[0], args[1], args[2], args[3], args[4], args[5], NULL); break;
     }
     for (int i=0; i<numArgs; i++) { 
       Py_DECREF(args[i]);
@@ -311,18 +311,24 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func ) {
     //return PyObject_CallFunctionObjArgs(func, args, NULL);
   } else {
     DBG printf("num args is 0 so just call func %p\n",func);
-    return PyObject_CallFunctionObjArgs(func, NULL);
+    return PyObject_CallFunctionObjArgs(func, request, NULL);
   }
   //TODO num args > 6 fail at start 
   return ret;
 }
 
-void Protocol_on_memcached_reply( MemcachedCallbackData *mcd ) {
-  //printf("YAY saw reply\n");
+void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data ) {
   Protocol *self = (Protocol*)mcd->protocol;
   Request  *req  = mcd->request;
-  //free(mcd);
-  Protocol_handle_request( self, req, req->route );
+  //printf("DELME mcd protocl on reply %p\n",self);
+  free(mcd);
+  //printf("DELME before handle req\n");
+  if ( !self->closed ) {
+    Protocol_handle_request( self, req, req->route );
+  } else {
+    printf("DELME closed?\n");
+  }
+  Py_DECREF(self);
 }
 
 Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
@@ -341,30 +347,38 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   request->body_len = body_len;
 
   request->transport = self->transport;
-  request->app = self->app;
+  request->app = self->app; //TODO need this?
   //Py_INCREF(self->transport);//TODO non static req
   //Py_INCREF(self->app);//TODO non static req
 
   Route *r = router_getRoute( self->router, self->request );
   if ( r == NULL ) {
-    // TODO pipeline..? Add test for coro then 404
+    // TODO If the pipeline isn't empty...
     protocol_write_error_response(self, 404,"Not Found","The requested page was not found");
     return self;
   }
 
   // If the route requires a session we need to check for a cookie session id, and fetch the session
-  // from the backend.
   if ( r->session ) {
     DBG printf("Route requires a session\n"); 
 
     self->request->route = r;
-    //TODO
-    // We need to call asyncGet and save this request so when our CB is called we continue processing
-    MemcachedCallbackData *mcd = malloc( sizeof(MemcachedCallbackData));
-    mcd->protocol = self;
-    mcd->request  = self->request;
-    MemcachedProtocol_asyncGet( self->memprotocol, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
-    return self;
+    Request_load_cookies(self->request);
+
+    // If we found a session id in the cookies lets fetch it
+    if ( self->request->session_id != NULL ) {
+
+      // We need to call asyncGet and save this request so when our CB is called we continue processing
+      MemcachedCallbackData *mcd = malloc( sizeof(MemcachedCallbackData));
+      mcd->protocol = self;
+      Py_INCREF(self);
+      mcd->request  = self->request;
+      MemcachedProtocol_asyncGet( self->memprotocol, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+      // Get a new request object so we don't overwrite this one while waiting for the reply
+      self->request = MrhttpApp_get_request( (MrhttpApp*)self->app );
+      return self;
+
+    }
 
     //?  PyObject *ret = pipeline_queue(self, (PipelineRequest){true, self->request, task});
   }
@@ -385,15 +399,16 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
 
   if ( r->iscoro || !PIPELINE_EMPTY(self)) {
     //self->gather.enabled = false;
-    // TODO We have a single request object so if we pipeline they all share it. 
-    // Setup a test to break this as we don't currently create separate requests
+    // If we can't finish now save this request by grabbing a new free request if we haven't already done so
+    if ( self->request == request ) self->request = MrhttpApp_get_request( (MrhttpApp*)self->app );
   }
 
-  if(!(result = protocol_callPageHandler(self, r->func)) ) {
+  if(!(result = protocol_callPageHandler(self, r->func, request)) ) {
   //if(!(result = PyObject_CallFunctionObjArgs(r->func, NULL))) {
     DBG printf("Page handler call failed with an exception\n");
     PyObject *type, *value, *traceback;
     PyErr_Fetch(&type, &value, &traceback);
+    PyErr_NormalizeException(&type, &value, &traceback);
     if (value) {
       PyObject *msg = PyObject_GetAttrString(value, "_message");
 
@@ -423,10 +438,10 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
         return self;
       }
     }
-    PyErr_Clear();
     printf("Unhandled exception :\n");
     PyObject_Print( type, stdout, 0 ); printf("\n");
-    PyObject_Print( value, stdout, 0 ); printf("\n");
+    if ( value ) { PyObject_Print( value, stdout, 0 ); printf("\n"); }
+    PyErr_Clear();
     //PyObject_Print( traceback, stdout, 0 ); printf("\n");
 
 /*
@@ -482,6 +497,8 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
 
   // Make sure the result is a string
   if ( !PyUnicode_Check( result ) ) {
+    //DELME
+    PyObject_Print(result, stdout, 0); printf("\n");
     PyErr_SetString(PyExc_ValueError, "Page handler did not return a string");
     protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
     goto error;
@@ -512,7 +529,8 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
 
   long int rlen, t;
   DBG_RESP printf("protocol write response\n");
-  char *rbuf = self->response->rbuf;
+  //char *rbuf = self->response->rbuf;
+  char *rbuf = getResponseBuffer();
 
   int headerLen = response_updateHeaders(self->response); // Add user headers 
   if (!headerLen) return NULL;
@@ -526,6 +544,10 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
   // Faster than sprintf
     //int result = sprintf( rbuf + 176, "%ld", rlen);
   int off = 33;
+  // clear the response length then write in the new length
+  int *ip = (int*)(rbuf + off);  
+  ip[0] = 0x20202020;
+  ip[1] = 0x20202020;
   char *s = rbuf + off;  
   do *s++ = (char)(48 + (t % 10ULL)); while(t /= 10ULL);
   reverse( rbuf+off, s-1 );  
@@ -538,6 +560,7 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
     rbuf[88] = 'c'; rbuf[89] = 'l'; rbuf[90] = 'o'; rbuf[91] = 's'; rbuf[92] = 'e'; rbuf[93] = ' '; rbuf[94] = ' '; rbuf[95] = ' '; rbuf[96] = ' '; rbuf[97] = ' ';
   }
 
+  DBG_RESP printf( "rlen headerlen %d %d\n", rlen, headerLen);
   DBG_RESP printf( "Sending response:\n\n%.*s\n", (int)rlen + headerLen, rbuf );
   PyObject *bytes;
   bytes = PyBytes_FromStringAndSize( rbuf, rlen + headerLen );
@@ -546,7 +569,7 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
   Py_DECREF(o);
   Py_DECREF(bytes);
 
-  req->inprog = false;
+  if ( req != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, req );
   return self;
 }
 
@@ -602,6 +625,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
           PyObject *reason = PyObject_GetAttrString(value, "reason");
           Py_DECREF(value);
           PyErr_Clear();
+          if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
           if(!protocol_write_error_response(self, code, PyUnicode_AsUTF8(reason), PyUnicode_AsUTF8(msg))) return NULL;
           return self;
         }
@@ -611,6 +635,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
           int code = PyLong_AsLong(PyObject_GetAttrString(value, "code"));
           Py_DECREF(value);
           PyErr_Clear();
+          if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
           if(!protocol_write_redirect_response(self, code, PyUnicode_AsUTF8(msg))) return NULL;
           return self;
         }
@@ -623,6 +648,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
       PyObject_Print( type, stdout, 0 ); printf("\n");
       PyObject_Print( value, stdout, 0 ); printf("\n");
   
+      if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
       protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
       return self;
     }
@@ -634,6 +660,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
 
   if ( !PyUnicode_Check( response ) ) {
     PyErr_SetString(PyExc_ValueError, "Page handler did not return a string");
+    if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
     protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
     return NULL;
   }
@@ -755,3 +782,17 @@ void* Protocol_pipeline_cancel(Protocol* self)
   return result;
 }
 
+PyObject* Protocol_get_pipeline_empty(Protocol* self)
+{
+  if(PIPELINE_EMPTY(self)) {
+    Py_RETURN_TRUE;
+  }
+  Py_RETURN_FALSE;
+}
+
+
+PyObject* Protocol_get_transport(Protocol* self)
+{
+  Py_INCREF(self->transport);
+  return self->transport;
+}

@@ -26,7 +26,7 @@ class Client(object):
       print("Could not connect to the memcached server(s)")
       exit(1)
     except Exception as e:
-      print("WTF")
+      print(e)
       exit(1)
       
 

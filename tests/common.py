@@ -1,5 +1,5 @@
 
-import sys, os, subprocess
+import sys, os, subprocess, signal
 #import ctypes.util
 import time
 import psutil
@@ -9,7 +9,7 @@ import inspect
 
 #stdout=subprocess.PIPE
 def start_server( script, suppress_error=False ):
-  server = subprocess.Popen([sys.executable, script], stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+  server = subprocess.Popen([sys.executable, script], stdout=subprocess.PIPE,stderr=subprocess.PIPE, start_new_session=True)
   #(o, e) = server.communicate()
   process = psutil.Process(server.pid)
   time.sleep(0.5)
@@ -34,4 +34,8 @@ def contains( a, b ):
   if not b in a:
     cf = inspect.currentframe()
     print( "ERROR Line", cf.f_back.f_lineno, "'"+b+"'", " not found in\n  " , a )
-    
+   
+def stop_server( s ):
+  if s == None: return
+  os.killpg(os.getpgid(s.pid), signal.SIGTERM)  
+  s.terminate() 

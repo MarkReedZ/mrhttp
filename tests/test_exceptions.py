@@ -1,7 +1,7 @@
 
 import tests.common
 import requests
-from tests.common import eq,contains
+from tests.common import eq,contains,stop_server
 
 #process.terminate()
 
@@ -31,5 +31,6 @@ def test_one():
 
 def teardown():
   global server
-  server.terminate()
+  stop_server(server)
+  #server.terminate()
 

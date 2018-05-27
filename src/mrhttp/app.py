@@ -56,12 +56,12 @@ class Application(mrhttp.CApp):
       self._protocol_factory = protocol_factory or Protocol
       self._debug = debug
       self.request = Request()
-      self.requests = [Request() for x in range(32)]
+      self.requests = [Request() for x in range(128)]
       self.response = Response()
       self.router = router.Router()
       self.tasks = []
       self.config = {}
-      self.listeners = { "before_start":[]}
+      self.listeners = { "at_start":[], "at_end":[]}
       self.mc = None
       self.uses_session = False
       
@@ -72,13 +72,17 @@ class Application(mrhttp.CApp):
         self._loop = asyncio.new_event_loop()
       return self._loop
 
+    def expand_requests(self):
+      for x in range(len(self.requests)):
+        self.requests.append(Request())
+
     def prehandler(self):
       pass
 
     # Decorator
     def on(self, event):
       """Call the decorated function on one of the following events:
-         ["before_start"]
+         ["at_start","at_end"]
       """
       def decorator(func):
         self.listeners[event].append(func)
@@ -198,9 +202,9 @@ class Application(mrhttp.CApp):
         server = loop.run_until_complete(server_coro)
 
         self.cinit()
-        self.router.setupRoutes()
         self.router.finalize_routes()
-        self.trigger_event("before_start")
+        self.router.setupRoutes()
+        self.trigger_event("at_start")
         self._appStart() # TODO remove
 
         #self.mmc = Client("127.0.0.1",7000, self.loop)
@@ -224,6 +228,7 @@ class Application(mrhttp.CApp):
         try:
           loop.run_forever()
         finally:
+          self.trigger_event("at_end")
           print("loop done")          
           server.close()
           #pr.disable()
@@ -305,9 +310,7 @@ class Application(mrhttp.CApp):
                 try:
                     signame = signames[-worker.exitcode]
                 except KeyError:
-                    print(
-                        'Worker crashed with unknown code {}!'
-                        .format(worker.exitcode))
+                    print( 'Worker crashed with unknown code {}!' .format(worker.exitcode))
                 else:
                     print('Worker crashed on signal {}!'.format(signame))
 

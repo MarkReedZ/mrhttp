@@ -29,7 +29,7 @@ typedef struct {
   int numArgs;
   bool inprog;
 
-  //char* session_key;
+  char* session_id;
   //char* session_value;
   void *route;
 
@@ -46,6 +46,8 @@ typedef struct {
 PyObject* Request_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 int Request_init(Request* self, PyObject *args, PyObject *kwds);
 void Request_dealloc(Request* self);
+
+void Request_reset(Request *self);
 
 #ifdef MRHTTP
 void request_load(Request* self, char* method, size_t method_len, char* path, size_t path_len, int minor_version, struct mr_header* headers, size_t num_headers);
@@ -66,3 +68,4 @@ char* request_getDecodedPath(Request* self);
 void request_decodePath(Request* self);
 
 PyObject *request_updateDate(Request *self, PyObject *date);
+void Request_load_cookies(Request* self);

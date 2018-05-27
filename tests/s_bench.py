@@ -2,8 +2,24 @@ from mrhttp import Application
 from mrhttp import Request
 import mrhttp
 import socket
+import aiomcache
 
 app = Application()
+
+
+@app.on('at_start')
+async def dbsetup():
+ app.mc = aiomcache.Client("127.0.0.1",11211, loop=app.loop)
+@app.on('at_end')
+async def dbclose():
+ app.mc.close()
+
+@app.route('/pys', type="text")
+async def pys(r):
+  j = await app.mc.get(b"mrsession" + r.cookies["mrsession"].encode("utf-8"))
+  return 'py session'
+
+
 
 @app.route('/')
 def index(r):
@@ -65,9 +81,13 @@ def content(r):
 def parseForm(r):
   return r.form["param2"]
 
+#@app.route('/json')
+#def parseJson(r):
+  #return r.form["param2"]
+
 @app.route('/s',tools=['session'])
 def session(req):
   return "session"
 
-app.run(cores=1)
+app.run(cores=4)
 

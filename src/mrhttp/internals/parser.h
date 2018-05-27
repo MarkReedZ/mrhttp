@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Python.h>
+#include <request.h>
 
 #ifdef MRHTTP
 #include "mrhttpparser.h"
@@ -37,7 +38,7 @@ typedef struct {
 } Parser;
 
 int  parser_init          (Parser* self, void* protocol);
-int  parser_data_received (Parser* self, PyObject *py_data);
+int  parser_data_received (Parser* self, PyObject *py_data, Request *request );
 void parser_dealloc       (Parser* self);
 
 int parse_headers(Parser* self);

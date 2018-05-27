@@ -41,6 +41,11 @@ static PyMethodDef Protocol_methods[] = {
   {"task_done",       (PyCFunction)protocol_task_done,       METH_O,       ""},
   {NULL}
 };
+static PyGetSetDef Protocol_getset[] = {
+  {"pipeline_empty", (getter)Protocol_get_pipeline_empty, NULL, "", NULL},
+  {"transport", (getter)Protocol_get_transport, NULL, "", NULL},
+  {NULL}
+};
 
 static PyMethodDef Router_methods[] = {
   {"setupRoutes", (PyCFunction)Router_setupRoutes, METH_NOARGS,   ""},
@@ -270,7 +275,7 @@ static PyTypeObject ProtocolType = {
   0,                         /* tp_iternext */
   Protocol_methods,          /* tp_methods */
   0,                         /* tp_members */
-  0,//Protocol_getset,           /* tp_getset */
+  Protocol_getset,           /* tp_getset */
   0,                         /* tp_base */
   0,                         /* tp_dict */
   0,                         /* tp_descr_get */

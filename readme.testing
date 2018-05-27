@@ -1,5 +1,11 @@
 
+gdb python3
+attach to child process
 
+CFLAGS='-Wall -O0 -g -fsanitize=address -fno-omit-frame-pointer -fsanitize-recover=address' python setup.py install --force
+ASAN_OPTIONS=halt_on_error=0 LD_PRELOAD=/usr/lib/gcc/x86_64-linux-gnu/7/libasan.so python tst.py
+
+curl -d '{"name": "r0fls"}' http://localhost:8080/template
 
 Chunked requests over same connection telnet and paste
 <<<
@@ -26,10 +32,19 @@ Accept: */*
 memcached -l 127.0.0.1 -p 11211 -d -m 50
 valgrind --tool=memcheck --suppressions=valgrind-python.supp python3 -E -tt ./tst.py
 
+FORM urlencoded
+curl -d "param1=value1&param2=value2" -X POST http://localhost:8080/form
+wrk -t4 -c32 -d1s http://localhost:8080/form -s tests/form.lua
+
 JSON post:
 curl -H "Content-Type: application/json" -X POST -d '{"username":"xyz","password":"xyz"}' http://localhost:8080/
+curl -H "Content-Type: application/json" -X POST -d '[1,2,3,4,5,6,7,8,9]' http://localhost:8080/
 
-curl -i --raw http://localhost:8080/ -H "cookie: foo=1; bar=2;"
+wrk -t4 -c32 -d5s http://localhost:8080/ -s tests/post.lua
+
+Session testing
+curl -i --raw http://localhost:8080/mc -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
+wrk -t4 -c32 -d1s http://localhost:8080/mc -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
 
 wrk -t4 -c32 -d5s http://localhost:8080/ -H "Cookie: last_write=9392597662310--zAhJdToJVGltZQ0ghhyAULskpAo6DW5hbm9fbnVtaQJ8AjoNbmFub19kZW5pBjoNc3VibWljcm8iB2NgOgtvZmZzZXRp%2FoCPOgl6b25lSSIIUFNUBjoGRVQ%3D--b761d36723502350717cef0d7d2e4858732264a2; user_session=zwHPFVsweWHORd6SuaeYcBEhqRW94NEIU0njSybiET7niLkO; __Host-user_session_same_site=ZwHPFVsweWHO234RF6SuaeYcBEhqRWo4NEIU0njSybiET7niLkO; logged_in=yes; dotcom_user=MarkReedZ; _gh_sess=R2I1bjhqdDZ0THNKckJqd3FlcFlRbjNJRUpiU084dU9UbVF4ZC81ZUsxVEgzMmhwSnBkWGR3TExzbmxuWnpoNDNkc1RUVXMr3kJmQ2svVHZBRkxZYkFUeXJIaTNraVV5YVM4anpCWnp4VG1XeD41d1J3Vm92U3laMkVXa1Nta2wySzFzUTZHNFVGMWtsN21Xc3FIQ1hERWF0RllNUUxpSFh6OUZJWS9TUzFzZjRCTjljQ1F3STgvYTA1SHc4O29QOGpEdzC2Y1hMbjlYbEtDU2pQOFJUZCEWmdrTUJtL3hpa3lPb244QVpHN1VjREpIL3pQcjhjZ2xTbVk4cXptODlVNlViWk1EY1l5dmVrQ1BrS2tRRmJYNTkvTjREOGVoV25aNmNBWCtreFM3MWs9LS1uZjBdfslJU1grUEsrOS9EaFpwaFRnPT0%3D--91cb95044f6813e14f1a4420826e27626c8e6666" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" -H "Accept-Language: ja,en-us;q=0.7,en;q=0.3" -H "Accept-Encoding: gzip,deflate" -H "Accept-Charset: Shift_JIS,utf-8;q=0.7,*;q=0.7" -H "Referer: https;//github.com/joyent/http-parser" -H "User-Agent: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; ja-JP-mac; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3"
 

@@ -1,10 +1,31 @@
 
+Techempower
+mrhttp
+Requests/sec:  58965.52
+Requests/sec: 448208.71
+
+Sanic
+Requests/sec:  24397.73
+- no pipeline
+
+japronto
+Requests/sec:  46532.67
+Requests/sec: 279540.72
+
+
+Sanic + NATS
+Requests/sec:  42265.34
+
+MrHTTP + NATS
+Requests/sec:  75731.49
+MrHTTP + MrQ
+Requests/sec:  86470.64
+
+wrk -t4 -c32 -d5s http://localhost:8080/
+
+valgrind doesn't work with sse4.2/avx2
 valgrind --tool=memcheck --suppressions=valgrind-python.supp python3 -E -tt ./tst.py
 
-tests for various user errors adding sessions other things
-
-wrk -t4 -c32 -d5s http://localhost:8080/foo/bar/test/ 
-Requests/sec: 118620.91
 
 ctest/blog/fast_str -- try AVX2 or tfw's
 
@@ -12,7 +33,7 @@ CFLAGS='-Wall -O0 -g' sudo python setup.py build
 
 
 
-jinja example
+jinja example. 
 
 # Render templates in a Flask like way from a "template" directory in
 # the project
@@ -49,24 +70,5 @@ async def test(request):
 
 app.run(host="0.0.0.0", port=8080, debug=True)
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>My Webpage</title>
-</head>
-<body>
-    <h1>Hello World</h1>
-    <p>knights - {{ knights }}</p>
-</body>
-</html>
-
-
-try:
-    await asyncio.wait_for(fut, timeout=5)
-except asyncio.TimeoutError:
-
-
-curl -iv --raw http://localhost:8080/t6/foobar/test7/
-curl -iv --raw -H "Content-Type: application/json" -X POST -d '{"username":"xyz","password":"xyz"}' http://localhost:8080/foo/bar/test/
 
 

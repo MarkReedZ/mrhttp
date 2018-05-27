@@ -1,7 +1,7 @@
 
 import tests.common
 import requests
-from tests.common import eq,contains
+from tests.common import eq,contains,stop_server
 
 #process.terminate()
 
@@ -35,11 +35,34 @@ def test_one():
   r = requests.get('http://localhost:8080/print/%E4%B8%8D%E5%8F%AF%E5%86%8D%E7%94%9F%E8%B5%84%E6%BA%90/?test')
   eq(r.text, "不可再生资源")
 
+  # requests orders cookie keys alphabetically looks like
+  r = requests.post('http://localhost:8080/printPostBody', json={"key": "value"})
+  eq(r.text, '{"key": "value"}')
+  cookie = {'foo': 'bar'}
+  r = requests.post('http://localhost:8080/printCookies', cookies=cookie)
+  eq(r.text, "{'foo': 'bar'}")
+  cookie = {'foo': 'bar','yay':'test'}
+  r = requests.post('http://localhost:8080/printCookies', cookies=cookie)
+  eq(r.text, "{'foo': 'bar', 'yay': 'test'}")
+  cookie = {'foo': 'bar','baz':'3'}
+  r = requests.post('http://localhost:8080/printCookies', cookies=cookie)
+  eq(r.text, "{'baz': '3', 'foo': 'bar'}")
+
+  # Form handling
+  r = requests.post('http://localhost:8080/form', data={"p1":"v1","param2":"value2"})
+  eq(r.text, "value2")
+
+  # Sessions
+  cookie = {'mrsession': '43709dd361cc443e976b05714581a7fb'}
+  r = requests.post('http://localhost:8080/s', cookies=cookie)
+  eq(r.text, "session")
+
 
   #contains(r.text, "Internal Server Error")
   #print( r.status_code, r.headers, r.text )
 
 def teardown():
   global server
-  server.terminate()
+  stop_server(server)
+  #server.terminate()
 

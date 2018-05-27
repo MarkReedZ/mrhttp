@@ -68,14 +68,19 @@ class Router(mrhttp.CRouter):
     self.routes.sort(key=lambda x: x["sortlen"],reverse=True)
 
   def add_route(self, handler, uri, methods=['GET'], tools=[],type="html"):
-    if asyncio.iscoroutinefunction(handler) and is_pointless_coroutine(handler):
-      handler = coroutine_to_func(handler)
+    #print("DELME add route func ",hex(id(handler)))
+    #if asyncio.iscoroutinefunction(handler) and is_pointless_coroutine(handler):
+      #handler = coroutine_to_func(handler)
+    #print("DELME add route func after coro change ",hex(id(handler)))
 
     numArgs = uri.count("{}")
-    if numArgs != len(inspect.signature(handler).parameters):
+    if numArgs == 0 and len(inspect.signature(handler).parameters) != 1:
+      raise ValueError("Page handler must take a request object as an argument")
+    if numArgs != (len(inspect.signature(handler).parameters)-1):
       print( "ERROR: Number of function args {} not equal to route args {}".format( numArgs, len(inspect.signature(handler).parameters)) )
       print( inspect.signature(handler), " vs ", uri )
       raise ValueError("Number of route arguments not equal to function arguments")
+     
     r = {}
     r["handler"] = id(handler)
     r["iscoro"]  = asyncio.iscoroutinefunction(handler)

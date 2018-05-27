@@ -1,6 +1,5 @@
 
 
-
 #include <Python.h>
 #include <stdbool.h>
 
@@ -73,9 +72,6 @@ PyObject *Router_setupRoutes (Router* self) {
     rte->session = false;
 
     PyObject *handler = PyLong_AsVoidPtr(PyDict_GetItemString( r, "handler" ));
-    //if ( handler ) {
-      //PyObject_CallFunctionObjArgs(handler, NULL);
-    //} 
     rte->func = handler;
     if ( !(o = PyDict_GetItemString( r, "path" )) ) goto error;
     rte->path = PyUnicode_AsUTF8AndSize( o, &(rte->len) );

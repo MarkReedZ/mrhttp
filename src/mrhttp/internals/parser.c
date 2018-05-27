@@ -1,6 +1,5 @@
 
 
-
 #include <strings.h>
 #include <sys/param.h>
 #include <immintrin.h>
@@ -29,10 +28,8 @@ int parser_init(Parser *self, void *protocol) {
   DBG printf("parser init\n");
   self->protocol = protocol;
   self->buf = malloc(8096); self->buf_size = 8096;
-  DBG printf(" bufptr %p start %p end %p\n", self->buf, self->start, self->end);
   if ( !self->buf ) return 0;
   _reset(self, true);
-  DBG printf(" bufptr %p start %p end %p\n", self->buf, self->start, self->end);
 
   //PyObject *pObj = NULL;
   //pObj = PyBytes_FromString("Hello world\n");
@@ -50,7 +47,7 @@ int parser_init(Parser *self, void *protocol) {
 }
 
 // TODO Check we don't exceed a max request size
-int parser_data_received(Parser *self, PyObject *py_data) {
+int parser_data_received(Parser *self, PyObject *py_data, Request *request ) {
 //#ifdef DEBUG_PRINT
   DBG printf("parser data\n");
 //#endif
@@ -86,21 +83,16 @@ parse_headers:
 
   if ( self->parsed_headers ) goto body;
 
+  
   char *method, *path;
   int rc, minor_version;
-#ifdef MRHTTP
-  struct mr_header headers[100];
-#else
-  struct phr_header headers[100];
-#endif
-  size_t prevbuflen = 0, method_len, path_len, num_headers;
+  //struct phr_header headers[100];
+  size_t prevbuflen = 0, method_len, path_len;//, num_headers;
 
-  num_headers = sizeof(headers) / sizeof(headers[0]);
-#ifdef MRHTTP
-  rc = mr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, headers, &num_headers, prevbuflen);
-#else
-  rc = phr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, headers, &num_headers, prevbuflen);
-#endif
+  request->num_headers = 100; // Max allowed headers
+  DBG_PARSER printf("before parser requests\n");
+  rc = phr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, request->headers, &(request->num_headers), prevbuflen);
+  DBG_PARSER printf("parser requests rc %d\n",rc);
   if ( rc < 0 ) return rc; // -2 incomplete, -1 error otherwise byte len of headers
 
   self->start += rc; 
@@ -111,8 +103,8 @@ parse_headers:
   DBG_PARSER printf("path is %.*s\n", (int)path_len, path);
   DBG_PARSER printf("HTTP version is 1.%d\n", minor_version);
   DBG_PARSER printf("headers:\n");
-  DBG_PARSER for (i = 0; i != num_headers; ++i) {
-    printf("%.*s: %.*s\n", (int)headers[i].name_len, headers[i].name, (int)headers[i].value_len, headers[i].value);
+  DBG_PARSER for (i = 0; i != request->num_headers; ++i) {
+    printf("%.*s: %.*s\n", (int)request->headers[i].name_len, request->headers[i].name, (int)request->headers[i].value_len, request->headers[i].value);
   }
 
   if(minor_version == 0) self->conn_state = CONN_CLOSE;
@@ -124,12 +116,12 @@ parse_headers:
   header->value_len == strlen(val) && fast_compare(header->value, val, header->value_len) == 0
 
 #ifdef MRHTTP
- for(struct mr_header* header = headers;
-      header < headers + num_headers;
+ for(struct mr_header* header = request->headers;
+      header < request->headers + request->num_headers;
       header++) {
 #else
- for(struct phr_header* header = headers;
-      header < headers + num_headers;
+ for(struct phr_header* header = request->headers;
+      header < request->headers + request->num_headers;
       header++) {
 #endif
 
@@ -187,7 +179,7 @@ with nginx proxy_request_buffering on which is the default we will never see chu
     }
   } 
 
-  if(!Protocol_on_headers( self->protocol, method, method_len, path, path_len, minor_version, headers, num_headers)) goto error; 
+  if(!Protocol_on_headers( self->protocol, method, method_len, path, path_len, minor_version, request->headers, request->num_headers)) goto error; 
 
 body:
 

@@ -58,6 +58,8 @@ PyObject* Protocol_connection_lost(Protocol* self, PyObject* args);
 PyObject* Protocol_data_received(Protocol* self, PyObject* data);
 PyObject* Protocol_eof_received(Protocol* self);
 PyObject* Protocol_updateDate(Protocol *self, PyObject *date);
+PyObject* Protocol_get_transport(Protocol* self);
+PyObject* Protocol_get_pipeline_empty(Protocol* self);
 
 Protocol* Protocol_on_incomplete(Protocol* self);
 Protocol* Protocol_on_headers(Protocol* self, char* method, size_t method_len,
