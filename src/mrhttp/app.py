@@ -228,8 +228,6 @@ class Application(mrhttp.CApp):
         try:
           loop.run_forever()
         finally:
-          self.trigger_event("at_end")
-          print("loop done")          
           server.close()
           #pr.disable()
           #s = io.StringIO()
@@ -240,6 +238,7 @@ class Application(mrhttp.CApp):
           #profiler_stop()
           loop.run_until_complete(server.wait_closed())
           loop.run_until_complete(self.drain())
+          self.trigger_event("at_end")
           #self._reaper.stop()
           loop.close()
 
