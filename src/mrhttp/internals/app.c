@@ -32,11 +32,24 @@ PyObject *MrhttpApp_cinit(MrhttpApp* self) {
   self->nextRequest = 0;
   self->freeRequests = l;
 
+  // Idle timeouts (conn and request)
+  PyObject* loop = NULL;
+
+  if(!(self->connections = PyObject_GetAttrString((PyObject*)self, "_connections"))) goto error;
+  if(!(loop = PyObject_GetAttrString((PyObject*)self, "_loop"))) goto error;
+  if(!(self->call_later = PyObject_GetAttrString(loop, "call_later"))) goto error;
+
+  if(!(self->check_idle = PyObject_GetAttrString((PyObject*)self, "check_idle"))) goto error;
+  self->check_interval = PyLong_FromLong(5);
+  self->check_idle_handle = PyObject_CallFunctionObjArgs( self->call_later, self->check_interval, self->check_idle, NULL);
+
   self->func_expand_requests = PyObject_GetAttrString(self, "expand_requests");
 
   response_setupResponseBuffer();
 
   Py_RETURN_NONE;
+error:
+  return NULL;
 }
 
 void MrhttpApp_release_request(MrhttpApp* self, Request *r) {
@@ -45,27 +58,48 @@ void MrhttpApp_release_request(MrhttpApp* self, Request *r) {
   self->freeRequests++;
 }
 
+void MrhttpApp_double_requests(MrhttpApp* self) {
+  self->nextRequest = self->numRequests-1;
+  PyObject *ret = PyObject_CallFunctionObjArgs(self->func_expand_requests, NULL);
+    
+  if ( ret == NULL ) {
+    printf("ret null\n");
+    exit(1);
+  }
+  self->freeRequests += self->numRequests;
+  self->numRequests *= 2;
+  //printf("DELME dbl req list sz %d num %d\n", PyList_GET_SIZE(self->requests), self->numRequests);
+}
+
 PyObject *MrhttpApp_get_request(MrhttpApp* self) {
   PyObject *ret = PyList_GET_ITEM( self->requests, self->nextRequest );
   Request *r = (Request*)ret;
   self->freeRequests--;
+  //printf("DELME get req free %d!\n", self->freeRequests); 
 
   // If we wrap and hit an in progress request double the number of requests and 
   // start at the new ones. 
   if ( r->inprog ) {
     // Double the number of requests if necessary
     if ( self->freeRequests < 10 ) {
-      self->nextRequest = self->numRequests-1;
-      PyObject *ret = PyObject_CallFunctionObjArgs(self->func_expand_requests, NULL);
-      if ( ret == NULL ) {
-        printf("ret null\n");
-      }
-      self->numRequests *= 2;
+      MrhttpApp_double_requests(self);
     }
     // Loop until found a free request
+    int cnt;
+redo:
+    cnt = 0;
     while (r->inprog) {
+      cnt++; 
+      if ( cnt > self->numRequests ) { 
+        //printf("DELME ARGH %d > %d free %d!\n", cnt, self->numRequests,self->freeRequests); 
+        break; 
+      }
       self->nextRequest = (self->nextRequest+1)%self->numRequests;
       r = (Request*)PyList_GET_ITEM( self->requests, self->nextRequest );
+    }
+    if ( cnt > self->numRequests ) {
+      MrhttpApp_double_requests(self);
+      goto redo;
     }
   }
   r->inprog = true;
@@ -75,5 +109,60 @@ PyObject *MrhttpApp_get_request(MrhttpApp* self) {
 
 PyObject *MrhttpApp_updateDate(MrhttpApp *self, PyObject *date) {
   return response_updateDate(date);
+}
+
+PyObject *MrhttpApp_check_idle(MrhttpApp *self) {
+
+  PyObject* iterator = NULL;
+  Protocol* c = NULL;
+  
+  if(!(iterator = PyObject_GetIter(self->connections))) goto error;
+  
+  unsigned long check_interval = PyLong_AsLong(self->check_interval);
+  while((c = (Protocol*)PyIter_Next(iterator))) {
+    //debug_print(
+      //"conn %p, idle_time %ld, read_ops %ld, last_read_ops %ld",
+      //conn, conn->idle_time, conn->read_ops, conn->last_read_ops);
+
+    if ( c->num_data_received == 0 ) {
+      c->conn_idle_time += check_interval;
+      if ( c->conn_idle_time > 20 ) {
+        //printf("DELME connection idle\n");
+        c->conn_idle_time = -2000; //DELME 
+        //if(!protocol_capi->Protocol_close(conn)) goto error;
+      }
+    } else {
+      c->conn_idle_time = 0;
+      c->num_data_received = 0;
+    }
+
+    if ( c->num_requests_popped == 0 ) {
+      c->request_idle_time += check_interval;
+      if ( c->request_idle_time >  4 ) {
+        //printf("DELME connection idle\n");
+        c->request_idle_time = -2000; //DELME 
+        //if(!protocol_capi->Protocol_close(conn)) goto error;
+      }
+    } else {
+      c->request_idle_time = 0;
+      c->num_requests_popped = 0;
+    }
+
+
+    Py_DECREF(c);
+  }
+  
+  goto finally;
+  
+  error: 
+  Py_XDECREF(iterator);
+  return NULL;
+  
+  finally:
+  Py_XDECREF(iterator);
+
+  Py_XDECREF(self->check_idle_handle);
+  self->check_idle_handle = PyObject_CallFunctionObjArgs( self->call_later, self->check_interval, self->check_idle, NULL);
+  Py_RETURN_NONE;
 }
 

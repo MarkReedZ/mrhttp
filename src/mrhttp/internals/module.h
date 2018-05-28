@@ -54,6 +54,7 @@ static PyMethodDef Router_methods[] = {
 static PyMethodDef MrhttpApp_methods[] = {
   {"cinit",      (PyCFunction)MrhttpApp_cinit,       METH_NOARGS,  ""},
   {"updateDate", (PyCFunction)MrhttpApp_updateDate,  METH_O,       ""},
+  {"check_idle", (PyCFunction)MrhttpApp_check_idle,  METH_NOARGS,  ""},
   {NULL}
 };
 static PyMethodDef MrqClient_methods[] = {

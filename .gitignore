@@ -3,6 +3,7 @@
 *.egg
 *.eggs
 *.pyc
+*.swp
 settings.py
 build/*
 .DS_Store

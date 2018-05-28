@@ -28,12 +28,20 @@ typedef struct {
   PyObject* writelines;
   double start_time;
 
-  // Http 1.1 Pipeline 
+  // Async Pipeline
   PyObject* create_task;
   PyObject* task_done; 
   PipelineRequest queue[50];
   size_t queue_start;
   size_t queue_end;
+
+  // Idle timeout - conn(data recvd) request(pipeline task)
+  int conn_idle_time;
+  int num_data_received;
+  //int last_data_received;
+  int request_idle_time;
+  int num_requests_popped;
+  //int last_requests_popped;
 
   Request *request;
   Router *router;

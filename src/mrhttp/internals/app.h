@@ -7,7 +7,16 @@
 
 typedef struct {
   PyObject_HEAD
+  
+  // Idle timeouts
+  PyObject *connections;
+  PyObject* call_later;
+  PyObject* check_idle;
+  PyObject* check_idle_handle;
+  PyObject* check_interval;
 
+
+  // Request pool
   PyObject *func_expand_requests;
   PyObject *requests;
   //Request **requests;
@@ -25,4 +34,6 @@ void MrhttpApp_release_request(MrhttpApp* self, Request *r);
 PyObject *MrhttpApp_get_request(MrhttpApp* self);
 
 PyObject *MrhttpApp_updateDate(MrhttpApp *self, PyObject *date);
+PyObject *MrhttpApp_check_idle(MrhttpApp *self);
+
 

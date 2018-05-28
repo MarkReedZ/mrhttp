@@ -39,6 +39,12 @@ PyObject * Protocol_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
   self->create_task = NULL;
   self->task_done = NULL;
 
+  self->conn_idle_time = 0;
+  self->num_data_received = 0;
+  self->request_idle_time = 0;
+  self->num_requests_popped = 0;
+
+
   DBG printf("proto new self = %p\n",(void*)self);
 
   finally:
@@ -205,6 +211,7 @@ PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
 
 PyObject* Protocol_data_received(Protocol* self, PyObject* data)
 {
+  self->num_data_received++;
   DBG printf("protocol data recvd %ld\n", Py_SIZE(data));
         //# Check for the request itself getting too large and exceeding
         //# memory limits
@@ -649,7 +656,8 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
       printf("Unhandled exception:\n");
       PyObject_Print( type, stdout, 0 ); printf("\n");
       PyObject_Print( value, stdout, 0 ); printf("\n");
-  
+ 
+      self->num_requests_popped++; 
       if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
       protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
       return self;
@@ -658,6 +666,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
   } else {
     response = task;
   }
+  self->num_requests_popped++; 
 
   if ( PyBytes_Check( response ) ) {
     response = PyUnicode_FromEncodedObject( response, "utf-8", "strict" );
