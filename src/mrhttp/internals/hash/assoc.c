@@ -14,7 +14,10 @@ typedef  unsigned       char ub1;
 #define hashsize(n) ((ub4)1<<(n))
 #define hashmask(n) (hashsize(n)-1)
 
-Assoc_t *assoc_create() {
+
+extern char *strndup(const char *s, size_t n);
+
+Assoc_t *assoc_create(void) {
   Assoc_t *t = malloc( sizeof *t );
   if (!t) {
     fprintf(stderr, "Failed to init hashtable.\n");

@@ -1,4 +1,5 @@
 
+
 #include "memprotocol.h"
 #include "Python.h"
 #include "common.h"
@@ -122,7 +123,7 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
     if ( p[0] == 'E' ) {
       p += 5;
       tMemcachedCallback cb = self->queue[self->queue_start].cb;
-      cb(self->queue[self->queue_start].connection, NULL);
+      cb(self->queue[self->queue_start].connection, NULL, 0);
       self->queue_start = (self->queue_start+1)%self->queue_sz;
     }
     // Session found
@@ -136,7 +137,7 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
       p += 2;
   
       if ( l < (60+vlen) ) {
-        printf("Partial memc response! vlen %d l %d\n",vlen,l);
+        printf("Partial memc response! vlen %d l %ld\n",vlen,l);
         PyObject_Print( data, stdout, 0 ); 
         printf("\n");
         exit(1);
@@ -145,13 +146,13 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
       char *buf = malloc( vlen );
       memcpy(buf, p, vlen);
       tMemcachedCallback cb = self->queue[self->queue_start].cb;
-      cb(self->queue[self->queue_start].connection, buf);
+      cb(self->queue[self->queue_start].connection, buf, vlen);
       self->queue_start = (self->queue_start+1)%self->queue_sz;
 
       p += vlen + 7;  
         
     } else {
-      printf("Bad memc response data len %d\n", strlen(p));
+      printf("Bad memc response data len %ld\n", strlen(p));
       PyObject_Print( data, stdout, 0 ); 
       printf("\n");
       exit(1);
@@ -168,7 +169,7 @@ int MemcachedProtocol_asyncGet( MemcachedProtocol* self, char *key, void *fn, vo
   char *kp = self->get_cmd+13;
   memcpy(kp, key, 32);
   PyObject *bytes = PyBytes_FromString(self->get_cmd);
-  self->queue[self->queue_end].cb = (tMemcachedCallback)fn;
+  self->queue[self->queue_end].cb = (tMemcachedCallback*)fn;
   self->queue[self->queue_end].connection = connection;
   self->queue_end = (self->queue_end+1)%self->queue_sz;
   if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 0;

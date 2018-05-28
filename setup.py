@@ -14,7 +14,6 @@ m1 = Extension(
       './src/mrhttp/internals/request.c',
       './src/mrhttp/internals/response.c',
       './src/mrhttp/internals/router.c',
-      './src/mrhttp/internals/perproc.c',
       #'./src/mrhttp/internals/mrhttpparser.c',
       './src/mrhttp/internals/picohttpparser.c',
       #'./src/mrhttp/cpp/cpptest.cpp'
@@ -22,8 +21,9 @@ m1 = Extension(
       './src/mrhttp/internals/hash/assoc.c',
      ],
      include_dirs = ['./src/mrhttp/internals'],
-     extra_compile_args = ['-msse4.2', '-mavx2', '-mbmi2', '-Wunused-variable','-std=c99'],
-     extra_link_args = [], #['-lasan'],
+     extra_compile_args = ['-msse4.2', '-mavx2', '-mbmi2', '-Wunused-variable','-std=c99','-Wno-discarded-qualifiers'],
+     extra_link_args = [],
+     #extra_link_args = ['-lasan'],
      define_macros = [('DEBUG_PRINT',1),("AMRHTTP",1)]
 )
 

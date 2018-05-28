@@ -22,8 +22,8 @@ typedef struct HashTable
 } Assoc_t;
 
 /* associative array */
-Assoc_t *assoc_create();
-Assoc_t *assoc_init();
+Assoc_t *assoc_create(void);
+Assoc_t *assoc_init(void);
 
 char *assoc_get(   Assoc_t *t, const char *key, const size_t nkey);
 int   assoc_insert(Assoc_t *t, const char *key, const size_t nkey, const char *val, const size_t nval);

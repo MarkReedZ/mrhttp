@@ -1,0 +1,8 @@
+*~
+*.egg-info
+*.egg
+*.eggs
+*.pyc
+settings.py
+build/*
+.DS_Store

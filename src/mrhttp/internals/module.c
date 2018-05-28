@@ -2,7 +2,6 @@
 #include "module.h"
 #include "protocol.h"
 #include "request.h"
-#include "perproc.h"
 
 
 #define PROXY(attr) \
@@ -37,17 +36,12 @@ static PyGetSetDef Request_getset[] = {
 */
 #undef PROXY
 
-static PyMethodDef mod_methods[] = {
-    { "init", PerProc_init, METH_O, "Per process initialization" },
-    { NULL, NULL, 0, NULL }        /* Sentinel */
-};
-
 static PyModuleDef internals_module = {
   PyModuleDef_HEAD_INIT,
   "internals",
   "C internals",
   -1,
-  mod_methods,
+  NULL, //mod_methods,
   NULL, NULL, NULL, NULL
 };
 

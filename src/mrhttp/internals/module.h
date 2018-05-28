@@ -52,7 +52,8 @@ static PyMethodDef Router_methods[] = {
   {NULL}
 };
 static PyMethodDef MrhttpApp_methods[] = {
-  {"cinit", (PyCFunction)MrhttpApp_cinit, METH_NOARGS,   ""},
+  {"cinit",      (PyCFunction)MrhttpApp_cinit,       METH_NOARGS,  ""},
+  {"updateDate", (PyCFunction)MrhttpApp_updateDate,  METH_O,       ""},
   {NULL}
 };
 static PyMethodDef MrqClient_methods[] = {
@@ -74,7 +75,6 @@ static PyGetSetDef Request_getset[] = {
 };
 
 static PyMethodDef Response_methods[] = {
-  {"updateDate",        (PyCFunction)response_updateDate,        METH_O,   ""},
   {NULL}
 };
 static PyGetSetDef Response_getset[] = {

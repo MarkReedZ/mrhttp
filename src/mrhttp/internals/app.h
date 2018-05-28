@@ -23,3 +23,6 @@ PyObject *MrhttpApp_cinit(MrhttpApp* self);
 
 void MrhttpApp_release_request(MrhttpApp* self, Request *r);
 PyObject *MrhttpApp_get_request(MrhttpApp* self);
+
+PyObject *MrhttpApp_updateDate(MrhttpApp *self, PyObject *date);
+

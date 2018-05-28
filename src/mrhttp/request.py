@@ -1,12 +1,22 @@
 import urllib.parse
-from json import loads as json_loads
 import cgi
 import encodings.idna
 import collections
 import mrhttp
+try:
+  import mrjson as json
+except:
+  try:
+    import ujson as json
+  except:
+    pass
+
+
 
 class Request(mrhttp.CRequest):
 
+  response = mrhttp.Response()
+  user = None
   memo = {}
   def __init__(self):
     super().__init__(self)
@@ -67,6 +77,13 @@ class Request(mrhttp.CRequest):
   @property
   def files(self):
     return self.get_form()[1]
+
+  def set_user(self, j):
+    try: #TODO bad json??
+      self.user = json.loads(j)
+    except Exception as e:
+      print("request.set_user exception:", e)
+      print("Error parsing json: ", j)
 
 
   #def __repr__(self):

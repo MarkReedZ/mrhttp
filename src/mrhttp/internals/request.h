@@ -2,6 +2,7 @@
 
 #include <Python.h>
 #include <stdbool.h>
+#include "response.h"
 //#include "module.h"
 
 typedef struct {
@@ -30,6 +31,7 @@ typedef struct {
   bool inprog;
 
   char* session_id;
+  PyObject *set_user;
   //char* session_value;
   void *route;
 
@@ -40,6 +42,7 @@ typedef struct {
   PyObject* py_cookies;
   PyObject* py_body;
 
+  Response* response;
 } Request;
 
 

@@ -36,7 +36,6 @@ typedef struct {
   size_t queue_end;
 
   Request *request;
-  Response *response;
   Router *router;
   Parser  parser;
   MemcachedProtocol *memprotocol;

@@ -11,7 +11,6 @@
 #else
 #include "picohttpparser.h"
 #endif
-#include "perproc.h"
 
 #ifdef __AVX2__
 #include <immintrin.h>
@@ -59,6 +58,8 @@ PyObject* Request_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
   Request* self = NULL;
   self = (Request*)type->tp_alloc(type, 0);
+  self->set_user = NULL;
+  self->response = NULL;
 
   return (PyObject*)self;
 }
@@ -69,6 +70,8 @@ void Request_dealloc(Request* self) {
   Py_XDECREF(self->transport);
   Py_XDECREF(self->app);
 
+  free(self->headers);
+
   Py_XDECREF(self->py_headers);
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
@@ -78,6 +81,9 @@ int Request_init(Request* self, PyObject *args, PyObject* kw)
 {
   Request_reset(self);
   self->headers = malloc( sizeof(*(self->headers))*100 ); //TODO
+  if(!(self->response = (Response*)PyObject_GetAttrString((PyObject*)self, "response"))) return -1;
+  if(!(self->set_user = PyObject_GetAttrString((PyObject*)self, "set_user"))) return -1;
+  
   return 0;
 }
 
@@ -282,7 +288,7 @@ PyObject* Request_getattro(Request* self, PyObject* name)
 
 static inline PyObject* Request_decode_headers(Request* self)
 {
-  DBG printf("request decode headers num heads %d\n",self->num_headers);
+  DBG printf("request decode headers num heads %ld\n",self->num_headers);
   PyObject* result = NULL;
   PyObject* headers = PyDict_New();
   if(!headers) goto error;

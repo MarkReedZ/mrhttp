@@ -1,51 +1,38 @@
 
-PyUnicode_Check in coro also needs handle bytes with warning + test
-
-rate limit
-
 Sessions 
-  fill in request.user with info
   gen id uuid.uuid4().hex
+  Handle cluster
   periodic info or something to test connection?
   examples - create examples dir
-  // Why shared mem when 250k req/s  
-  shared memory session user storage
-    if update saved user - regen session id
-    Create blocks and timeout the block
 
 upload a file
 
-tests:
- test_vhosts sanic..?
+vhosts -- how to do - don't like sanic's 
+  sanic:
+    @app.route('/', host=["example.com",
+                      "somethingelse.com",
+                      "therestofyourdomains.com"])
+  cherrypy:
+    conf = {
+      "/": {
+        "request.dispatch": cherrypy.dispatch.VirtualHost(
+          **{
+        'api.foo.com':       '/api',
 
-realloc of response buffer? 
-   parser buffer ( use request buffer, but can realloc it the same )
-response part of request
-protocol write response needs to realloc buffer if we need to
-response update date fix / rejigger the buffer handling
 
 
-mem check - Asan says no leaks now.  Check valgrind tho
+
+
+rate limit in C
 
 test partial request / disconnects
+todo add test >128k byte response body to test realloc of response buffer
 
-
-Add template bench - eventually can move to C with that C++ json and jinja
+Add template bench - eventually can move to C with that sweet C++ json lib fixed up and jinja
 
 
 ?? ip = cherrypy.request.remote.ip
 Allow setting custom error pages 
-
-simple exception in page handler - make sure we print out exception for the user
-  Can we stop on the first exception and get rid of the rest
-     ValueError: Page handler did not return a string
-     The above exception was the direct cause of the following exception:
-  Add a test for this
-  def hello():
-    return app.request.cookies()
-
-
-
 
 
 

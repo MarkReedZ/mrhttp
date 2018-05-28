@@ -38,7 +38,6 @@ import atexit
 
 
 def run_wrk(loop, endpoint=None, lua=None, options=None):
-  print(options)
   endpoint = endpoint or 'http://localhost:8080/'
   if lua:
     wrk_fut = asyncio.create_subprocess_exec( 'wrk', '-t', '4', '-c', '32', '-d', '2', '-s', lua, endpoint, stdout=PIPE, stderr=STDOUT)
@@ -97,7 +96,6 @@ loop = uvloop.new_event_loop()
 
 asyncio.set_event_loop(loop)
 
-o = open("test_output.txt","w")
 server_fut = asyncio.create_subprocess_exec( 'python3', 'tests/s_bench.py', stdout=asyncio.subprocess.PIPE )
 server = loop.run_until_complete(server_fut)
 process = psutil.Process(server.pid)
@@ -109,19 +107,20 @@ try:
 	#TODO mrq/nats
 
   opts = ('-H','Cookie: mrsession=43709dd361cc443e976b05714581a7fb;')
-  #print ("Hello pipelined", run_wrk(loop,'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
-  print ("Hello          ", run_wrk(loop,'http://localhost:8080/'), "Requests/second" )
-  print ("Cookies        ", run_wrk(loop,'http://localhost:8080/printCookies'), "Requests/second" )
-  print ("404            ", run_wrk(loop,'http://localhost:8080/404/'), "Requests/second" )
-  print ("form parsing   ", run_wrk(loop,'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
-  print ("sessions       ", run_wrk(loop,'http://localhost:8080/s',options=opts), "Requests/second" )
-  print ("sessions (py)  ", run_wrk(loop,'http://localhost:8080/pys',options=opts), "Requests/second" )
+  print ("Hello pipelined", run_wrk(loop,'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
+  #print ("Hello          ", run_wrk(loop,'http://localhost:8080/'), "Requests/second" )
+  #print ("Cookies        ", run_wrk(loop,'http://localhost:8080/printCookies'), "Requests/second" )
+  #print ("404            ", run_wrk(loop,'http://localhost:8080/404/'), "Requests/second" )
+  #print ("form parsing   ", run_wrk(loop,'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
+  #print ("sessions       ", run_wrk(loop,'http://localhost:8080/s',options=opts), "Requests/second" )
+  #print ("sessions (py)  ", run_wrk(loop,'http://localhost:8080/pys',options=opts), "Requests/second" )
   #print ("json post      ", run_wrk(loop,'http://localhost:8080/form'), "Requests/second" )
 
+except KeyboardInterrupt:
+  pass
 finally:
   server.terminate()
   loop.run_until_complete(server.wait())
-  o.close()
 
 #cpu_p = 100
 #while cpu_p > 5:

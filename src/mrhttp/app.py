@@ -11,9 +11,8 @@ import os #, io, pstats
 import sys
 import multiprocessing
 import faulthandler
-from functools import partial
+import functools
 from wsgiref.handlers import format_date_time
-from functools import wraps
 import inspect, copy
 #from inspect import signature #getmodulename, isawaitable, signature, stack
 #from prof import profiler_start,profiler_stop
@@ -102,7 +101,7 @@ class Application(mrhttp.CApp):
       if not uri.startswith('/'): uri = '/' + uri
       def response(func): 
         #if "ssession" in tools:
-          #@wraps(func)
+          #@functools.wraps(func)
           #async def wrapper(*args, **kwds):
             #try:
               #k = self.request.cookies["key"]
@@ -120,16 +119,6 @@ class Application(mrhttp.CApp):
         return func
       return response
 
-
-    def bad_request(self, error):
-        error = error.encode('utf-8')
-
-        response = [
-            'HTTP/1.0 400 Bad Request\r\n',
-            'Content-Type: text/plain; charset=utf-8\r\n',
-            'Content-Length: {}\r\n\r\n'.format(len(error))]
-
-        return ''.join(response).encode('utf-8') + error
 
     def default_request_logger(self, request):
         print(request.remote_addr, request.method, request.path)
@@ -170,15 +159,43 @@ class Application(mrhttp.CApp):
         return self.default_error_handler(request, exception)
 
     def _get_idle_and_busy_connections(self):
-        return []
-            #[c for c in self._connections if c.pipeline_empty], \
-            #[c for c in self._connections if not c.pipeline_empty]
+      return \
+        [c for c in self._connections if c.pipeline_empty], \
+        [c for c in self._connections if not c.pipeline_empty]
 
     async def drain(self):
-      for c in self._connections:
-        if c.transport:
+      await asyncio.sleep(1)
+      idle, busy = self._get_idle_and_busy_connections()
+
+      for c in idle:
+        c.transport.close()
+
+      if idle or busy:
+        print('Draining connections...')
+      else:
+        return
+
+      if idle:
+        print('{} idle connections closed immediately'.format(len(idle)))
+      if busy:
+        print('{} connections busy, read-end closed'.format(len(busy)))
+
+      for x in range(5, 0, -1):
+        await asyncio.sleep(1)
+        idle, busy = self._get_idle_and_busy_connections()
+        for c in idle:
           c.transport.close()
-      # TODO idle / busy
+        if not busy:
+          break
+        else:
+          print( "{} seconds remaining, {} connections still busy" .format(x, len(busy)))
+
+      _, busy = self._get_idle_and_busy_connections()
+      if busy:
+        print('Forcefully killing {} connections'.format(len(busy)))
+      for c in busy:
+        c.pipeline_cancel()
+
 
     def extend_request(self, handler, *, name=None, property=False):
         if not name:
@@ -204,8 +221,8 @@ class Application(mrhttp.CApp):
         self.cinit()
         self.router.finalize_routes()
         self.router.setupRoutes()
+        self._appStart() 
         self.trigger_event("at_start")
-        self._appStart() # TODO remove
 
         #self.mmc = Client("127.0.0.1",7000, self.loop)
         if self.uses_session:
@@ -227,40 +244,35 @@ class Application(mrhttp.CApp):
 
         try:
           loop.run_forever()
+        except KeyboardInterrupt:
+          pass
         finally:
+          print("Stopping ...")
           server.close()
-          #pr.disable()
-          #s = io.StringIO()
-          #sortby = 'cumulative'
-          #ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-          #ps.print_stats()
-          #print(s.getvalue())
-          #profiler_stop()
           loop.run_until_complete(server.wait_closed())
           loop.run_until_complete(self.drain())
+
           self.trigger_event("at_end")
           #self._reaper.stop()
           loop.close()
 
 
-    # Update the response date string every second
+    # Update the response date string every few seconds
     def updateDateString(self):
-      self.response.updateDate( format_date_time(None) )
-      self.loop.call_later(1, self.updateDateString)
+      self.updateDate( format_date_time(None) )
+      self.loop.call_later(5, self.updateDateString)
 
-
-    def appStart(self):
-      pass
 
     def _appStart(self):
-      #self.loop.call_soon(self.updateDateString)
+      self.loop.call_soon(self.updateDateString)
+
+      # TODO Remove as we now have a C memcache client
       if "memcache" in self.config:
         try:
           self.mc = aiomcache.Client(self.config["memcache"][0], self.config["memcache"][1], loop=self.loop, pool_size=1)
         except:
           print("aiomcache must be installed to use sessions")
           exit(0)
-      self.appStart()
 
 
     def _run(self, *, host, port, num_workers=None, reloader_pid=None, debug=None):
@@ -288,7 +300,7 @@ class Application(mrhttp.CApp):
             for worker in workers:
                 worker.terminate()
 
-        signal.signal(signal.SIGINT, stop)
+        #signal.signal(signal.SIGINT, stop)
         signal.signal(signal.SIGTERM, stop)
         signal.signal(signal.SIGHUP, stop)
 
@@ -301,17 +313,20 @@ class Application(mrhttp.CApp):
         sock.close() # Only the kids access the socket
 
         for worker in workers:
-            worker.join()
+            try:
+              worker.join()
 
-            if worker.exitcode > 0:
+              if worker.exitcode > 0:
                 print('Worker exited with code {}'.format(worker.exitcode))
-            elif worker.exitcode < 0:
+              elif worker.exitcode < 0:
                 try:
-                    signame = signames[-worker.exitcode]
+                  signame = signames[-worker.exitcode]
                 except KeyError:
-                    print( 'Worker crashed with unknown code {}!' .format(worker.exitcode))
+                  print( 'Worker crashed with unknown code {}!' .format(worker.exitcode))
                 else:
-                    print('Worker crashed on signal {}!'.format(signame))
+                  print('Worker crashed on signal {}!'.format(signame))
+            except KeyboardInterrupt:
+              pass
 
     def run(self, host='0.0.0.0', port=8080, *, cores=None, reload=False, debug=False):
 

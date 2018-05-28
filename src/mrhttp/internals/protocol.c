@@ -1,5 +1,5 @@
 
-#include "perproc.h"
+
 #include "protocol.h"
 #include "common.h"
 #include "module.h"
@@ -49,7 +49,7 @@ void Protocol_dealloc(Protocol* self)
 {
   parser_dealloc(&self->parser);
   //Py_XDECREF(self->request);
-  Py_XDECREF(self->response);
+  //Py_XDECREF(self->response);
   Py_XDECREF(self->router);
   Py_XDECREF(self->app);
   Py_XDECREF(self->transport);
@@ -70,7 +70,7 @@ int Protocol_init(Protocol* self, PyObject *args, PyObject *kw)
 
   self->request = MrhttpApp_get_request( (MrhttpApp*)self->app );
   //if(!(self->request  = (Request*) PyObject_GetAttrString(self->app, "request" ))) return -1;
-  if(!(self->response = (Response*)PyObject_GetAttrString(self->app, "response"))) return -1;
+  //if(!(self->response = (Response*)PyObject_GetAttrString(self->app, "response"))) return -1;
   if(!(self->router   = (Router*)  PyObject_GetAttrString(self->app, "router"  ))) return -1;
 
   if ( !parser_init(&self->parser, self) ) return -1;
@@ -317,12 +317,14 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *req
   return ret;
 }
 
-void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data ) {
+void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int data_sz ) {
   Protocol *self = (Protocol*)mcd->protocol;
   Request  *req  = mcd->request;
-  //printf("DELME mcd protocl on reply %p\n",self);
+
+  PyObject *session = PyUnicode_FromStringAndSize( data, data_sz );
+  PyObject_CallFunctionObjArgs(req->set_user, session, NULL);
+  
   free(mcd);
-  //printf("DELME before handle req\n");
   if ( !self->closed ) {
     Protocol_handle_request( self, req, req->route );
   } else {
@@ -394,7 +396,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
   DBG printf("protocol handle request\n");
 
   if ( r->mtype ) {
-    self->response->mtype = r->mtype;
+    request->response->mtype = r->mtype;
   }
 
   if ( r->iscoro || !PIPELINE_EMPTY(self)) {
@@ -529,16 +531,17 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
 
   long int rlen, t;
   DBG_RESP printf("protocol write response\n");
-  //char *rbuf = self->response->rbuf;
-  char *rbuf = getResponseBuffer();
 
-  int headerLen = response_updateHeaders(self->response); // Add user headers 
+  int headerLen = response_updateHeaders(req->response); // Add user headers 
   if (!headerLen) return NULL;
 
   // TODO Would unicode to bytes (PyUnicode_AsEncodedString) then concatenate body and header be faster? Could check those functions
   char *r = PyUnicode_AsUTF8AndSize( resp, &rlen ); 
   t = rlen;
   DBG_RESP printf("Response body >%.*s<\n", (int)rlen, r);
+
+  char *rbuf = getResponseBuffer(headerLen + rlen);
+
   memcpy( rbuf + headerLen, r, rlen );
 
   // Faster than sprintf
@@ -574,7 +577,7 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
 }
 
 static inline Protocol* protocol_write_redirect_response(Protocol* self, int code, char *url ) {
-  PyObject *bytes = response_getRedirectResponse( self->response, code, url );
+  PyObject *bytes = response_getRedirectResponse( code, url );
   if ( !bytes ) return NULL;
   PyObject *o;
   if(!(o = PyObject_CallFunctionObjArgs(self->write, bytes, NULL))) return NULL;
@@ -585,7 +588,7 @@ static inline Protocol* protocol_write_redirect_response(Protocol* self, int cod
 
 // TODO rename
 static inline Protocol* protocol_write_error_response(Protocol* self, int code, char *reason, char *msg) { 
-  PyObject *bytes = response_getErrorResponse( self->response, code, reason, msg );
+  PyObject *bytes = response_getErrorResponse( code, reason, msg );
   if ( !bytes ) return NULL;
   PyObject *o;
   if(!(o = PyObject_CallFunctionObjArgs(self->write, bytes, NULL))) return NULL;
@@ -607,7 +610,6 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
     if(!(get_result = PyObject_GetAttrString(task, "result")))
       goto error;
 
-    DBG printf("  pipeline ready2\n");
     if(!(response = PyObject_CallFunctionObjArgs(get_result, NULL))) {
       DBG printf("  exception in coro page handler\n");
       // TODO exception
@@ -656,7 +658,11 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
   } else {
     response = task;
   }
-  DBG printf("  pipeline ready3\n");
+
+  if ( PyBytes_Check( response ) ) {
+    response = PyUnicode_FromEncodedObject( response, "utf-8", "strict" );
+    printf("WARNING: Page handler should return a string. Bytes object returned from the page handler is being converted to unicode using utf-8\n");
+  }
 
   if ( !PyUnicode_Check( response ) ) {
     PyErr_SetString(PyExc_ValueError, "Page handler did not return a string");

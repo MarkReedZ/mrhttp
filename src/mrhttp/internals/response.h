@@ -35,14 +35,14 @@ PyObject* Response_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 int Response_init(Response* self, PyObject *args, PyObject *kwds);
 void Response_dealloc(Response* self);
 
-PyObject *response_updateDate(Response *self, PyObject *date);
+PyObject *response_updateDate(PyObject *date);
 int       response_updateHeaders(Response *self);
 
 PyObject* Response_get_headers(Response* self, void* closure);
 PyObject* Response_get_cookies(Response* self, void* closure);
 
-PyObject* response_getRedirectResponse(Response *self, int code, char *url );
-PyObject* response_getErrorResponse(   Response *self, int code, char *reason, char *msg );
+PyObject* response_getRedirectResponse( int code, char *url );
+PyObject* response_getErrorResponse(    int code, char *reason, char *msg );
 
-void setupResponseBuffer(char* buf);
-char *getResponseBuffer();
+void response_setupResponseBuffer(void);
+char *getResponseBuffer(int sz);

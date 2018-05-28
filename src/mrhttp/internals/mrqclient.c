@@ -8,7 +8,7 @@
 #include "common.h"
 #include "module.h"
 
-static char *resp_buf;
+//static char *resp_buf;
 
 PyObject *MrqClient_new(PyTypeObject* type, PyObject *args, PyObject *kwargs) {
   MrqClient* self = NULL;
