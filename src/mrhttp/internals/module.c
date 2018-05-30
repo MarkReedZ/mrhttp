@@ -1,4 +1,3 @@
-
 #include "module.h"
 #include "protocol.h"
 #include "request.h"
@@ -41,7 +40,7 @@ static PyModuleDef internals_module = {
   "internals",
   "C internals",
   -1,
-  NULL, //mod_methods,
+  mod_methods,
   NULL, NULL, NULL, NULL
 };
 

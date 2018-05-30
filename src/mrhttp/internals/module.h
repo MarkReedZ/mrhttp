@@ -1,3 +1,4 @@
+
 #pragma once
 #include "Python.h"
 #include "request.h"
@@ -15,6 +16,10 @@
   //{"match_request", (PyCFunction)matcher_match_request, METH_O, ""},
   //{NULL}
 //};
+static PyGetSetDef mod_methods[] = {
+  {"randint", myrandint, METH_VARARGS, "Generate a random integer in the interval [0,range]"},
+  {NULL}
+};
 
 static PyMethodDef MemcachedProtocol_methods[] = {
   {"connection_made", (PyCFunction)MemcachedProtocol_connection_made, METH_O,       ""},

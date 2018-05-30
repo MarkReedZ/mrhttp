@@ -127,9 +127,7 @@ PyObject *MrhttpApp_check_idle(MrhttpApp *self) {
     if ( c->num_data_received == 0 ) {
       c->conn_idle_time += check_interval;
       if ( c->conn_idle_time > 20 ) {
-        //printf("DELME connection idle\n");
-        c->conn_idle_time = -2000; //DELME 
-        //if(!protocol_capi->Protocol_close(conn)) goto error;
+        if( !Protocol_close(c) ) goto error;
       }
     } else {
       c->conn_idle_time = 0;
@@ -139,8 +137,6 @@ PyObject *MrhttpApp_check_idle(MrhttpApp *self) {
     if ( c->num_requests_popped == 0 ) {
       c->request_idle_time += check_interval;
       if ( c->request_idle_time >  4 ) {
-        //printf("DELME connection idle\n");
-        c->request_idle_time = -2000; //DELME 
         //if(!protocol_capi->Protocol_close(conn)) goto error;
       }
     } else {

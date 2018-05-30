@@ -5,6 +5,9 @@ import importlib
 
 import tests
 
+# TODO
+#  Check for memcached being up and add the session key so we hit and load the json 43709dd361cc443e976b05714581a7fb
+
 package = tests
 for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
   if modname.startswith("test"):
@@ -108,12 +111,12 @@ try:
 
   opts = ('-H','Cookie: mrsession=43709dd361cc443e976b05714581a7fb;')
   print ("Hello pipelined", run_wrk(loop,'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
-  #print ("Hello          ", run_wrk(loop,'http://localhost:8080/'), "Requests/second" )
-  #print ("Cookies        ", run_wrk(loop,'http://localhost:8080/printCookies'), "Requests/second" )
-  #print ("404            ", run_wrk(loop,'http://localhost:8080/404/'), "Requests/second" )
-  #print ("form parsing   ", run_wrk(loop,'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
-  #print ("sessions       ", run_wrk(loop,'http://localhost:8080/s',options=opts), "Requests/second" )
-  #print ("sessions (py)  ", run_wrk(loop,'http://localhost:8080/pys',options=opts), "Requests/second" )
+  print ("Hello          ", run_wrk(loop,'http://localhost:8080/'), "Requests/second" )
+  print ("Cookies        ", run_wrk(loop,'http://localhost:8080/printCookies'), "Requests/second" )
+  print ("404            ", run_wrk(loop,'http://localhost:8080/404/'), "Requests/second" )
+  print ("form parsing   ", run_wrk(loop,'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
+  print ("sessions       ", run_wrk(loop,'http://localhost:8080/s',options=opts), "Requests/second" )
+  print ("sessions (py)  ", run_wrk(loop,'http://localhost:8080/pys',options=opts), "Requests/second" )
   #print ("json post      ", run_wrk(loop,'http://localhost:8080/form'), "Requests/second" )
 
 except KeyboardInterrupt:

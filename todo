@@ -1,13 +1,17 @@
 
+FINISH send 403?  on request timeout
+
 Sessions 
   gen id uuid.uuid4().hex
   Handle cluster
   periodic info or something to test connection?
   examples - create examples dir
 
+Conn/req timeouts - raise and respond
+
 upload a file
 
-vhosts -- how to do - don't like sanic's 
+vhosts -- how to do this? I don't like sanic's, maybe do cherrypy's redir
   sanic:
     @app.route('/', host=["example.com",
                       "somethingelse.com",
@@ -24,6 +28,7 @@ vhosts -- how to do - don't like sanic's
 
 
 rate limit in C
+Make conn/req timeouts as arguments  (20 / 5 right now)
 
 test partial request / disconnects
 todo add test >128k byte response body to test realloc of response buffer
@@ -35,10 +40,18 @@ Add template bench - eventually can move to C with that sweet C++ json lib fixed
 Allow setting custom error pages 
 
 
+Look at a mysql C client?  We can do better than aiomysql.  Either libmysqlclient or our own
+https://dev.mysql.com/doc/dev/mysql-server/latest/PAGE_PROTOCOL.html
+https://dev.mysql.com/doc/internals/en/a-mysql-client-logs-in.html
+
 
 logging 
 
+Stream large file upload
+https://github.com/channelcat/sanic/issues/546
 
+Dev reload?
+https://github.com/channelcat/sanic/issues/168
 
 
 Write tutorials? github wiki pages
