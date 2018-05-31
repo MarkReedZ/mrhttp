@@ -1,34 +1,18 @@
 
-picohttp
-
-Hello pipelined 3448098.99 Requests/second
-Hello           502512.14 Requests/second
-Cookies         461546.19 Requests/second
-404             317240.0 Requests/second
-form parsing    228569.16 Requests/second
-sessions        523460.98 Requests/second
-sessions (py)   53182.44 Requests/second
-
-Benchmarks
-Hello pipelined 3425797.02 Requests/second
-Hello           513654.82 Requests/second
-Cookies         486019.27 Requests/second
-404             330707.55 Requests/second
-form parsing    226651.53 Requests/second
-sessions        524168.89 Requests/second
-sessions (py)   54207.85 Requests/second
 
 
 
-wrk -t4 -c32 -d5s http://localhost:8080/
 
-valgrind doesn't work with sse4.2/avx2
-valgrind --tool=memcheck --suppressions=valgrind-python.supp python3 -E -tt ./tst.py
+wrk -t4 -c32 -d2s http://localhost:8080/
+
 
 
 ctest/blog/fast_str -- try AVX2 or tfw's
 
 CFLAGS='-Wall -O0 -g' sudo python setup.py build
+
+
+
 
 
 Testing
@@ -60,6 +44,7 @@ Accept: */*
 
 
 Valgrind doesn't work with AVX2 ... 
+valgrind --tool=memcheck --suppressions=valgrind-python.supp python3 -E -tt ./tst.py
 
 FORM urlencoded TODO more params.  Can we fix the performance here?
 curl -d "param1=value1&param2=value2" -X POST http://localhost:8080/form
