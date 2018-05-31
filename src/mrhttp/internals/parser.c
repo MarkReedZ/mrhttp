@@ -56,7 +56,7 @@ int parser_data_received(Parser *self, PyObject *py_data, Request *request ) {
   int i;
 
   if(PyBytes_AsStringAndSize(py_data, &data, &datalen) == -1) {
-    DBG printf("DELME py bytes as string failed\n");
+    DBG printf("WARNING py bytes as string failed\n");
     goto error;
   }
   DBG printf("parser data\n%.*s\n",(int)datalen, data);
@@ -91,7 +91,8 @@ parse_headers:
 
   request->num_headers = 100; // Max allowed headers
   DBG_PARSER printf("before parser requests\n");
-  rc = phr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, request->headers, &(request->num_headers), prevbuflen);
+
+  rc = mr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, request->headers, &(request->num_headers), prevbuflen);
   DBG_PARSER printf("parser requests rc %d\n",rc);
   if ( rc < 0 ) return rc; // -2 incomplete, -1 error otherwise byte len of headers
 
@@ -115,15 +116,9 @@ parse_headers:
 #define header_value_equal(val) \
   header->value_len == strlen(val) && fast_compare(header->value, val, header->value_len) == 0
 
-#ifdef MRHTTP
  for(struct mr_header* header = request->headers;
       header < request->headers + request->num_headers;
       header++) {
-#else
- for(struct phr_header* header = request->headers;
-      header < request->headers + request->num_headers;
-      header++) {
-#endif
 
 /*
 Transfer-Encoding: chunked

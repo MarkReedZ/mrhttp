@@ -61,6 +61,13 @@ def content(r):
   print( r.encoding )
   return r.mime_type
 
+@app.route('/query_string')
+def query_string(r):
+  return str(r.args)
+
+
+
+
 @app.route('/form')
 def parseForm(r):
   return r.form["param2"]

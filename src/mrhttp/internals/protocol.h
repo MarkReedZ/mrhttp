@@ -76,6 +76,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len);
 Protocol* Protocol_on_error(Protocol* self, PyObject*);
 
 Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r);
+void Protocol_timeout_request(Protocol* self);
 
 
 static inline Protocol* protocol_write_response(Protocol* self, Request *req, PyObject* resp);

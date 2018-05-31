@@ -39,7 +39,5 @@ PyObject* MemcachedProtocol_connection_lost (MemcachedProtocol* self, PyObject* 
 PyObject* MemcachedProtocol_data_received   (MemcachedProtocol* self, PyObject* data);
 PyObject* MemcachedProtocol_eof_received    (MemcachedProtocol* self);
 
-//int MemcachedProtocol_asyncGet    (MemcachedProtocol* self, void* fn);
-//typedef struct {
-  //int (*MemcachedProtocol_asyncGet) (MemcachedProtocol* self, void* fn);
-//} MemcachedProtocol_CAPI;
+int MemcachedProtocol_asyncGet( MemcachedProtocol* self, char *key, void *fn, void *connection );
+

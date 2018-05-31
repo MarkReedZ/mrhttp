@@ -35,11 +35,17 @@ PyObject* Response_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 int Response_init(Response* self, PyObject *args, PyObject *kwds);
 void Response_dealloc(Response* self);
 
+void Response_reset(Response *self);
+
+
 PyObject *response_updateDate(PyObject *date);
 int       response_updateHeaders(Response *self);
 
 PyObject* Response_get_headers(Response* self, void* closure);
 PyObject* Response_get_cookies(Response* self, void* closure);
+int Response_set_cookies(Response *self, PyObject *value, void *closure);
+int response_add_headers( Response *self, char *p );
+int response_add_cookies( Response *self, char *p );
 
 PyObject* response_getRedirectResponse( int code, char *url );
 PyObject* response_getErrorResponse(    int code, char *reason, char *msg );

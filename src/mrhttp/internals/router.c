@@ -162,7 +162,7 @@ Route* router_getRoute(Router* self, Request* request) {
   DBG printf("router getRoute\n");
   request_decodePath( request );
   int plen = request->path_len;
-  DBG printf("path >%.*s<\n", plen, request->path );
+  DBG printf("DELME path >%.*s<\n", plen, request->path );
  
   Route *r = self->staticRoutes;
   for (int i = 0; i<self->numStaticRoutes; i++,r++ ) {

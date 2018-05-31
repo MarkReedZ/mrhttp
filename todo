@@ -1,15 +1,16 @@
 
-FINISH send 403?  on request timeout
+
+Remove picohttpparser and cleanup mrhttpparser
 
 Sessions 
-  gen id uuid.uuid4().hex
+  examples - create examples dir
+    gen id uuid.uuid4().hex
   Handle cluster
   periodic info or something to test connection?
-  examples - create examples dir
 
-Conn/req timeouts - raise and respond
 
 upload a file
+  https://stackoverflow.com/questions/12667797/using-curl-to-upload-post-data-with-files
 
 vhosts -- how to do this? I don't like sanic's, maybe do cherrypy's redir
   sanic:
@@ -30,19 +31,15 @@ vhosts -- how to do this? I don't like sanic's, maybe do cherrypy's redir
 rate limit in C
 Make conn/req timeouts as arguments  (20 / 5 right now)
 
-test partial request / disconnects
 todo add test >128k byte response body to test realloc of response buffer
 
 Add template bench - eventually can move to C with that sweet C++ json lib fixed up and jinja
-
 
 ?? ip = cherrypy.request.remote.ip
 Allow setting custom error pages 
 
 
-Look at a mysql C client?  We can do better than aiomysql.  Either libmysqlclient or our own
-https://dev.mysql.com/doc/dev/mysql-server/latest/PAGE_PROTOCOL.html
-https://dev.mysql.com/doc/internals/en/a-mysql-client-logs-in.html
+
 
 
 logging 
@@ -58,4 +55,17 @@ Write tutorials? github wiki pages
 Flask:
 https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world
 
+
+
+
+Look at a mysql C client?  We can do better than aiomysql.  Either libmysqlclient or our own
+https://dev.mysql.com/doc/dev/mysql-server/latest/PAGE_PROTOCOL.html
+https://dev.mysql.com/doc/internals/en/a-mysql-client-logs-in.html
+
+
+Something like this? 
+
+The goal of Mrhttp is not just to provide a C async server, but to implement as much as possible in C.  Take a look at the C vs python session numbers.  A session reads the key from the cookie, fetches the user json from memcached and then converts the json string into an object.  By moving this into the server we're able to speed this common case up by 10x.
+
+So we need your help to find common patterns to implement in C.  If you have one please open an issue, mark it as an enhancement and leave some example code so we can benchmark and discuss.  Don't forget to pop in and [vote on your favorites](https://github.com/MarkReedZ/mrhttp/labels/enhancement).
 

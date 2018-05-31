@@ -1,12 +1,11 @@
 
-
-
 #include <Python.h>
 #include <stdbool.h>
 
 #include "request.h"
 #include "common.h"
 #include "module.h"
+#include "time.h"
 
 PyObject *MrhttpApp_new(PyTypeObject* type, PyObject *args, PyObject *kwargs) {
   MrhttpApp* self = NULL;
@@ -20,6 +19,7 @@ void MrhttpApp_dealloc(MrhttpApp* self) {
 }
 
 int MrhttpApp_init(MrhttpApp* self, PyObject *args, PyObject *kwargs) {
+  srand(time(0)); // TODO seed utils.randint
   return 0;
 }
 
@@ -43,7 +43,7 @@ PyObject *MrhttpApp_cinit(MrhttpApp* self) {
   self->check_interval = PyLong_FromLong(5);
   self->check_idle_handle = PyObject_CallFunctionObjArgs( self->call_later, self->check_interval, self->check_idle, NULL);
 
-  self->func_expand_requests = PyObject_GetAttrString(self, "expand_requests");
+  self->func_expand_requests = PyObject_GetAttrString((PyObject*)self, "expand_requests");
 
   response_setupResponseBuffer();
 
@@ -124,6 +124,7 @@ PyObject *MrhttpApp_check_idle(MrhttpApp *self) {
       //"conn %p, idle_time %ld, read_ops %ld, last_read_ops %ld",
       //conn, conn->idle_time, conn->read_ops, conn->last_read_ops);
 
+    // Connection hung
     if ( c->num_data_received == 0 ) {
       c->conn_idle_time += check_interval;
       if ( c->conn_idle_time > 20 ) {
@@ -134,10 +135,11 @@ PyObject *MrhttpApp_check_idle(MrhttpApp *self) {
       c->num_data_received = 0;
     }
 
+    // Request handler hung
     if ( c->num_requests_popped == 0 ) {
       c->request_idle_time += check_interval;
       if ( c->request_idle_time >  4 ) {
-        //if(!protocol_capi->Protocol_close(conn)) goto error;
+        Protocol_timeout_request(c);
       }
     } else {
       c->request_idle_time = 0;

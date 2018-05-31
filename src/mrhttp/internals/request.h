@@ -16,11 +16,7 @@ typedef struct {
   bool qs_decoded;
   size_t qs_len;
   int minor_version;
-#ifdef MRHTTP
   struct mr_header* headers;
-#else
-  struct phr_header* headers;
-#endif
   size_t num_headers;
   char* body;
   size_t body_len;
@@ -41,6 +37,8 @@ typedef struct {
   PyObject* py_headers;
   PyObject* py_cookies;
   PyObject* py_body;
+  PyObject* py_query_string;
+  PyObject* py_args;
 
   Response* response;
 } Request;
@@ -52,11 +50,7 @@ void Request_dealloc(Request* self);
 
 void Request_reset(Request *self);
 
-#ifdef MRHTTP
 void request_load(Request* self, char* method, size_t method_len, char* path, size_t path_len, int minor_version, struct mr_header* headers, size_t num_headers);
-#else
-void request_load(Request* self, char* method, size_t method_len, char* path, size_t path_len, int minor_version, struct phr_header* headers, size_t num_headers);
-#endif
 //void Request_set_body(Request* self, char* body, size_t body_len);
 PyObject* Request_add_done_callback(Request* self, PyObject* callback);
 
@@ -66,6 +60,8 @@ PyObject* Request_get_transport(Request* self, void* closure);
 PyObject* Request_get_headers(Request* self, void* closure);
 PyObject* Request_get_cookies(Request* self, void* closure);
 PyObject* Request_get_body(Request* self, void* closure);
+PyObject* Request_get_query_string(Request* self, void* closure);
+PyObject* Request_get_query_args(Request* self, void* closure);
 
 char* request_getDecodedPath(Request* self);
 void request_decodePath(Request* self);

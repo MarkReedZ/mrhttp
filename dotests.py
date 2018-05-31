@@ -19,11 +19,14 @@ for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
           exit()
     for f in functions:
       if f[0].startswith("test_"):
-        f[1]()
+        try:
+          f[1]()
+        except Exception as e:
+          print(e)
     for f in functions:
       if f[0] == 'teardown':
         f[1]()
- 
+
 print("Benchmarks")
     
 import argparse

@@ -1,4 +1,23 @@
 
+picohttp
+
+Hello pipelined 3448098.99 Requests/second
+Hello           502512.14 Requests/second
+Cookies         461546.19 Requests/second
+404             317240.0 Requests/second
+form parsing    228569.16 Requests/second
+sessions        523460.98 Requests/second
+sessions (py)   53182.44 Requests/second
+
+Benchmarks
+Hello pipelined 3425797.02 Requests/second
+Hello           513654.82 Requests/second
+Cookies         486019.27 Requests/second
+404             330707.55 Requests/second
+form parsing    226651.53 Requests/second
+sessions        524168.89 Requests/second
+sessions (py)   54207.85 Requests/second
+
 
 
 wrk -t4 -c32 -d5s http://localhost:8080/
@@ -27,7 +46,12 @@ ASAN_OPTIONS=halt_on_error=0 LD_PRELOAD=/usr/lib/gcc/x86_64-linux-gnu/7/libasan.
 
 Telnet and send partial / bad requests
 <<<
-GET /session HTTP/1.1
+GET / HTTP/1.1
+Host: localhost:8080
+User-Agent: curl/7.51.0
+Accept: */*
+
+GET / HTTP/1.1
 Host: localhost:8080
 User-Agent: curl/7.51.0
 Accept: */*
@@ -43,7 +67,7 @@ wrk -t4 -c32 -d1s http://localhost:8080/form -s tests/form.lua
 
 JSON post:
 curl -H "Content-Type: application/json" -X POST -d '{"username":"xyz","password":"xyz"}' http://localhost:8080/
-curl -H "Content-Type: application/json" -X POST -d '[1,2,3,4,5,6,7,8,9]' http://localhost:8080/
+curl -H "Content-Type: application/json" -X POST -d '[1,2,3,4,5,6,7,8,9]' http://localhost:8080/printPostBody
 
 wrk -t4 -c32 -d5s http://localhost:8080/ -s tests/post.lua
 

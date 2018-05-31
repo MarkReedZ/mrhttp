@@ -33,7 +33,7 @@ app = Application()
 def hello(r):
   return 'Hello World!'
 
-app.run(debug=True, cores=1)
+app.run(cores=1)
 
 ```
 
@@ -41,13 +41,5 @@ Installation
 ------------
 
 -  ``pip install mrhttp``
-
-
-Philosophy
-----------
-
-The goal of Mrhttp is not just to provide a C async server, but to implement as much as possible in C.  Take a look at the C vs python session numbers.  A session reads the key from the cookie, fetches the user json from memcached and then converts the json string into an object.  By moving this into the server we're able to speed this common case up by 10x.  
-
-So we need your help to find common patterns to implement in C.  If you have one please open an issue, mark it as an enhancement and leave some example code so we can benchmark and discuss.  Don't forget to pop in and [vote on your favorites](https://github.com/MarkReedZ/mrhttp/labels/enhancement).
 
 

@@ -3,11 +3,7 @@
 #include <Python.h>
 #include <request.h>
 
-#ifdef MRHTTP
 #include "mrhttpparser.h"
-#else
-#include "picohttpparser.h"
-#endif
 
 enum connection_state {
   UNSET,
@@ -22,16 +18,11 @@ typedef struct {
   int parsed_headers;
   long body_length;
 
-#ifdef MRHTTP
   struct mr_chunked_decoder chunked_decoder;
-#else
-  struct phr_chunked_decoder chunked_decoder;
-#endif
   size_t chunked_offset;
 
   char *buf, *buf_end, *start, *end;
   int buf_size;
-
 
   void* protocol;
 

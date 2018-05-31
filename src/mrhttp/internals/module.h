@@ -8,6 +8,7 @@
 #include "mrqclient.h"
 #include "router.h"
 #include "app.h"
+#include "utils.h"
 
 //PyMethodDef Request_methods[];
 //PyGetSetDef Request_getset[];
@@ -16,8 +17,8 @@
   //{"match_request", (PyCFunction)matcher_match_request, METH_O, ""},
   //{NULL}
 //};
-static PyGetSetDef mod_methods[] = {
-  {"randint", myrandint, METH_VARARGS, "Generate a random integer in the interval [0,range]"},
+static PyMethodDef mod_methods[] = {
+  {"randint", (PyCFunction)myrandint, METH_VARARGS, "Generate a random integer in the interval [0,range]"},
   {NULL}
 };
 
@@ -77,6 +78,9 @@ static PyGetSetDef Request_getset[] = {
   {"headers", (getter)Request_get_headers, NULL, "", NULL},
   {"cookies", (getter)Request_get_cookies, NULL, "", NULL},
   {"body", (getter)Request_get_body, NULL, "", NULL},
+  {"query_string", (getter)Request_get_query_string, NULL, "", NULL},
+  {"args", (getter)Request_get_query_args, NULL, "", NULL},
+
   {NULL}
 };
 
@@ -85,7 +89,7 @@ static PyMethodDef Response_methods[] = {
 };
 static PyGetSetDef Response_getset[] = {
   {"headers", (getter)Response_get_headers, NULL, "", NULL},
-  {"cookies", (getter)Response_get_cookies, NULL, "", NULL},
+  {"cookies", NULL, (setter)Response_set_cookies, "", NULL},
   {NULL}
 };
 

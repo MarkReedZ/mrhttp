@@ -1,5 +1,4 @@
 
-
 #include "protocol.h"
 #include "common.h"
 #include "module.h"
@@ -15,7 +14,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-void printErr() {
+void printErr(void) {
   PyObject *type, *value, *traceback;
   PyErr_Fetch(&type, &value, &traceback);
   printf("Unhandled exception :\n");
@@ -74,7 +73,7 @@ int Protocol_init(Protocol* self, PyObject *args, PyObject *kw)
   if(!PyArg_ParseTuple(args, "O", &self->app)) return -1;
   Py_INCREF(self->app);
 
-  self->request = MrhttpApp_get_request( (MrhttpApp*)self->app );
+  self->request = (Request*)MrhttpApp_get_request( (MrhttpApp*)self->app );
   //if(!(self->request  = (Request*) PyObject_GetAttrString(self->app, "request" ))) return -1;
   //if(!(self->response = (Response*)PyObject_GetAttrString(self->app, "response"))) return -1;
   if(!(self->router   = (Router*)  PyObject_GetAttrString(self->app, "router"  ))) return -1;
@@ -237,7 +236,6 @@ PyObject* pipeline_queue(Protocol* self, PipelineRequest r)
   PyObject* result = Py_None; 
   PyObject* add_done_callback = NULL;
 
-  // TODO Doesn't this mean both are 0?  
   if(PIPELINE_EMPTY(self)) {
     self->queue_start = self->queue_end = 0;
   }
@@ -384,7 +382,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
       mcd->request  = self->request;
       MemcachedProtocol_asyncGet( self->memprotocol, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
       // Get a new request object so we don't overwrite this one while waiting for the reply
-      self->request = MrhttpApp_get_request( (MrhttpApp*)self->app );
+      self->request = (Request*)MrhttpApp_get_request( (MrhttpApp*)self->app );
       return self;
 
     }
@@ -409,7 +407,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
   if ( r->iscoro || !PIPELINE_EMPTY(self)) {
     //self->gather.enabled = false;
     // If we can't finish now save this request by grabbing a new free request if we haven't already done so
-    if ( self->request == request ) self->request = MrhttpApp_get_request( (MrhttpApp*)self->app );
+    if ( self->request == request ) self->request = (Request*)MrhttpApp_get_request( (MrhttpApp*)self->app );
   }
 
   if(!(result = protocol_callPageHandler(self, r->func, request)) ) {
@@ -570,7 +568,7 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
     rbuf[88] = 'c'; rbuf[89] = 'l'; rbuf[90] = 'o'; rbuf[91] = 's'; rbuf[92] = 'e'; rbuf[93] = ' '; rbuf[94] = ' '; rbuf[95] = ' '; rbuf[96] = ' '; rbuf[97] = ' ';
   }
 
-  DBG_RESP printf( "rlen headerlen %d %d\n", rlen, headerLen);
+  DBG_RESP printf( "rlen headerlen %ld %d\n", rlen, headerLen);
   DBG_RESP printf( "Sending response:\n\n%.*s\n", (int)rlen + headerLen, rbuf );
   PyObject *bytes;
   bytes = PyBytes_FromStringAndSize( rbuf, rlen + headerLen );
@@ -811,3 +809,16 @@ PyObject* Protocol_get_transport(Protocol* self)
   Py_INCREF(self->transport);
   return self->transport;
 }
+
+void Protocol_timeout_request(Protocol* self) {
+  if ( !PIPELINE_EMPTY(self) ) {
+    self->queue_start++; // Drop the request
+    protocol_write_error_response(self, 503,"Service unavailable","The server timed out responding to your request and may be overloaded.  Please try again later.");
+    protocol_task_done(self, NULL);
+  }
+
+}
+
+
+
+

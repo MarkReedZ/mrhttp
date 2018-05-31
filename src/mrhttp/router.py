@@ -62,12 +62,19 @@ class Router(mrhttp.CRouter):
   def __init__(self):
     self.routes = []
     self.static_routes = []
+    self.func_namemap= {}
+
     super().__init__()
 
   def finalize_routes(self):
     self.routes.sort(key=lambda x: x["sortlen"],reverse=True)
 
   def add_route(self, handler, uri, methods=['GET'], tools=[],type="html"):
+
+    if handler.__name__ in self.func_namemap:
+      raise ValueError("You have page handlers with the same name - use unique function names")
+    self.func_namemap[ handler.__name__ ] = 1
+
     #print("DELME add route func ",hex(id(handler)))
     #if asyncio.iscoroutinefunction(handler) and is_pointless_coroutine(handler):
       #handler = coroutine_to_func(handler)

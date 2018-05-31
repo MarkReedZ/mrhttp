@@ -35,6 +35,14 @@ def test_one():
   r = requests.get('http://localhost:8080/print/%E4%B8%8D%E5%8F%AF%E5%86%8D%E7%94%9F%E8%B5%84%E6%BA%90/?test')
   eq(r.text, "不可再生资源")
 
+  # Query string ?foo=bar
+  r = requests.get('http://localhost:8080/query_string')
+  eq(r.text, "{}")
+  r = requests.get('http://localhost:8080/query_string?foo=bar')
+  eq(r.text, "{'foo': 'bar'}")
+  r = requests.get('http://localhost:8080/query_string?a=b&foo=bar&ABCDE=01234567890123456789')
+  eq(r.text, "{'a': 'b', 'foo': 'bar', 'ABCDE': '01234567890123456789'}")
+
   # requests orders cookie keys alphabetically looks like
   r = requests.post('http://localhost:8080/printPostBody', json={"key": "value"})
   eq(r.text, '{"key": "value"}')

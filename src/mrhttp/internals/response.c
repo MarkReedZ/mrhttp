@@ -41,7 +41,15 @@ void Response_dealloc(Response* self) {
   Py_TYPE(self)->tp_free((PyObject*)self);
   //free(self->rbuf);
   //free(self->errbuf);
+  Py_XDECREF(self->cookies);
+  Py_XDECREF(self->headers);
 }
+
+void Response_reset(Response *self) {
+  self->headers = NULL;
+  self->cookies = NULL;
+}
+
 
 char *getResponseBuffer(int sz) {
   if ( sz > rbuf_sz ) {
@@ -55,6 +63,7 @@ int Response_init(Response* self, PyObject *args, PyObject* kw)
 {
   self->mtype = 0;
   self->headers = NULL;
+  self->cookies = NULL;
   return 0;
 }
 
@@ -79,14 +88,28 @@ int response_updateHeaders(Response *self) {
     else if ( self->mtype == 2 ) { memcpy( p+117, resp_json,  20 ); ret = 137; }
   } 
 
-  // TODO Add response headers
-  if ( self->headers == NULL ) return ret;
+  if ( self->headers != NULL ) {
+    int hlen = response_add_headers( self, rbuf+ret-2 );
+    if ( hlen ) ret += hlen-2;
+    // else TODO raise an error or just ignore 
+  }
+  if ( self->cookies != NULL ) {
+    int l = response_add_cookies( self, rbuf+ret-2 );
+    if ( l ) ret += l-2;
+    // else TODO raise an error or just ignore 
+  }
+  Py_XDECREF(self->cookies);
+  Py_XDECREF(self->headers);
+  self->headers = NULL;
+  self->cookies = NULL;
+  return ret;
+}
 
+int response_add_headers( Response *self, char *p ) {
+  int ret = 0;
   Py_ssize_t num;
   num = PyDict_Size(self->headers);
-  if(!num) goto skip_headers;
-  ret -= 2;
-  char *p = rbuf + ret;
+  if(!num) return 0;
   char *s = p;
 
   PyObject *name, *value;
@@ -101,8 +124,8 @@ int response_updateHeaders(Response *self) {
     //PyObject_Print( value, stdout, 0 ); printf("\n");
 
     // TODO This returns a bad v.  No matter how I do AsUTF8 its bad so convert to bytes first 
-    //      No clue how that can happen
     //v = PyUnicode_AsUTF8AndSize(value, &vlen);
+
     PyBytes_AsStringAndSize( PyUnicode_AsUTF8String(value), &v, &vlen);
     if(!(k = PyUnicode_AsUTF8AndSize(name, &klen))) return 0;
     if ( v == NULL ) return 0;
@@ -120,11 +143,33 @@ int response_updateHeaders(Response *self) {
   }
   *p++ = '\r';
   *p++ = '\n';
-  ret += p-s;
 
-skip_headers:
+  return p-s;
+}
 
-  return ret;
+int response_add_cookies( Response *self, char *p ) {
+  Py_ssize_t clen;
+  if((clen = PyObject_Size(self->cookies)) < 0) return 0;
+
+  if(!clen) return 0;
+
+  PyObject* c_str = NULL;
+  PyObject* c_bytes = NULL;
+
+  if(!(c_str = PyObject_Str(self->cookies))) return 0;
+
+  if(!(c_bytes = PyUnicode_AsASCIIString(c_str))) return 0;
+
+  char* cptr;
+  if(PyBytes_AsStringAndSize(c_bytes, &cptr, &clen) == -1) return 0;
+
+  memcpy(p, cptr, (size_t)clen); p += (size_t)clen;
+  *p++ = '\r';
+  *p++ = '\n';
+  *p++ = '\r';
+  *p++ = '\n';
+
+  return clen+4;
 }
 
 PyObject* Response_get_headers(Response* self, void* closure)
@@ -134,6 +179,12 @@ PyObject* Response_get_headers(Response* self, void* closure)
   }
   Py_XINCREF(self->headers);
   return self->headers;
+}
+
+int Response_set_cookies(Response *self, PyObject *value, void *closure) {
+  self->cookies = value;
+  Py_XINCREF(self->cookies);
+  return 0;
 }
 
 PyObject* Response_get_cookies(Response* self, void* closure)
