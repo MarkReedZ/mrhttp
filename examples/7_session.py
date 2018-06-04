@@ -1,0 +1,39 @@
+
+
+# Run this and open your browser to http://localhost:8080/ 
+
+import mrhttp
+try:
+  import mrjson as json
+except:
+  print("This example requires\n\npip install mrjson\n\n")
+
+app = mrhttp.Application()
+app.config["memcache"] = [ ("127.0.0.1", 11211) ]
+
+
+@app.route('/',tools=['session'])
+def session(r):
+
+  if r.user == None:
+    return "You are not logged in.  <a href='login'>Login here</a>"
+
+  if ( r.user["user"] == 'Mark' ): 
+    return "You are logged in as Mark"
+
+  return "session"
+
+
+@app.route('/login')
+async def login(r):
+
+  # This creates a session key, stores it in memcache with the user's data, and sets the session
+  # cookie in the browser
+  app.setSessionUserAndCookies( r, json.dumps({"user":"Mark"}) )
+
+  return "You are now logged in! <a href='/'> Try the main page </a>"
+
+app.run(cores=1)
+
+# Open your browser to http://localhost:8080/ 
+
