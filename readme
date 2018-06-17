@@ -48,13 +48,14 @@ valgrind --tool=memcheck --suppressions=valgrind-python.supp python3 -E -tt ./ts
 
 FORM urlencoded TODO more params.  Can we fix the performance here?
 curl -d "param1=value1&param2=value2" -X POST http://localhost:8080/form
-wrk -t4 -c32 -d1s http://localhost:8080/form -s tests/form.lua
+wrk -t4 -c32 -d1s http://localhost:8080/form -s tests/lua/form.lua
 
 JSON post:
 curl -H "Content-Type: application/json" -X POST -d '{"username":"xyz","password":"xyz"}' http://localhost:8080/
 curl -H "Content-Type: application/json" -X POST -d '[1,2,3,4,5,6,7,8,9]' http://localhost:8080/printPostBody
 
-wrk -t4 -c32 -d5s http://localhost:8080/ -s tests/post.lua
+wrk -t4 -c32 -d5s http://localhost:8080/q/1/2/ -s tests/lua/post.lua
+wrk -t4 -c32 -d5s http://localhost:8080/q/1/2/ -s tests/lua/q-pipeline.lua
 
 Session testing
 curl -i --raw http://localhost:8080/s -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"

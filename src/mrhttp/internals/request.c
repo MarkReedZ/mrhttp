@@ -1,4 +1,5 @@
 
+
 #include <stddef.h>
 #include <sys/param.h>
 #include <strings.h>
@@ -62,13 +63,18 @@ PyObject* Request_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 void Request_dealloc(Request* self) {
 
-  //TODO these two are not incref'd, but we don't create/destroy requests currently  
-  Py_XDECREF(self->transport);
-  Py_XDECREF(self->app);
+  printf("DELME request dealloc\n");
 
   free(self->headers);
 
+  Py_XDECREF(self->set_user);
   Py_XDECREF(self->py_headers);
+  Py_XDECREF(self->py_body);
+  Py_XDECREF(self->py_cookies);
+  Py_XDECREF(self->py_query_string);
+  Py_XDECREF(self->py_args);
+  Py_XDECREF(self->py_path);
+  Py_XDECREF(self->py_method);
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -88,8 +94,13 @@ int Request_init(Request* self, PyObject *args, PyObject* kw)
 void Request_reset(Request *self) {
   self->inprog = false;
   self->session_id = NULL;
+  Py_XDECREF(self->py_headers);
+  Py_XDECREF(self->py_body);
+  Py_XDECREF(self->py_path);
+  Py_XDECREF(self->py_method);
   self->py_headers = NULL;
   self->py_body = NULL;
+  self->py_path = NULL;
   self->py_method = NULL;
   self->num_headers = 0;
   Response_reset(self->response);
@@ -112,20 +123,16 @@ void request_load(Request* self, char* method, size_t method_len, char* path, si
   //self->keep_alive = KEEP_ALIVE_UNSET;
 
 }
+PyObject* Request_cleanup(Request* self) {
+  Py_XDECREF(self->set_user); self->set_user = NULL;
+  Py_RETURN_NONE;
+}
 
 PyObject* Request_add_done_callback(Request* self, PyObject* callback)
 {
   Py_RETURN_NONE;
 }
 
-PyObject* Request_get_method(Request* self, void* closure)
-{
-  if(!self->py_method) {
-    self->py_method = PyUnicode_DecodeLatin1( "TEST", 4, NULL); //TODO
-  }
-  Py_XINCREF(self->py_method);
-  return self->py_method;
-}
 PyObject* Request_get_transport(Request* self, void* closure) {
   DBG printf("request transport ptr %p\n",self->transport);
   if (self->transport) {
@@ -226,7 +233,7 @@ static inline size_t sse_decode(char* path, ssize_t length, size_t *qs_len) {
       write++;
     }
   }
-  DBG printf("sse_decode >%.*s<\n", (int)length, path);
+  DBG printf("sse_decode len %d path >%.*s<\n", (int)length, (int)length, path);
 
   return length;
 }
@@ -509,6 +516,27 @@ static inline PyObject* parse_query_args( char *buf, size_t buflen ) {
 }
 
 
+PyObject* Request_get_path(Request* self, void* closure)
+{
+  request_decodePath(self);
+  if(!self->py_path) {
+    if ( self->path_len == 0 ) self->py_path = Py_None;
+    else self->py_path = PyUnicode_FromStringAndSize(self->path, self->path_len);
+  }
+  Py_XINCREF(self->py_path);
+  return self->py_path;
+}
+PyObject* Request_get_method(Request* self, void* closure)
+{
+  if(!self->py_method) {
+    if ( self->method_len == 0 ) self->py_method = Py_None;
+    else self->py_method = PyUnicode_FromStringAndSize(self->method, self->method_len);
+    //TODO Decode latin? self->py_method = PyUnicode_DecodeLatin1( REQUEST_METHOD(self), self->method_len, NULL);
+
+  }
+  Py_XINCREF(self->py_method);
+  return self->py_method;
+}
 PyObject* Request_get_query_string(Request* self, void* closure)
 {
   if(!self->py_query_string) {

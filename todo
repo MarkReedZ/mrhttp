@@ -1,11 +1,20 @@
 
 
+python dotests.py then ctrl-c during benchmark "RuntimeError: Event loop stopped before Future completed."
+
+nginx mrq
 
 Sessions 
-  examples - create examples dir
-    gen id uuid.uuid4().hex
-  Handle cluster
-  periodic info or something to test connection?
+  handle connections drops, hangs? I'm in the middle of this
+  commit all the session changes and example
+
+test for replace header with r.headers and check 4_reponse.py works
+  setContentType or catch it return -1 and rerun add_headers
+
+
+Wiki doc:
+http://www.django-rest-framework.org/api-guide/requests/
+
 
 
 upload a file
@@ -25,21 +34,24 @@ vhosts -- how to do this? I don't like sanic's, maybe do cherrypy's redir
 
 
 
-
-
 rate limit in C
 Make conn/req timeouts as arguments  (20 / 5 right now)
 
 todo add test >128k byte response body to test realloc of response buffer
-
-Add template bench - eventually can move to C with that sweet C++ json lib fixed up and jinja
 
 ?? ip = cherrypy.request.remote.ip
 Allow setting custom error pages 
 
 
 
+Why is 404 so slow?
+  raised. We could try to cache it. Create a bytes obj and test just writing that. Or not use the raise method app.404 or something
 
+This is slow so do it in C to speed up forms
+  urllib.parse.parse_qsl('foo=bar&baz=foor&dogsdont=likecats')
+
+
+examples/5_router.py -- methods?
 
 logging 
 
@@ -55,16 +67,11 @@ Flask:
 https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world
 
 
+Create an async memcached client - needed for clustering
 
 
 Look at a mysql C client?  We can do better than aiomysql.  Either libmysqlclient or our own
 https://dev.mysql.com/doc/dev/mysql-server/latest/PAGE_PROTOCOL.html
 https://dev.mysql.com/doc/internals/en/a-mysql-client-logs-in.html
 
-
-Something like this? 
-
-The goal of Mrhttp is not just to provide a C async server, but to implement as much as possible in C.  Take a look at the C vs python session numbers.  A session reads the key from the cookie, fetches the user json from memcached and then converts the json string into an object.  By moving this into the server we're able to speed this common case up by 10x.
-
-So we need your help to find common patterns to implement in C.  If you have one please open an issue, mark it as an enhancement and leave some example code so we can benchmark and discuss.  Don't forget to pop in and [vote on your favorites](https://github.com/MarkReedZ/mrhttp/labels/enhancement).
 

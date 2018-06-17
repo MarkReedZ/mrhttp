@@ -1,4 +1,5 @@
 
+
 #include <Python.h>
 #include <stdbool.h>
 
@@ -36,8 +37,8 @@ PyObject *MrhttpApp_cinit(MrhttpApp* self) {
   PyObject* loop = NULL;
 
   if(!(self->connections = PyObject_GetAttrString((PyObject*)self, "_connections"))) goto error;
-  if(!(loop = PyObject_GetAttrString((PyObject*)self, "_loop"))) goto error;
-  if(!(self->call_later = PyObject_GetAttrString(loop, "call_later"))) goto error;
+  if(!(self->loop = PyObject_GetAttrString((PyObject*)self, "_loop"))) goto error;
+  if(!(self->call_later = PyObject_GetAttrString(self->loop, "call_later"))) goto error;
 
   if(!(self->check_idle = PyObject_GetAttrString((PyObject*)self, "check_idle"))) goto error;
   self->check_interval = PyLong_FromLong(5);
@@ -46,6 +47,9 @@ PyObject *MrhttpApp_cinit(MrhttpApp* self) {
   self->func_expand_requests = PyObject_GetAttrString((PyObject*)self, "expand_requests");
 
   response_setupResponseBuffer();
+
+
+  
 
   Py_RETURN_NONE;
 error:
@@ -111,10 +115,27 @@ PyObject *MrhttpApp_updateDate(MrhttpApp *self, PyObject *date) {
   return response_updateDate(date);
 }
 
+//DELME
+//PyObject *MrhttpApp_test_fut(MrhttpApp *self) {
+  //PyObject *cf = PyObject_GetAttrString(self->loop, "create_future");
+  //self->fut =     PyObject_CallFunctionObjArgs(cf, NULL);
+  //return self->fut;
+//}
+
 PyObject *MrhttpApp_check_idle(MrhttpApp *self) {
 
   PyObject* iterator = NULL;
   Protocol* c = NULL;
+
+  // DELME
+  //if ( self->fut != NULL ) {
+    //printf("Setting fut result!\n");
+    //PyObject *cf = PyObject_GetAttrString(self->fut, "set_result");
+    //PyObject *ret = PyObject_CallFunctionObjArgs(cf, Py_None, NULL);
+    //self->fut = NULL;
+    //Py_RETURN_NONE;
+  //}
+
   
   if(!(iterator = PyObject_GetIter(self->connections))) goto error;
   

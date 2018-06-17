@@ -4,7 +4,9 @@
 *.egg
 *.eggs
 *.pyc
+*.cache
 *.swp
 settings.py
 build/*
 .DS_Store
+__pycache__

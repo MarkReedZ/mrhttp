@@ -31,6 +31,7 @@ typedef struct {
   //char* session_value;
   void *route;
 
+  PyObject* py_path;
   PyObject* py_method;
   PyObject* transport;
   PyObject* app;
@@ -49,12 +50,15 @@ int Request_init(Request* self, PyObject *args, PyObject *kwds);
 void Request_dealloc(Request* self);
 
 void Request_reset(Request *self);
+PyObject* Request_cleanup(Request* self);
+
 
 void request_load(Request* self, char* method, size_t method_len, char* path, size_t path_len, int minor_version, struct mr_header* headers, size_t num_headers);
 //void Request_set_body(Request* self, char* body, size_t body_len);
 PyObject* Request_add_done_callback(Request* self, PyObject* callback);
 
 PyObject* Request_getattro(Request* self, PyObject* name);
+PyObject* Request_get_path(Request* self, void* closure);
 PyObject* Request_get_method(Request* self, void* closure);
 PyObject* Request_get_transport(Request* self, void* closure);
 PyObject* Request_get_headers(Request* self, void* closure);

@@ -273,37 +273,10 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
         *valp_ += res_;                                                                                                            \
     } while (0)
 
-/* returned pointer is always within [buf, buf_end), or null */
-static const char *parse_http_version(const char *buf, const char *buf_end, int *minor_version, int *ret)
-{
-    /* we want at least [HTTP/1.<two chars>] to try to parse */
-    if (buf_end - buf < 9) {
-        *ret = -2;
-        return NULL;
-    }
-    if ( *(unsigned long *)buf == TFW_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','1') ) {
-      *minor_version = 1;
-      return buf+8;
-    }
-    if ( *(unsigned long *)buf == TFW_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','0') ) {
-      *minor_version = 0;
-      return buf+8;
-    }
-    *ret = -1;
-    return NULL;
-}
-
-// >Expires<: >-1<
-// >Content-Type<: > text/html; charset=ISO-8859-1<
-// >Transfer-Encoding<: > chunked<
-//   PARSE("HTTP/1.0 200 OK\r\nExpires: -1\r\nContent-Type: text/html; charset=ISO-8859-1\r\nTransfer-Encoding: chunked\r\n\r\n", 0, 0, "Test");
-
-
 
 static const char *parse_headers(const char *buf, const char *buf_end, struct mr_header *headers, size_t *num_headers,
                                  size_t max_headers, int *ret)
 {
-    int i;
     if ( buf_end <= buf ) {
       *ret = -2;
       return NULL;
@@ -466,6 +439,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               buf += 18;
               goto hvalue;
             }
+            break;
           case 'a':
             //printf("?? %c\n", buf[13] );
             //printf(">%.*s<", 16, buf);
@@ -601,9 +575,6 @@ uri:
         return NULL;
     }
     
-    //if ((buf = parse_http_version(buf, buf_end, minor_version, ret)) == NULL) {
-        //return NULL;
-    //}
 endfirst:
     if (*buf == '\015') {
         ++buf;
@@ -663,9 +634,6 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
                                   size_t *msg_len, struct mr_header *headers, size_t *num_headers, size_t max_headers, int *ret)
 {
     /* parse "HTTP/1.x" */
-    //if ((buf = parse_http_version(buf, buf_end, minor_version, ret)) == NULL) {
-        //return NULL;
-    //}
     if ( buf_end - buf < 16 ) {
       *ret = -2;
       return NULL;

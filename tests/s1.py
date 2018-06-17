@@ -4,8 +4,9 @@ import mrhttp
 import socket
 
 app = Application()
+app.config["memcache"] = [ ("127.0.0.1", 11211) ]
 
-@app.route('/')
+@app.route('/',type='text')
 def index(r):
   return 'Hello World!'
 
@@ -70,6 +71,8 @@ def query_string(r):
 
 @app.route('/form')
 def parseForm(r):
+  print(r.form)
+  if r.form == None: return "No form"
   return r.form["param2"]
 
 @app.route('/s',tools=['session'])

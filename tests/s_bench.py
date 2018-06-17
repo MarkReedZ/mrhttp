@@ -3,8 +3,16 @@ from mrhttp import Request
 import mrhttp
 import socket
 import aiomcache
+import mrjson
+
+import tenjin
+tenjin.set_template_encoding('utf-8')
+from tenjin.helpers import *
+engine = tenjin.Engine(path=['tests/templates'])
+
 
 app = Application()
+app.config["memcache"] = [ ("127.0.0.1", 11211) ]
 
 
 @app.on('at_start')
@@ -88,6 +96,17 @@ def parseForm(r):
 @app.route('/s',tools=['session'])
 def session(req):
   return "session"
+
+@app.route('/login', type="text")
+def login(r):
+  app.setSessionUserAndCookies( r, mrjson.dumps({"user":"Mark"}) )
+  return 'Logged in!'
+
+@app.route('/template')
+def t2(r):
+  context = { "world":"all you python fanatics out there!" } 
+  return engine.render('example.ten', context)
+
 
 app.run(cores=4)
 

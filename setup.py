@@ -9,6 +9,7 @@ m1 = Extension(
       './src/mrhttp/internals/protocol.c',
       './src/mrhttp/internals/mrqprotocol.c',
       './src/mrhttp/internals/mrqclient.c',
+      './src/mrhttp/internals/memcachedclient.c',
       './src/mrhttp/internals/memprotocol.c',
       './src/mrhttp/internals/parser.c',
       './src/mrhttp/internals/request.c',

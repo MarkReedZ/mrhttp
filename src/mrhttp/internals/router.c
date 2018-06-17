@@ -70,6 +70,7 @@ PyObject *Router_setupRoutes (Router* self) {
     r = PyList_GetItem(sroutes, i);
     rte->iscoro  = false;
     rte->session = false;
+    rte->mrq = false;
 
     PyObject *handler = PyLong_AsVoidPtr(PyDict_GetItemString( r, "handler" ));
     rte->func = handler;
@@ -77,6 +78,7 @@ PyObject *Router_setupRoutes (Router* self) {
     rte->path = PyUnicode_AsUTF8AndSize( o, &(rte->len) );
     if ( Py_True == PyDict_GetItemString( r, "iscoro"  ) ) rte->iscoro  = true;
     if ( Py_True == PyDict_GetItemString( r, "session" ) ) rte->session = true;
+    if ( Py_True == PyDict_GetItemString( r, "mrq" ) ) rte->mrq = true;
     o = PyDict_GetItemString( r, "type"  );
     if (o) rte->mtype = PyLong_AsLong(o);
 
@@ -105,10 +107,11 @@ PyObject *Router_setupRoutes (Router* self) {
     if ( !(o = PyDict_GetItemString( r, "path" )) ) goto error;
     rte->path = PyUnicode_AsUTF8AndSize( o, &(rte->len) );
     DBG printf( " path len %ld str %.*s\n", rte->len, (int)rte->len, rte->path );
-    rte->iscoro  = false;
-    rte->session = false;
+
+    rte->iscoro  = false; rte->session = false; rte->mrq = false;
     if ( Py_True == PyDict_GetItemString( r, "iscoro"  ) ) rte->iscoro = true;
     if ( Py_True == PyDict_GetItemString( r, "session" ) ) rte->session = true;
+    if ( Py_True == PyDict_GetItemString( r, "mrq" ) ) rte->mrq = true;
     o = PyDict_GetItemString( r, "type"  );
     if (o) rte->mtype = PyLong_AsLong(o);
 

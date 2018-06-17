@@ -6,7 +6,8 @@
 #include "parser.h"
 #include "request.h"
 #include "response.h"
-#include "memprotocol.h"
+#include "memcachedclient.h"
+#include "mrqclient.h"
 
 //MrMemcachedProtocol_CAPI
 
@@ -46,7 +47,8 @@ typedef struct {
   Request *request;
   Router *router;
   Parser  parser;
-  MemcachedProtocol *memprotocol;
+  MemcachedClient *memclient;
+  MrqClient *mrqclient;
 } Protocol;
 
 typedef struct {

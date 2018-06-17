@@ -6,6 +6,7 @@
 #include "memprotocol.h"
 #include "mrqprotocol.h"
 #include "mrqclient.h"
+#include "memcachedclient.h"
 #include "router.h"
 #include "app.h"
 #include "utils.h"
@@ -67,12 +68,19 @@ static PyMethodDef MrqClient_methods[] = {
   {"cinit", (PyCFunction)MrqClient_cinit, METH_NOARGS,   ""},
   {NULL}
 };
+static PyMethodDef MemcachedClient_methods[] = {
+  {"cinit", (PyCFunction)MemcachedClient_cinit, METH_NOARGS,   ""},
+  {"set", (PyCFunction)MemcachedClient_set, METH_VARARGS,   ""},
+  {NULL}
+};
 static PyMethodDef Request_methods[] = {
   //{"Response", (PyCFunction)Request_Response, METH_VARARGS | METH_KEYWORDS, ""},
   {"add_done_callback", (PyCFunction)Request_add_done_callback, METH_O,   ""},
+  {"cleanup", (PyCFunction)Request_cleanup, METH_NOARGS,   ""},
   {NULL}
 };
 static PyGetSetDef Request_getset[] = {
+  {"path", (getter)Request_get_path, NULL, "", NULL},
   {"method", (getter)Request_get_method, NULL, "", NULL},
   {"transport", (getter)Request_get_transport, NULL, "", NULL},
   {"headers", (getter)Request_get_headers, NULL, "", NULL},
@@ -416,5 +424,45 @@ static PyTypeObject MrqClientType = {
   (initproc)MrqClient_init,    /* tp_init */
   0,                         /* tp_alloc */
   MrqClient_new,              /* tp_new */
+};
+static PyTypeObject MemcachedClientType = {
+  PyVarObject_HEAD_INIT(NULL, 0)
+  "internals.MemcachedClient",       /* tp_name */
+  sizeof(MemcachedClient),          /* tp_basicsize */
+  0,                         /* tp_itemsize */
+  (destructor)MemcachedClient_dealloc, /* tp_dealloc */
+  0,                         /* tp_print */
+  0,                         /* tp_getattr */
+  0,                         /* tp_setattr */
+  0,                         /* tp_reserved */
+  0,                         /* tp_repr */
+  0,                         /* tp_as_number */
+  0,                         /* tp_as_sequence */
+  0,                         /* tp_as_mapping */
+  0,                         /* tp_hash  */
+  0,                         /* tp_call */
+  0,                         /* tp_str */
+  0,
+  0,                         /* tp_setattro */
+  0,                         /* tp_as_buffer */
+  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /* tp_flags */
+  "MemcachedClient",                /* tp_doc */
+  0,                         /* tp_traverse */
+  0,                         /* tp_clear */
+  0,                         /* tp_richcompare */
+  0,                         /* tp_weaklistoffset */
+  0,                         /* tp_iter */
+  0,                         /* tp_iternext */
+  MemcachedClient_methods,           /* tp_methods */
+  0,                         /* tp_members */
+  0,            /* tp_getset */
+  0,                         /* tp_base */
+  0,                         /* tp_dict */
+  0,                         /* tp_descr_get */
+  0,                         /* tp_descr_set */
+  0,                         /* tp_dictoffset */
+  (initproc)MemcachedClient_init,    /* tp_init */
+  0,                         /* tp_alloc */
+  MemcachedClient_new,              /* tp_new */
 };
 

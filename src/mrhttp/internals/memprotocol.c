@@ -1,12 +1,15 @@
 
 
 #include "memprotocol.h"
+#include "memcachedclient.h"
 #include "Python.h"
 #include "common.h"
 #include <errno.h>
 #include <string.h>
 
 // We only support 32 character session IDs and memcache key must be mrsession[32chars]
+
+static char *memp_noreply = " noreply\r\n";
 
 PyObject * MemcachedProtocol_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -22,12 +25,18 @@ PyObject * MemcachedProtocol_new(PyTypeObject *type, PyObject *args, PyObject *k
 
   memcpy(self->get_cmd, "get mrsessionZZZZ9dd361cc443e976b05714581a7fb\r\n",strlen("get mrsession43709dd361cc443e976b05714581a7fb\r\n"));
 
+  self->set_cmd = malloc( 2048 );
+  self->set_cmd_sz = 2048;
+  // set <key> <flags> <exptime> <bytes> [noreply]\r\n[data]\r\n
+  // 0 == never expire
+
   finally:
   return (PyObject*)self;
 }
 
 void MemcachedProtocol_dealloc(MemcachedProtocol* self)
 {
+  free(self->set_cmd);
   Py_XDECREF(self->transport);
   Py_XDECREF(self->write);
   Py_TYPE(self)->tp_free((PyObject*)self);
@@ -40,10 +49,10 @@ int MemcachedProtocol_init(MemcachedProtocol* self, PyObject *args, PyObject *kw
   self->queue_sz = 1024;
   self->queue_start = 0;
   self->queue_end = 0;
+  memcpy(self->set_cmd, "set mrsessionZZZZ9dd361cc443e976b05714581a7fb 0 0 ",strlen("set mrsessionZZZZ9dd361cc443e976b05714581a7fb 0 25920000 "));
 
-  if(!PyArg_ParseTuple(args, "O", &self->client)) return -1;
+  if(!PyArg_ParseTuple(args, "Oi", &self->client, &self->server_num)) return -1;
   Py_INCREF(self->client);
-
 
   //printf("Memcached protocol init end\n");
   return 0;
@@ -59,20 +68,8 @@ PyObject* MemcachedProtocol_connection_made(MemcachedProtocol* self, PyObject* t
 
   if(!(self->write      = PyObject_GetAttrString(transport, "write"))) return NULL;
 
-  //printf("Memcached protocol made\n");
-  //PyObject* connections = NULL;
-  PyObject* setconn = NULL;
-  if(!(setconn = PyObject_GetAttrString(self->client, "setConnection"))) return NULL;
-  //printf("Memcached protocol made\n");
-  PyObject* tmp = PyObject_CallFunctionObjArgs(setconn, (PyObject*)self, NULL);
-  if(!tmp) return NULL;
-  //printf("Memcached protocol made\n");
-  Py_DECREF(tmp);
-  //if(!(connections = PyObject_GetAttrString(self->client, "_connections"))) return NULL;
-  //if(PyList_Add(connections, (PyObject*)self) == -1) return NULL;
-  //Py_XDECREF(connections);
+  MemcachedClient_addConnection( (MemcachedClient*)(self->client), self, self->server_num );
 
-  //return (PyObject*)self;
   Py_RETURN_NONE;
 }
 
@@ -147,6 +144,7 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
       memcpy(buf, p, vlen);
       tMemcachedCallback cb = self->queue[self->queue_start].cb;
       cb(self->queue[self->queue_start].connection, buf, vlen);
+      free(buf);
       self->queue_start = (self->queue_start+1)%self->queue_sz;
 
       p += vlen + 7;  
@@ -176,4 +174,45 @@ int MemcachedProtocol_asyncGet( MemcachedProtocol* self, char *key, void *fn, vo
   return 1;
 }
 
+static inline void reverse(char* begin, char* end)
+{
+  char t;
+  while (end > begin) {
+    t = *end;
+    *end-- = *begin;
+    *begin++ = t;
+  }
+}
+
+
+int MemcachedProtocol_asyncSet( MemcachedProtocol* self, char *key, char *val, int val_sz ) {
+// <command name> <key> <flags> <exptime> <bytes> [noreply]\r\n<data>\r\n
+  DBG_MEMCAC printf("MemcachedProtocol - asyncSet\n");
+
+  if ( 128 + val_sz > self->set_cmd_sz ) {
+    while ( 128 + val_sz > self->set_cmd_sz ) self->set_cmd_sz *= 2;
+    self->set_cmd = realloc(self->set_cmd, self->set_cmd_sz);
+  }
+
+  char *p = self->set_cmd+13;
+  memcpy(p, key, 32);
+
+  p += 37;
+  // write val_sz
+  int i = val_sz;
+  do *p++ = (char)(48 + (i % 10ULL)); while(i /= 10ULL);
+  reverse( self->set_cmd+50, p-1 );
+ 
+  memcpy(p, memp_noreply, 10); 
+  p+=10;
+  memcpy(p, val,val_sz);
+  p += val_sz;
+  *p++ = '\r';
+  *p++ = '\n';
+  PyObject *bytes = PyBytes_FromStringAndSize(self->set_cmd,p-self->set_cmd);
+  //DBG_MEMCAC PyObject_Print(bytes, stdout,0); 
+  //DBG_MEMCAC printf("\n");
+  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 1;
+  return 0;  
+}
 

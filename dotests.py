@@ -8,25 +8,26 @@ import tests
 # TODO
 #  Check for memcached being up and add the session key so we hit and load the json 43709dd361cc443e976b05714581a7fb
 
-package = tests
-for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
-  if modname.startswith("test"):
-    m = importlib.import_module('tests.'+modname)
-    functions = inspect.getmembers(m, inspect.isfunction)
-    for f in functions:
-      if f[0] == 'setup':
-        if f[1]():
-          exit()
-    for f in functions:
-      if f[0].startswith("test_"):
-        try:
+if 1:
+  package = tests
+  for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
+    if modname.startswith("test"):
+      m = importlib.import_module('tests.'+modname)
+      functions = inspect.getmembers(m, inspect.isfunction)
+      for f in functions:
+        if f[0] == 'setup':
+          if f[1]():
+            exit()
+      for f in functions:
+        if f[0].startswith("test_"):
+          try:
+            f[1]()
+          except Exception as e:
+            print(e)
+      for f in functions:
+        if f[0] == 'teardown':
           f[1]()
-        except Exception as e:
-          print(e)
-    for f in functions:
-      if f[0] == 'teardown':
-        f[1]()
-
+  
 print("Benchmarks")
     
 import argparse
@@ -73,16 +74,6 @@ def run_wrk(loop, endpoint=None, lua=None, options=None):
   return rps
 
 
-def cpu_usage(p):
-  return p.cpu_percent() + sum(c.cpu_percent() for c in p.children())
-
-def connections(process):
-  return len( set(c.fd for c in process.connections()) | set(c.fd for p in process.children() for c in p.connections()))
-
-def memory(p):
-  return p.memory_percent('uss') + sum(c.memory_percent('uss') for c in p.children())
-
-
 noisy = ['atom', 'chrome', 'firefox', 'dropbox', 'opera', 'spotify', 'gnome-documents']
 
 def silence():
@@ -109,17 +100,23 @@ process = psutil.Process(server.pid)
 time.sleep(1)
 try:
 
-	#TODO sessions first causes problems
-	#TODO mrq/nats
-
   opts = ('-H','Cookie: mrsession=43709dd361cc443e976b05714581a7fb;')
-  print ("Hello pipelined", run_wrk(loop,'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
-  print ("Hello          ", run_wrk(loop,'http://localhost:8080/'), "Requests/second" )
-  print ("Cookies        ", run_wrk(loop,'http://localhost:8080/printCookies'), "Requests/second" )
-  print ("404            ", run_wrk(loop,'http://localhost:8080/404/'), "Requests/second" )
-  print ("form parsing   ", run_wrk(loop,'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
-  print ("sessions       ", run_wrk(loop,'http://localhost:8080/s',options=opts), "Requests/second" )
-  print ("sessions (py)  ", run_wrk(loop,'http://localhost:8080/pys',options=opts), "Requests/second" )
+  print ("Hello pipelined", run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
+  print ("Hello          ", run_wrk(loop, 'http://localhost:8080/'),             "Requests/second" )
+  print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies'), "Requests/second" )
+
+  # TODO Look into this  
+  print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
+
+  # TODO Look into this
+  print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
+  print ("Templates      ", run_wrk(loop, 'http://localhost:8080/template'),            "Requests/second" )
+  print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
+  print ("Sessions (py)  ", run_wrk(loop, 'http://localhost:8080/pys',   options=opts), "Requests/second" )
+
+  # TODO - We should be able to speed this up by generating the session id in C not python. 
+  print ("Session login  ", run_wrk(loop, 'http://localhost:8080/login'),               "Requests/second" )
+
   #print ("json post      ", run_wrk(loop,'http://localhost:8080/form'), "Requests/second" )
 
 except KeyboardInterrupt:
@@ -128,41 +125,3 @@ finally:
   server.terminate()
   loop.run_until_complete(server.wait())
 
-#cpu_p = 100
-#while cpu_p > 5:
-  #cpu_p = psutil.cpu_percent(interval=1)
-  #print('CPU usage in 1 sec:', cpu_p)
-
-#results = []
-#cpu_usages = []
-#process_cpu_usages = []
-#mem_usages = []
-#conn_cnt = []
-#if process:
-    #cpu_usage(process)
-#for _ in range(4):
-    #results.append(run_wrk(loop, args.endpoint))
-    #cpu_usages.append(psutil.cpu_percent())
-    #if process:
-        #process_cpu_usages.append(cpu_usage(process))
-        #conn_cnt.append(connections(process))
-        #mem_usages.append(round(memory(process), 2))
-    #print('.', end='')
-    #sys.stdout.flush()
-#
-#if not args.endpoint:
-    #server.terminate()
-    #loop.run_until_complete(server.wait())
-#
-##if args.cpu_change: cpu.change('ondemand')
-#
-#print()
-#print('RPS', results)
-#print('Mem', mem_usages)
-#print('Conn', conn_cnt)
-#print('Server', process_cpu_usages)
-#print('System', cpu_usages)
-#median = statistics.median_grouped(results)
-#stdev = round(statistics.stdev(results), 2)
-#p = round((stdev / median) * 100, 2)
-#print('median:', median, 'stdev:', stdev, '%', p)

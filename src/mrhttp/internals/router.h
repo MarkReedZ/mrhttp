@@ -14,6 +14,7 @@ typedef struct {
   long len;
   bool iscoro;
   bool session;
+  bool mrq;
   char mtype;
 } Route;
 

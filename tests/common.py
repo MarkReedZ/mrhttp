@@ -12,13 +12,16 @@ def start_server( script, suppress_error=False ):
   server = subprocess.Popen([sys.executable, script], stdout=subprocess.PIPE,stderr=subprocess.PIPE, start_new_session=True)
   #(o, e) = server.communicate()
   process = psutil.Process(server.pid)
-  time.sleep(0.5)
-  # If server is not running fail
-  if not (server.poll() is None):
-    if not suppress_error:
-      print("ERROR starting server",script)
-    return None
-  return server
+  try:
+    time.sleep(0.5)
+    # If server is not running fail
+    if not (server.poll() is None):
+      if not suppress_error:
+        print("ERROR starting server",script)
+      return None
+    return server
+  except KeyboardInterrupt:
+    stop_server(server)
 
 def eq( a, b ):
   #global num_fails

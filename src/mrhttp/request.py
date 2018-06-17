@@ -43,7 +43,6 @@ class Request(mrhttp.CRequest):
     return wrapper
 
   #TODO we reuse requests so we need to clear memo to use it
-  @memoize
   def parsed_content_type(self):
     content_type = self.headers.get('Content-Type')
     if not content_type: return None, {}
@@ -59,7 +58,6 @@ class Request(mrhttp.CRequest):
 
   def get_form(self):
     content_type = self.headers.get('Content-Type')
-
     # TODO This can be sped up considerably in C (parse_qsl)
     if self.mime_type == 'application/x-www-form-urlencoded':
       return dict(urllib.parse.parse_qsl(self.body.decode("utf-8"))), None

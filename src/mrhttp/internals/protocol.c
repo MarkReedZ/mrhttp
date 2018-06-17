@@ -1,4 +1,3 @@
-
 #include "protocol.h"
 #include "common.h"
 #include "module.h"
@@ -145,19 +144,9 @@ PyObject* Protocol_connection_made(Protocol* self, PyObject* transport)
   DBG printf("connection made num %ld\n", PySet_GET_SIZE(connections));
   Py_XDECREF(connections);
 
-
-  // TODO only check if session enabled
-  PyObject *mc = PyObject_GetAttrString(self->app, "mmc");
-  if ( mc ) {
-    PyObject *getconn = PyObject_GetAttrString(mc, "getConnection");
-    self->memprotocol = (MemcachedProtocol*)PyObject_CallFunctionObjArgs(getconn, NULL);
-    if(!self->memprotocol) {
-      printf("TODO no mem proto \n");
-      return NULL;
-    }
-  } else {
-    PyErr_Clear();
-  }
+  // TODO Only if session is enabled?
+  self->memclient = (MemcachedClient*)PyObject_GetAttrString(self->app, "_mc");
+  self->mrqclient = (MrqClient*)PyObject_GetAttrString(self->app, "_mrq");
 
   self->closed = false;
   Py_RETURN_NONE;
@@ -326,8 +315,12 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
   Protocol *self = (Protocol*)mcd->protocol;
   Request  *req  = mcd->request;
 
-  PyObject *session = PyUnicode_FromStringAndSize( data, data_sz );
-  PyObject_CallFunctionObjArgs(req->set_user, session, NULL);
+  DBG_MEMCAC printf(" memcached reply data len %d data %.*s\n",data_sz,data_sz,data);
+
+  if ( data_sz ) {
+    PyObject *session = PyUnicode_FromStringAndSize( data, data_sz );
+    PyObject_CallFunctionObjArgs(req->set_user, session, NULL);
+  } 
   
   free(mcd);
   if ( !self->closed ) {
@@ -365,6 +358,8 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     return self;
   }
 
+  // TODO session and mrq?
+
   // If the route requires a session we need to check for a cookie session id, and fetch the session
   if ( r->session ) {
     DBG printf("Route requires a session\n"); 
@@ -380,7 +375,8 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
       mcd->protocol = self;
       Py_INCREF(self);
       mcd->request  = self->request;
-      MemcachedProtocol_asyncGet( self->memprotocol, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+      MemcachedClient_get( self->memclient, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+      //MemcachedProtocol_asyncGet( self->memprotocol, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
       // Get a new request object so we don't overwrite this one while waiting for the reply
       self->request = (Request*)MrhttpApp_get_request( (MrhttpApp*)self->app );
       return self;
@@ -388,6 +384,20 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     }
 
     //?  PyObject *ret = pipeline_queue(self, (PipelineRequest){true, self->request, task});
+  }
+  if ( r->mrq ) { //TODO
+    DBG printf("Route uses mrq\n"); 
+    // TODO Get slot from url A
+       //rte->segs[rte->numSegs-1] = rest; //TODO last one?
+        //rte->segLens[j] = rest_len;
+    int slot = 0;
+
+    // Send body to mrq
+    //TODO request->body / body_len
+    MrqClient_push( self->mrqclient, slot, request->body, request->body_len );
+
+    // TODO set a client member to say success/fail? Have to start failing if slow consumer / connection gone.
+
   }
   // TODO for memcached
   //  Need to set app->request or pass to page handlers

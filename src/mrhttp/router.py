@@ -98,6 +98,7 @@ class Router(mrhttp.CRouter):
     if type == "text": r["type"] = 1
     if type == "json": r["type"] = 2
     if "session" in tools: r["session"] = True
+    if "mrq" in tools: r["mrq"] = True
     # Static routes
     if not "{" in uri:
       self.static_routes.append( r )

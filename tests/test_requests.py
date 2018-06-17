@@ -59,6 +59,8 @@ def test_one():
   # Form handling
   r = requests.post('http://localhost:8080/form', data={"p1":"v1","param2":"value2"})
   eq(r.text, "value2")
+  r = requests.get('http://localhost:8080/form')
+  eq(r.text, "No form")
 
   # Sessions
   cookie = {'mrsession': '43709dd361cc443e976b05714581a7fb'}

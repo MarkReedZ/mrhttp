@@ -1,5 +1,4 @@
 
-
 #include "Python.h"
 #include "string.h"
 #include "response.h"
@@ -81,7 +80,7 @@ PyObject *response_updateDate(PyObject *date) {
 int response_updateHeaders(Response *self) {
   int ret = 145;
 
-  // 1 plain, 2 json, default is html
+  // Set Content-Type:  1 plain, 2 json, default is html
   if ( self->mtype ) {
     char *p = rbuf;
     if      ( self->mtype == 1 ) { memcpy( p+117, resp_plain, 14 ); ret = 131; }
@@ -92,6 +91,13 @@ int response_updateHeaders(Response *self) {
     int hlen = response_add_headers( self, rbuf+ret-2 );
     if ( hlen ) ret += hlen-2;
     // else TODO raise an error or just ignore 
+  } else {
+  
+    // As we reuse a single buffer for the response if we aren't writing headers we need to make sure that
+    // the headers ends in \r\n
+    char *p = rbuf+ret-2;
+    *p++ = '\r';
+    *p++ = '\n';
   }
   if ( self->cookies != NULL ) {
     int l = response_add_cookies( self, rbuf+ret-2 );
@@ -130,6 +136,10 @@ int response_add_headers( Response *self, char *p ) {
     if(!(k = PyUnicode_AsUTF8AndSize(name, &klen))) return 0;
     if ( v == NULL ) return 0;
 
+    // If Content-Type modify that header
+    //if ( k[0] == 'C' && klen == 12 && k[11] == 'e' ) {
+      //memcpy( rbuf+117, v, (size_t)vlen );
+    //} else {
     memcpy(p, k, (size_t)klen); p += (size_t)klen;
 
     *p++ = ':';
@@ -139,6 +149,7 @@ int response_add_headers( Response *self, char *p ) {
 
     *p++ = '\r';
     *p++ = '\n';
+    //}
 
   }
   *p++ = '\r';

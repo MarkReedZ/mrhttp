@@ -14,6 +14,7 @@ typedef struct {
   PyObject* check_idle;
   PyObject* check_idle_handle;
   PyObject* check_interval;
+  PyObject* loop;
 
 
   // Request pool
@@ -35,5 +36,6 @@ PyObject *MrhttpApp_get_request(MrhttpApp* self);
 
 PyObject *MrhttpApp_updateDate(MrhttpApp *self, PyObject *date);
 PyObject *MrhttpApp_check_idle(MrhttpApp *self);
+PyObject *MrhttpApp_test_fut(MrhttpApp *self);
 
 
