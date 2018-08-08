@@ -2,7 +2,7 @@ from mrhttp import Application
 from mrhttp import Request
 import mrhttp
 import socket
-import aiomcache
+import mrasyncmc
 import mrjson
 
 import tenjin
@@ -17,14 +17,14 @@ app.config["memcache"] = [ ("127.0.0.1", 11211) ]
 
 @app.on('at_start')
 async def dbsetup():
- app.mc = aiomcache.Client("127.0.0.1",11211, loop=app.loop)
+  app.mcc = await mrasyncmc.create_client([("127.0.0.1",11211),("127.0.0.1",11212)], loop=app.loop,pool_size=4)
 @app.on('at_end')
 async def dbclose():
- app.mc.close()
+  await app.mcc.close()
 
 @app.route('/pys', type="text")
 async def pys(r):
-  j = await app.mc.get(b"mrsession" + r.cookies["mrsession"].encode("utf-8"))
+  j = await app.mcc.get(b"mrsession" + r.cookies["mrsession"].encode("utf-8"))
   return 'py session'
 
 

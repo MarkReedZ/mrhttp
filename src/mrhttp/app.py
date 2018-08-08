@@ -46,11 +46,10 @@ signames = {
     if isinstance(v, signal.Signals)}
 
 class Application(mrhttp.CApp):
-  def __init__(self, *, reaper_settings=None, log_request=None,
+  def __init__(self, *, log_request=None,
                protocol_factory=None, debug=False):
     self._loop = None
     self._connections = set()
-    self._reaper_settings = reaper_settings or {}
     self._error_handlers = []
     self._log_request = log_request
     self._request_extensions = {}
