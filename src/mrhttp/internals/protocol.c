@@ -344,6 +344,7 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
 
       // Only push to mrq if we found a session for the user's key
       if ( data_sz ) {
+        // push [ user, json ] if append_user is set
         if ( r->append_user ) {
           char *tmp = malloc( req->body_len + data_sz + 16 );
           tmp[0] = '[';
@@ -358,8 +359,8 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
           if ( rc == -1 ) {
             rc = PyObject_SetAttrString((PyObject*)req, "servers_down", Py_True );
           }
-          
         }
+
   // TODO Delete the below and just keep append user
         /*
         else if ( r->user_key ) { 

@@ -3,12 +3,6 @@
 cleanup mrq and memcac pro/client
 Add tests for memc and mrq failover. 
 
-This error message is bad, add a test
-  @app.route('/em/delme', type="html")
-  def delme(r,host,thread):
-
-
-python dotests.py then ctrl-c during benchmark "RuntimeError: Event loop stopped before Future completed."
 
 nginx mrq
 
@@ -19,6 +13,7 @@ Sessions
 test for replace header with r.headers and check 4_reponse.py works
   setContentType or catch it return -1 and rerun add_headers
 
+python dotests.py then ctrl-c during benchmark "RuntimeError: Event loop stopped before Future completed."
 
 Wiki doc:
 http://www.django-rest-framework.org/api-guide/requests/

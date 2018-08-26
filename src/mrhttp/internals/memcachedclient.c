@@ -105,8 +105,8 @@ int MemcachedClient_get(MemcachedClient* self, char *key, void *fn, void *connec
   int ksz = 32;
   int hash = (hexchar[(uint8_t)key[ksz-3]]<<8) | (hexchar[(uint8_t)key[ksz-2]]<<4) | hexchar[(uint8_t)key[ksz-1]];
   int server = connmap[hash];
-  if ( server == -1 ) return -1;
   DBG_MEMCAC printf("  memcached get server %d\n",server); 
+  if ( server == -1 ) return -1;
 
   int rc = MemcachedServer_get( self->servers[server], key, fn, connection );
   return rc;
