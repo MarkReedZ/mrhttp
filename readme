@@ -57,6 +57,11 @@ curl -H "Content-Type: application/json" -X POST -d '[1,2,3,4,5,6,7,8,9]' http:/
 wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -s tests/lua/post.lua
 wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -s tests/lua/q-pipeline.lua
 
+MRQ test:
+curl -i --raw http://localhost:8080/q/0/0/ -H "Cookie: mrsession=43709dd361cc443e976b057145832e84;" -X POST -d '{"username":"xyz","type":"add"}' 
+wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;" -s tests/lua/post.lua
+
+
 Session testing
 curl -i --raw http://localhost:8080/s -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
 wrk -t4 -c32 -d1s http://localhost:8080/s -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"

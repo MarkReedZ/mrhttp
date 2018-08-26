@@ -16,7 +16,7 @@ typedef struct {
 
   PyObject* transport;
   PyObject* write;
-  PyObject* client;
+  void *client;
 
   int server_num;
   char *b;
@@ -37,7 +37,7 @@ PyObject* MrqProtocol_connection_lost (MrqProtocol* self, PyObject* args);
 PyObject* MrqProtocol_data_received   (MrqProtocol* self, PyObject* data);
 PyObject* MrqProtocol_eof_received    (MrqProtocol* self);
 
-int MrqProtocol_push(MrqProtocol* self, int slot, char *d, int dsz);
+int MrqProtocol_push(MrqProtocol* self, int topic, int slot, char *d, int dsz);
 //typedef struct {
   //int (*MrqProtocol_asyncGet) (MrqProtocol* self, void* fn);
 //} MrqProtocol_CAPI;

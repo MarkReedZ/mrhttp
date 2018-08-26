@@ -1,5 +1,4 @@
 
-
 #include <stddef.h>
 #include <sys/param.h>
 #include <strings.h>
@@ -301,6 +300,7 @@ static inline PyObject* Request_decode_headers(Request* self)
       name  = PyUnicode_FromStringAndSize(header->name,  header->name_len);        if(!name)  goto loop_error;
       value = PyUnicode_DecodeLatin1(     header->value, header->value_len, NULL); if(!value) goto loop_error;
       if(PyDict_SetItem(headers, name, value) == -1) goto loop_error;
+      //DBG printf("Found header: %.*s %.*s\n",header->name_len,  header->name, header->value_len, header->value);
 
       goto loop_finally;
 loop_error:
@@ -338,6 +338,8 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
   PyObject* cookies = PyDict_New();
   PyObject* key = NULL; PyObject* value = NULL;
 
+  //DBG printf("parse cookies: %.*s\n",buflen, buf);
+
   static char ALIGNED(16) ranges1[] = "==" ";;";
   int found;
   int state = 0;
@@ -350,6 +352,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
       if ( *buf == '=' ) {
         // Save out the mrsession id TODO use a separate function since we dont need this all the time
         if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
+          DBG printf("Grab session\n");
           grab_session = 1;
         }
         key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
@@ -400,6 +403,10 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
       last = buf;
     }
     else if ( *buf == '=' ) {
+      if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
+        DBG printf("Grab session\n");
+        grab_session = 1;
+      }
       key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
       if (!key) printf("!key\n");
       state = 1;

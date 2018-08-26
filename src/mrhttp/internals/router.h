@@ -15,7 +15,12 @@ typedef struct {
   bool iscoro;
   bool session;
   bool mrq;
+  bool append_user;
   char mtype;
+
+  PyObject *user_key;
+  //char *user_key;
+  //long user_key_len;
 } Route;
 
 typedef struct {

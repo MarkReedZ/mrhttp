@@ -17,6 +17,7 @@ class Request(mrhttp.CRequest):
 
   response = mrhttp.Response()
   user = None
+  servers_down = False
   memo = {}
   def __init__(self):
     super().__init__(self)

@@ -109,6 +109,7 @@ PyObject* MrqProtocol_connection_lost(MrqProtocol* self, PyObject* args)
 {
   DBG_MRQ printf("MrqProtocol conn lost\n");
   self->closed = true;
+  MrqClient_connection_lost((MrqClient*)self->client, self );
 
   Py_RETURN_NONE;
 }
@@ -124,7 +125,7 @@ PyObject* MrqProtocol_data_received(MrqProtocol* self, PyObject* data)
   Py_RETURN_NONE;
 }
 
-int MrqProtocol_push(MrqProtocol* self, int slot, char *d, int dsz) {
+int MrqProtocol_push(MrqProtocol* self, int topic, int slot, char *d, int dsz) {
 
   if ( dsz > 10*1024 ) return -1;
 
@@ -134,6 +135,9 @@ int MrqProtocol_push(MrqProtocol* self, int slot, char *d, int dsz) {
     self->bb = self->b+8;
     self->bp4 = (int*)(self->b+4);
   }
+
+  self->b[2] = topic;  
+  self->b[3] = topic;  
 
   //int *p_len = (int*)(self->bp4);
   *self->bp4 = dsz;

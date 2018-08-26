@@ -1,3 +1,4 @@
+
 #include "protocol.h"
 #include "common.h"
 #include "module.h"
@@ -12,6 +13,7 @@
 
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+
 
 void printErr(void) {
   PyObject *type, *value, *traceback;
@@ -144,7 +146,7 @@ PyObject* Protocol_connection_made(Protocol* self, PyObject* transport)
   DBG printf("connection made num %ld\n", PySet_GET_SIZE(connections));
   Py_XDECREF(connections);
 
-  // TODO Only if session is enabled?
+  // TODO Only if session or mrq is enabled?
   self->memclient = (MemcachedClient*)PyObject_GetAttrString(self->app, "_mc");
   self->mrqclient = (MrqClient*)PyObject_GetAttrString(self->app, "_mrq");
 
@@ -313,10 +315,11 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *req
 
 void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int data_sz ) {
   Protocol *self = (Protocol*)mcd->protocol;
-  Request  *req  = mcd->request;
+  Request  *req  = (Request*)mcd->request;
 
   DBG_MEMCAC printf(" memcached reply data len %d data %.*s\n",data_sz,data_sz,data);
 
+  // TODO if mrq we pass it on so can skip this?
   if ( data_sz ) {
     PyObject *session = PyUnicode_FromStringAndSize( data, data_sz );
     PyObject_CallFunctionObjArgs(req->set_user, session, NULL);
@@ -324,6 +327,77 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
   
   free(mcd);
   if ( !self->closed ) {
+
+    Route *r = req->route;
+    if ( r->mrq ) { 
+      // TODO Get slot from url A
+        //rte->segs[rte->numSegs-1] = rest; //TODO last one?
+          //rte->segLens[j] = rest_len;
+      int slot = 0;
+      int topic = 0;
+      if ( req->numArgs > 0 ) {
+        int len = req->argLens[0];
+        char *p = req->args[0];
+        while (len--) slot = (slot * 10) + (*p++ - '0');
+      }
+
+
+      // Only push to mrq if we found a session for the user's key
+      if ( data_sz ) {
+        if ( r->append_user ) {
+          char *tmp = malloc( req->body_len + data_sz + 16 );
+          tmp[0] = '[';
+          char *p = tmp+1;
+          memcpy(p, req->body, req->body_len);
+          p += req->body_len;
+          *p++ = ',';
+          memcpy(p, data, data_sz);
+          p += data_sz;
+          *p++ = ']';
+          int rc = MrqClient_push( self->mrqclient, topic, slot, tmp, (int)(p-tmp) );
+          if ( rc == -1 ) {
+            rc = PyObject_SetAttrString((PyObject*)req, "servers_down", Py_True );
+          }
+          
+        }
+  // TODO Delete the below and just keep append user
+        /*
+        else if ( r->user_key ) { 
+          //request.user has a dict and we need r->user_key key
+          // TODO or we search for "key": in the char* 
+          PyObject *user = PyObject_GetAttrString((PyObject*)req, "user"  );
+          if ( user ) {
+            PyObject *tmp = PyDict_GetItem( user, r->user_key );
+            // TODO This object could be a long or unicode
+            if ( PyLong_Check(tmp) ) {
+              long v = PyLong_AsLong(tmp);
+              //We want [ 12345, {msg} ]
+              char *tmp = malloc( req->body_len + 32 );
+              tmp[0] = '[';
+              char *s = tmp + 1;
+              do *s++ = (char)(48 + (v % 10ULL)); while(v /= 10ULL);
+              reverse( tmp+1, s-1 );
+              *s = ',';
+              strncpy(s, req->body, req->body_len);
+              s += req->body_len;
+              *s++ = ']';
+              MrqClient_push( self->mrqclient, topic, slot, tmp, (int)(s-tmp) );
+            }
+  
+          } else {
+            MrqClient_push( self->mrqclient, topic, slot, req->body, req->body_len );
+          }
+        */  
+        else {
+          // Send body to mrq
+          MrqClient_push( self->mrqclient, topic, slot, req->body, req->body_len );
+        }
+      }
+      // TODO else tell user to login?
+  
+      // TODO set a client member to say success/fail? Have to start failing if slow consumer / connection gone.
+    } 
+
     Protocol_handle_request( self, req, req->route );
   } else {
     printf("DELME closed?\n");
@@ -358,8 +432,6 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     return self;
   }
 
-  // TODO session and mrq?
-
   // If the route requires a session we need to check for a cookie session id, and fetch the session
   if ( r->session ) {
     DBG printf("Route requires a session\n"); 
@@ -369,7 +441,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
 
     // If we found a session id in the cookies lets fetch it
     if ( self->request->session_id != NULL ) {
-
+      DBG printf("found session in cookies\n");
       // We need to call asyncGet and save this request so when our CB is called we continue processing
       MemcachedCallbackData *mcd = malloc( sizeof(MemcachedCallbackData));
       mcd->protocol = self;
@@ -380,7 +452,11 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
       // Get a new request object so we don't overwrite this one while waiting for the reply
       self->request = (Request*)MrhttpApp_get_request( (MrhttpApp*)self->app );
       return self;
+    }
 
+    // if mrq we need to return now so we don't push the json on if user is not logged in
+    if ( r->mrq ) {
+      return Protocol_handle_request( self, self->request, r );
     }
 
     //?  PyObject *ret = pipeline_queue(self, (PipelineRequest){true, self->request, task});
@@ -391,10 +467,10 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
        //rte->segs[rte->numSegs-1] = rest; //TODO last one?
         //rte->segLens[j] = rest_len;
     int slot = 0;
+    int topic = 0;
 
     // Send body to mrq
-    //TODO request->body / body_len
-    MrqClient_push( self->mrqclient, slot, request->body, request->body_len );
+    MrqClient_push( self->mrqclient, topic, slot, self->request->body, self->request->body_len );
 
     // TODO set a client member to say success/fail? Have to start failing if slow consumer / connection gone.
 

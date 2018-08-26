@@ -98,55 +98,21 @@ class Application(mrhttp.CApp):
         self.loop.run_until_complete(result)
 
   # Decorator
-  def route(self, uri, methods=["GET"], tools=[], type="html"):
-    if "session" in tools:
+  def route(self, uri, methods=["GET"], options=[], type="html"):
+    if "session" in options:
       self.uses_session = True
-    if "mrq" in tools:
+    if "mrq" in options:
       self.uses_mrq = True
     if not uri.startswith('/'): uri = '/' + uri
     def response(func): 
-      self.router.add_route( func, uri, methods, tools, type )
+      self.router.add_route( func, uri, methods, options, type )
       return func
     return response
 
+  def add_routes(self, rs):
+    for r in rs:
+      self.router.add_route( r[0], r[1], r[2], r[3], r[4] )
 
-  def default_request_logger(self, request):
-      print(request.remote_addr, request.method, request.path)
-
-  def add_error_handler(self, typ, handler):
-      self._error_handlers.append((typ, handler))
-
-  def default_error_handler(self, request, exception):
-      #if isinstance(exception, RouteNotFoundException):
-          #return request.Response(code=404, text='Not Found')
-      #if isinstance(exception, asyncio.CancelledError):
-          #return request.Response(code=503, text='Service unavailable')
-
-      tb = traceback.format_exception(
-          None, exception, exception.__traceback__)
-      tb = ''.join(tb)
-      print(tb, file=sys.stderr, end='')
-      return request.Response(
-          code=500,
-          text=tb if self._debug else 'Internal Server Error')
-
-  def error_handler(self, request, exception):
-      for typ, handler in self._error_handlers:
-          if typ is not None and not isinstance(exception, typ):
-              continue
-
-          try:
-              return handler(request, exception)
-          except:
-              print('-- Exception in error_handler occured:')
-              traceback.print_exc()
-
-          print('-- while handling:')
-          traceback.print_exception(None, exception, exception.__traceback__)
-          return request.Response(
-              code=500, text='Internal Server Error')
-
-      return self.default_error_handler(request, exception)
 
   def _get_idle_and_busy_connections(self):
     return \
@@ -216,6 +182,10 @@ class Application(mrhttp.CApp):
       self.trigger_event("at_start")
 
       if self.uses_mrq:
+        #mrqconf = self.config.get("mrq", None)
+        #if not mrqconf:
+          #print("When using MrQ app.config['mrq'] must be set. Exiting")
+          #exit(1)
         srvs = self.config.get("mrq", None)
         if type(srvs) != list or len(srvs) == 0 or type(srvs[0]) != tuple:
           print("When using MrQ app.config['mrq'] must be set to a list of (host,port) tuple pairs. Exiting")
@@ -343,7 +313,7 @@ class Application(mrhttp.CApp):
     self._run( host=host, port=port, num_workers=cores, debug=debug)
 
 
-  def setSessionUserAndCookies(self, request, userj, backend="memcached" ):
+  def setUserSessionAndCookies(self, request, userj, backend="memcached" ):
     if self._mc == None:
       raise ValueError("setUserSession called without memcached being setup")
 

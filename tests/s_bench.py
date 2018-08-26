@@ -99,7 +99,7 @@ def session(req):
 
 @app.route('/login', type="text")
 def login(r):
-  app.setSessionUserAndCookies( r, mrjson.dumps({"user":"Mark"}) )
+  app.setUserSessionAndCookies( r, mrjson.dumps({"user":"Mark"}) )
   return 'Logged in!'
 
 @app.route('/template')

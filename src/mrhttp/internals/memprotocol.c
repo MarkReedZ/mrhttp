@@ -124,6 +124,7 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
       self->queue_start = (self->queue_start+1)%self->queue_sz;
     }
     // Session found
+    // TODO The session key length must be 32 , allow variable and check performance
     else if ( p[0] == 'V' ) {
       p += 50;
       int vlen = 0;
@@ -132,7 +133,7 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
         p += 1;
       } 
       p += 2;
-  
+
       if ( l < (60+vlen) ) {
         printf("Partial memc response! vlen %d l %ld\n",vlen,l);
         PyObject_Print( data, stdout, 0 ); 

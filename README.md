@@ -14,6 +14,7 @@ Sessions           589,414 Requests/second
 Sessions (py)       67,119 Requests/second
 Session login      121,745 Requests/second
 Write Queue (MrQ)  428,110 Requests/second
+MrWorkServer       338,891 Requests/second
 ```
 
 Versus sanic a pure python async server

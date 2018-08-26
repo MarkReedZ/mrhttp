@@ -1,4 +1,8 @@
 
+This error message is bad, add a test
+  @app.route('/em/delme', type="html")
+  def delme(r,host,thread):
+
 
 python dotests.py then ctrl-c during benchmark "RuntimeError: Event loop stopped before Future completed."
 
