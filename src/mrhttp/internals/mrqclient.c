@@ -78,7 +78,7 @@ void MrqClient_connection_lost( MrqClient* self, MrqProtocol *conn ) {
   MrqServer *srv = self->servers[conn->server_num];
   MrqServer_connection_lost( srv, conn );
 
-  PyObject* func = PyObject_GetAttrString(self, "lost_connection");
+  PyObject* func = PyObject_GetAttrString((PyObject*)self, "lost_connection");
   PyObject* tmp = PyObject_CallFunctionObjArgs(func, PyLong_FromLong(conn->server_num), NULL);
   Py_XDECREF(func);
   Py_XDECREF(tmp);

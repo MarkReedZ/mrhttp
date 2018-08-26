@@ -447,8 +447,13 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
       mcd->protocol = self;
       Py_INCREF(self);
       mcd->request  = self->request;
-      MemcachedClient_get( self->memclient, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
-      //MemcachedProtocol_asyncGet( self->memprotocol, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+      int rc = MemcachedClient_get( self->memclient, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+
+      // If the get failed (no servers) then we're done
+      if ( rc != 0 ) {
+        Protocol_handle_request( self, self->request, r );
+        return self;
+      }
       // Get a new request object so we don't overwrite this one while waiting for the reply
       self->request = (Request*)MrhttpApp_get_request( (MrhttpApp*)self->app );
       return self;

@@ -1,4 +1,8 @@
 
+
+cleanup mrq and memcac pro/client
+Add tests for memc and mrq failover. 
+
 This error message is bad, add a test
   @app.route('/em/delme', type="html")
   def delme(r,host,thread):

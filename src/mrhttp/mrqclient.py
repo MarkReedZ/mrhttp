@@ -3,9 +3,12 @@ import asyncio
 import os
 import mrhttp
 
-#TODO sighup reload server list from config..
 
+#TODO
+# sighup reload server list from config..
+# When reconnecting after establishing a conn bring up pool_size conns. Right now its just 1
 # When coming back wait 10 seconds before using that server.  Add to the conn map, but return error to any request.
+#   This prevents two servers from working on the same partition at the same time
 
 class MrqServer():
   def __init__(self, host, port, pool_size=2):
@@ -19,14 +22,16 @@ class MrqServer():
        
 class MrqClient(mrhttp.CMrqClient):
   def __init__(self, servers, loop, pool_size=2):
+
+    if not isinstance(servers, list):
+      raise ValueError("Mrq client takes a list of (host, port) servers")
+
     super().__init__(len(servers))
     self.loop = loop
     self.servers = []
     for s in servers:
       self.servers.append( MrqServer(s[0], s[1], pool_size) )
 
-    if not isinstance(servers, list):
-      raise ValueError("Mrq client takes a list of (host, port) servers")
 
     try:
       snum = 0

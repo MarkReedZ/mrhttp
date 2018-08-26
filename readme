@@ -19,6 +19,7 @@ Testing
 
 
 memcached -l 127.0.0.1 -p 11211 -d -m 50
+memcached -l 127.0.0.1 -p 11212 -d -m 50
 
 gdb python3
 attach to child process
@@ -64,6 +65,8 @@ wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -H "Cookie: mrsession=43709dd361c
 
 Session testing
 curl -i --raw http://localhost:8080/s -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
+#server 1  curl -i --raw http://localhost:8080/ -H "Cookie: mrsession=1234567361cc443e976b05714581a123;"
+
 wrk -t4 -c32 -d1s http://localhost:8080/s -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
 
 These are cookies from a couple websites:

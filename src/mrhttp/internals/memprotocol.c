@@ -98,7 +98,7 @@ PyObject* MemcachedProtocol_connection_lost(MemcachedProtocol* self, PyObject* a
 {
   DBG_MEMCAC printf("MemcachedProtocol conn lost\n");
   self->closed = true;
-
+  MemcachedClient_connection_lost((MemcachedClient*)self->client, self, self->server_num );
   Py_RETURN_NONE;
 }
 
