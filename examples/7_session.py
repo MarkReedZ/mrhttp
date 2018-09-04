@@ -12,7 +12,7 @@ app = mrhttp.Application()
 app.config["memcache"] = [ ("127.0.0.1", 11211) ]
 
 
-@app.route('/',tools=['session'])
+@app.route('/',options=['session'])
 def session(r):
 
   if r.user == None:
@@ -29,7 +29,10 @@ async def login(r):
 
   # This creates a session key, stores it in memcache with the user's data, and sets the session
   # cookie in the browser
-  app.setSessionUserAndCookies( r, json.dumps({"user":"Mark"}) )
+  try:
+    app.setUserSessionAndCookies( r, json.dumps({"user":"Mark"}) )
+  except Exception as e:
+    print(e)
 
   return "You are now logged in! <a href='/'> Try the main page </a>"
 

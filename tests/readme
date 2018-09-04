@@ -1,4 +1,7 @@
 
+Start this up to run the tests -- have in automatically done?
+memcached -l 127.0.0.1 -p 11211 -d -m 50
+
 set methods on pages
 test not returning a string from a page ( regular and coro )
 test pipeline coro

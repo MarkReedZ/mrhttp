@@ -9,7 +9,7 @@ app = Application()
 def foo():
   return 'foo\n'
 
-#@app.route('/',tools=['session'])
+#@app.route('/',options=['session'])
 @app.route('/')
 def hello():
   raise mrhttp.HTTPRedirect("/foo")

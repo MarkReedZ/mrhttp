@@ -6,7 +6,9 @@ app = mrhttp.Application()
 def hello(r):
   print("Path: ", r.path)
   print("Method: ", r.method)
+  print("Mime Type: ", r.mime_type)
   print("Body: ", r.body)
+  print("Json: ", r.json)
   print("Headers: ", r.headers)
   print("Form data: ", r.form)
   print("Cookies: ", r.cookies)
@@ -15,6 +17,7 @@ def hello(r):
 
 @app.route('/{}/')
 def argpath(r, arg):
+  print("Path arg: ", arg)
   print("Path: ", r.path)
   print("Method: ", r.method)
   print("Body: ", r.body)

@@ -30,7 +30,7 @@ void MemcachedClient_connection_lost( MemcachedClient* self, MemcachedProtocol* 
 PyObject *MemcachedClient_addConnection(MemcachedClient* self, MemcachedProtocol *conn, int server);
 
 int MemcachedClient_get(MemcachedClient* self, char *key, void *fn, void *connection );
-int MemcachedClient_set(MemcachedClient* self, PyObject *args);
+PyObject *MemcachedClient_set(MemcachedClient* self, PyObject *args);
 
 int MemcachedServer_init( MemcachedServer *self, int server_num );
 int MemcachedServer_get( MemcachedServer *self, char *k, void *fn, void *connection);

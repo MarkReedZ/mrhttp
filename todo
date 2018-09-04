@@ -1,19 +1,24 @@
 
+Add an r.json test
+
 
 cleanup mrq and memcac pro/client
+If MemcachedClient_set servers are down we return NULL and don't setup an exception
 Add tests for memc and mrq failover. 
+If we don't post JSON this breaks.  Check for empty body.  Maybe check JSON or endpoint checks and drops?
+  curl -i --raw http://localhost:8080/q/0/0/ -H "Cookie: mrsession=43709dd361cc443e976b057145832e6e;" 
 
-
-nginx mrq
-
-Sessions 
-  handle connections drops, hangs? I'm in the middle of this
-  commit all the session changes and example
+If user's async handler has an exception is this ok?
+  exception in coro page handler
+Unhandled exception:
 
 test for replace header with r.headers and check 4_reponse.py works
   setContentType or catch it return -1 and rerun add_headers
 
 python dotests.py then ctrl-c during benchmark "RuntimeError: Event loop stopped before Future completed."
+
+
+
 
 Wiki doc:
 http://www.django-rest-framework.org/api-guide/requests/
@@ -52,6 +57,8 @@ Why is 404 so slow?
 
 This is slow so do it in C to speed up forms
   urllib.parse.parse_qsl('foo=bar&baz=foor&dogsdont=likecats')
+  cgi.parse_header do in C 
+   curl -d "param1=value1&param2=value2" -X POST http://localhost:8080/form --verbose -H "Content-Type: application/x-www-form-urlencoded; charset=UTF-8"
 
 
 examples/5_router.py -- methods?
@@ -71,6 +78,7 @@ https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world
 
 
 Create an async memcached client - needed for clustering
+  embed it in app
 
 
 Look at a mysql C client?  We can do better than aiomysql.  Either libmysqlclient or our own

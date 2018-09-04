@@ -75,7 +75,7 @@ def parseForm(r):
   if r.form == None: return "No form"
   return r.form["param2"]
 
-@app.route('/s',tools=['session'])
+@app.route('/s',options=['session'])
 def session(req):
   return "session"
 

@@ -105,11 +105,12 @@ try:
   print ("Hello          ", run_wrk(loop, 'http://localhost:8080/'),             "Requests/second" )
   print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies'), "Requests/second" )
 
-  # TODO Look into this  
+  # TODO Look into speeding this up
   print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
 
-  # TODO Look into this
+  # TODO Look into speeding this up
   print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
+
   print ("Templates      ", run_wrk(loop, 'http://localhost:8080/template'),            "Requests/second" )
   print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
   print ("Sessions (py)  ", run_wrk(loop, 'http://localhost:8080/pys',   options=opts), "Requests/second" )

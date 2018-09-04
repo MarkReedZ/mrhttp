@@ -46,15 +46,20 @@ signames = {
     if isinstance(v, signal.Signals)}
 
 class Application(mrhttp.CApp):
-  def __init__(self, *, log_request=None,
-               protocol_factory=None, debug=False):
+  _instance = None
+  def __new__(cls, *args, **kwargs):
+    if not cls._instance:
+      cls._instance = super(Application, cls).__new__(cls, *args, **kwargs)
+    return cls._instance
+
+  def __init__(self):
     self._loop = None
     self._connections = set()
     self._error_handlers = []
-    self._log_request = log_request
     self._request_extensions = {}
-    self._protocol_factory = protocol_factory or Protocol
-    self._debug = debug
+    self._log_request = None
+    self._protocol_factory = Protocol
+    self._debug = False
     self.request = Request()
     self.requests = None
     self.response = Response()
@@ -66,7 +71,11 @@ class Application(mrhttp.CApp):
     self._mrq = None
     self.uses_session = False
     self.uses_mrq = False
-    
+   
+  def setup(self, log_request=None, protocol_factory=None, debug=False):
+    self._log_request = log_request
+    self._protocol_factory = protocol_factory or Protocol
+    self._debug = debug
 
   @property
   def loop(self):
@@ -326,4 +335,5 @@ class Application(mrhttp.CApp):
 
     self._mc.set( skey, userj )
 
+app = Application()
 

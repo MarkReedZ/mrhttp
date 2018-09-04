@@ -1,4 +1,5 @@
 
+
 #include <Python.h>
 #include <stdbool.h>
 
@@ -113,7 +114,7 @@ int MemcachedClient_get(MemcachedClient* self, char *key, void *fn, void *connec
 }
 
 // Args Session key bytes, user bytes
-int MemcachedClient_set(MemcachedClient* self, PyObject *args) {
+PyObject *MemcachedClient_set(MemcachedClient* self, PyObject *args) {
 
   PyObject *pykey, *pydata;
   if(!PyArg_ParseTuple(args, "OO", &pykey, &pydata)) return NULL;
@@ -125,11 +126,15 @@ int MemcachedClient_set(MemcachedClient* self, PyObject *args) {
 
   int hash = (hexchar[(uint8_t)k[ksz-3]]<<8) | (hexchar[(uint8_t)k[ksz-2]]<<4) | hexchar[(uint8_t)k[ksz-1]];
   int server = connmap[hash];
-  if ( server == -1 ) return -1;
+  if ( server == -1 ) return NULL;
 
   DBG_MEMCAC printf("  memcached set server %d\n",server); 
   int rc = MemcachedServer_set( self->servers[server], k, ksz, d, dsz );
-  return rc;
+  // TODO We have to set an exception here
+  if ( rc != 0 ) {
+    return NULL;
+  }
+  Py_RETURN_NONE;
 }
 
 
@@ -188,8 +193,7 @@ int MemcachedServer_set( MemcachedServer *self, char *k, int ksz, char* d, int d
   if ( self->num_conns == 0 ) return -1;
   int c = self->next_conn++;
   if ( self->next_conn == self->num_conns ) self->next_conn = 0;
-  MemcachedProtocol_asyncSet( self->conns[c], k, d, dsz );
-  return 0;
+  return MemcachedProtocol_asyncSet( self->conns[c], k, d, dsz );
 }
 int MemcachedServer_get( MemcachedServer *self, char *k, void *fn, void *connection ) {
   if ( self->num_conns == 0 ) return -1;

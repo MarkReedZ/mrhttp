@@ -9,17 +9,20 @@ class Router(mrhttp.CRouter):
     self.routes = []
     self.static_routes = []
     self.func_namemap= {}
+    self.funcs = []
 
     super().__init__()
 
   def finalize_routes(self):
     self.routes.sort(key=lambda x: x["sortlen"],reverse=True)
 
-  def add_route(self, handler, uri, methods=['GET'], options=[],optiondict={},type="html"):
+  def add_route(self, handler, uri, methods=['GET'], options=[],type="html"):
 
     if handler.__name__ in self.func_namemap:
       raise ValueError("You have page handlers with the same name - use unique function names")
     self.func_namemap[ handler.__name__ ] = 1
+
+    self.funcs.append(handler) # Store the handler to increment the ref count as we save the memory location below
 
     numArgs = uri.count("{}")
     if numArgs == 0 and len(inspect.signature(handler).parameters) == 0:
@@ -28,6 +31,7 @@ class Router(mrhttp.CRouter):
       print( "ERROR: Number of function args {} not equal to route args {}".format( len(inspect.signature(handler).parameters), numArgs) )
       print( "  ", inspect.signature(handler), " vs ", uri )
       raise ValueError("Number of route arguments not equal to function arguments")
+    
      
     r = {}
     r["handler"] = id(handler)

@@ -19,6 +19,7 @@ class Request(mrhttp.CRequest):
   user = None
   servers_down = False
   memo = {}
+  _json = None
   def __init__(self):
     super().__init__(self)
     pass
@@ -47,7 +48,7 @@ class Request(mrhttp.CRequest):
   def parsed_content_type(self):
     content_type = self.headers.get('Content-Type')
     if not content_type: return None, {}
-    return content_type, {} #cgi.parse_header(content_type)
+    return cgi.parse_header(content_type)
 
   @property
   def mime_type(self):
@@ -72,6 +73,16 @@ class Request(mrhttp.CRequest):
   @property
   def form(self): 
     return self.get_form()[0]
+
+  @property
+  def json(self): 
+    if self._json == None:
+      try:
+        if self.mime_type == "application/json":
+          self._json = json.loads(self.body.decode("utf-8"))
+      except:
+        pass
+    return self._json
 
   @property
   def files(self):

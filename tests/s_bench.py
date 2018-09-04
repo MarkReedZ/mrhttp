@@ -93,7 +93,7 @@ def parseForm(r):
 #def parseJson(r):
   #return r.form["param2"]
 
-@app.route('/s',tools=['session'])
+@app.route('/s',options=['session'])
 def session(req):
   return "session"
 
