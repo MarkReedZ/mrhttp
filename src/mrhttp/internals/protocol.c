@@ -1,5 +1,4 @@
 
-
 #include "protocol.h"
 #include "common.h"
 #include "module.h"
@@ -214,9 +213,9 @@ PyObject* Protocol_data_received(Protocol* self, PyObject* data)
 //if self._header_fragment == b'Content-Length' \ and int(value) > self.request_max_size:
                 //exception = PayloadTooLarge('Payload Too Large')
 
+  // If -1 it was an error, but we should have raised it already
   if(parser_data_received(&self->parser, data, self->request) == -1) {
-    //  TODO Write a bad request 400 response
-    return NULL; 
+    Py_RETURN_NONE;
   }
 
   Py_RETURN_NONE;
@@ -493,9 +492,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
   PyObject* result = NULL;
   DBG printf("protocol handle request\n");
 
-  if ( r->mtype ) {
-    request->response->mtype = r->mtype;
-  }
+  request->response->mtype = r->mtype;
 
   if ( r->iscoro || !PIPELINE_EMPTY(self)) {
     //self->gather.enabled = false;
@@ -597,11 +594,9 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
 
   // Make sure the result is a string
   if ( !PyUnicode_Check( result ) ) {
-    //DELME
-    PyObject_Print(result, stdout, 0); printf("\n");
-    PyErr_SetString(PyExc_ValueError, "Page handler did not return a string");
     protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
-    goto error;
+    PyErr_SetString(PyExc_ValueError, "Page handler did not return a string");
+    return NULL;
   }
 
   if(!protocol_write_response(self, request, result)) goto error;
@@ -669,6 +664,9 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
   if(!(o = PyObject_CallFunctionObjArgs(self->write, bytes, NULL))) return NULL;
   Py_DECREF(o);
   Py_DECREF(bytes);
+
+  // If we modified the header in the response buffer return it to default TODO
+  if ( req->response->mtype ) response_setHtmlHeader();
 
   if ( req != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, req );
   return self;
@@ -765,15 +763,14 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
   }
 
   if ( !PyUnicode_Check( response ) ) {
-    PyErr_SetString(PyExc_ValueError, "Page handler did not return a string");
     if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
     protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
+    PyErr_SetString(PyExc_ValueError, "Page handler did not return a string");
     return NULL;
   }
 
   if(!self->closed) {
-    if(!protocol_write_response(self, request, response))
-      goto error;
+    if(!protocol_write_response(self, request, response)) goto error;
   } else {
     // TODO: Send that to protocol_error
     //printf("Connection closed, response dropped\n");
@@ -809,19 +806,15 @@ PyObject* protocol_task_done(Protocol* self, PyObject* task)
     if(pipeline_is_task(*r)) {
       task = pipeline_get_task(*r);
 
-      if(!(done = PyObject_GetAttrString(task, "done")))
-        goto loop_error;
-
-      if(!(done_result = PyObject_CallFunctionObjArgs(done, NULL)))
-        goto loop_error;
+      if(!(done = PyObject_GetAttrString(task, "done"))) goto loop_error;
+      if(!(done_result = PyObject_CallFunctionObjArgs(done, NULL))) goto loop_error;
 
       if(done_result == Py_False) {
         result = Py_False;
         goto loop_finally;
       }
     }
-    if(!protocol_pipeline_ready(self, *r))
-      goto loop_error;
+    if(!protocol_pipeline_ready(self, *r)) goto loop_error;
 
     pipeline_DECREF(*r);
 
@@ -833,10 +826,8 @@ PyObject* protocol_task_done(Protocol* self, PyObject* task)
     loop_finally:
     Py_XDECREF(done_result);
     Py_XDECREF(done);
-    if(!result)
-      goto error;
-    if(result == Py_False)
-      break;
+    if(!result) goto error;
+    if(result == Py_False) break;
   }
 
   self->queue_start = r - self->queue;

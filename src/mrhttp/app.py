@@ -331,6 +331,8 @@ class Application(mrhttp.CApp):
     # Send the session cookie back to the user  
     c = http.cookies.SimpleCookie()
     c['mrsession'] = skey
+    c['mrsession']['path'] = '/' #TODO
+    c['mrsession']['expires'] = 12 * 30 * 24 * 60 * 60 # 1 year TODO arg
     request.response.cookies = c
 
     self._mc.set( skey, userj )

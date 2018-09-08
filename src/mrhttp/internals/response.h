@@ -40,6 +40,7 @@ void Response_reset(Response *self);
 
 PyObject *response_updateDate(PyObject *date);
 int       response_updateHeaders(Response *self);
+void      response_setHtmlHeader(void);
 
 PyObject* Response_get_headers(Response* self, void* closure);
 PyObject* Response_get_cookies(Response* self, void* closure);

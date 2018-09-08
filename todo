@@ -1,16 +1,11 @@
 
 Add an r.json test
 
-
 cleanup mrq and memcac pro/client
 If MemcachedClient_set servers are down we return NULL and don't setup an exception
 Add tests for memc and mrq failover. 
 If we don't post JSON this breaks.  Check for empty body.  Maybe check JSON or endpoint checks and drops?
   curl -i --raw http://localhost:8080/q/0/0/ -H "Cookie: mrsession=43709dd361cc443e976b057145832e6e;" 
-
-If user's async handler has an exception is this ok?
-  exception in coro page handler
-Unhandled exception:
 
 test for replace header with r.headers and check 4_reponse.py works
   setContentType or catch it return -1 and rerun add_headers

@@ -1,10 +1,12 @@
 
+
 #include "Python.h"
 #include "string.h"
 #include "response.h"
 #include "common.h"
 
 static char *resp_plain = "text/plain\r\n\r\n";
+static char *resp_html = "text/html; charset=utf-8\r\n\r\n";
 static char *resp_json  = "application/json\r\n\r\n";
 
 static char *rbuf   = NULL;
@@ -74,6 +76,10 @@ PyObject *response_updateDate(PyObject *date) {
   p += 6;
   memcpy(p, d, l);
   Py_RETURN_NONE;
+}
+
+void response_setHtmlHeader() {
+  memcpy( rbuf+117, resp_html, 28 );
 }
 
 // Returns the header length
