@@ -31,7 +31,7 @@ m1 = Extension(
 
 setup(
   name="mrhttp", 
-  version="0.2",
+  version="0.3",
   license='MIT',
   description='A python web framework written in C',
   ext_modules = [m1],
