@@ -1,27 +1,96 @@
 
-Add an r.json test
 
-cleanup mrq and memcac pro/client
+memcached = clean it up
 If MemcachedClient_set servers are down we return NULL and don't setup an exception
-Add tests for memc and mrq failover. 
-If we don't post JSON this breaks.  Check for empty body.  Maybe check JSON or endpoint checks and drops?
-  curl -i --raw http://localhost:8080/q/0/0/ -H "Cookie: mrsession=43709dd361cc443e976b057145832e6e;" 
 
-test for replace header with r.headers and check 4_reponse.py works
-  setContentType or catch it return -1 and rerun add_headers
+dotests disconnect 
+Request_reset - we doing in all necessary places
+
+Make conn/req timeouts as arguments  (20 / 5 right now)
+
+Try mrpacker again - make sure we have the code up to date
+  Back out the parser changes? 
+  Why is mrunpacking directly in C slower?
+  
+Add tests for memc and mrq failover. ?
+
+async start so can embed
+
+
+
+
+
+
+test for setUserSession with added cookies
+/r/python - Why would you write your web server in anything but python
+
+If we lose the mrq servers we have to tell client 
+
+
+!!
+ File "uvloop/handles/basetransport.pyx", line 92, in uvloop.loop.UVBaseTransport._maybe_pause_protocol
+AttributeError: 'internals.MrqProtocol' object has no attribute 'pause_writing'
+protocol.resume_writing() failed
+protocol: <internals.MrqProtocol object at 0x7f1530f86cf0>
+transport: <TCPTransport closed=False reading=True 0x2b62fc8>
+Traceback (most recent call last):
+  File "uvloop/handles/basetransport.pyx", line 108, in uvloop.loop.UVBaseTransport._maybe_resume_protocol
+AttributeError: 'internals.MrqProtocol' object has no attribute 'resume_writing'
+Explained?
+For the asyncio streams-based implementation, StreamReader automatically uses the {pause,resume}_reading methods to transmit backpressure upstream, and StreamWriter provides a friendly wrapper around {pause,resume}_writing to help us accept backpressure from downstream: the drain method – we just have to remember to use it. So in order to fix our proxy to transmit backpressure, all we need to do is to add one line of code to copy_all. Specifically, this line:
+  await drain()
+await dest_writer.drain()
+
+Flow Control
+In the initial echo server example we had await writer.drain() as this paused the coroutine from writing more data to the socket till the client had caught up, it drained the socket. This is useful as until the client catches up the data will be stored in memory, hence a malicious client can make many requests for a lot of data, refuse to receive the data, and allow the server to exhaust its memory.
+
+To combat this the coroutine sending data should await a drain function, that can be added to the protocol,
+
+import asyncio
+class FlowControlServer(asyncio.Protocol):
+    def __init__(self):
+        self._can_write = asyncio.Event()
+        self._can_write.set()
+    def pause_writing(self) -> None:
+        # Will be called whenever the transport crosses the 
+        # high-water mark.
+        self._can_write.clear()
+    def resume_writing(self) -> None:
+        # Will be called whenever the transport drops back below the
+        # low-water mark.
+        self._can_write.set()
+    async def drain(self) -> None:
+        await self._can_write.wait()
+
+WriteTransport.set_write_buffer_limits(high=None, low=None)
+Set the high and low watermarks for write flow control.
+
+These two values (measured in number of bytes) control when the protocol’s protocol.pause_writing() and protocol.resume_writing() methods are called. If specified, the low watermark must be less than or equal to the high watermark. Neither high nor low can be negative.
+
+pause_writing() is called when the buffer size becomes greater than or equal to the high value. If writing has been paused, resume_writing() is called when the buffer size becomes less than or equal to the low value.
+
+The defaults are implementation-specific. If only the high watermark is given, the low watermark defaults to an implementation-specific value less than or equal to the high watermark. Setting high to zero forces low to zero as well, and causes pause_writing() to be called whenever the buffer becomes non-empty. Setting low to zero causes resume_writing() to be called only once the buffer is empty. Use of zero for either limit is generally sub-optimal as it reduces opportunities for doing I/O and computation concurrently.
+
+
+
+
+
+
+
+
+
+
 
 python dotests.py then ctrl-c during benchmark "RuntimeError: Event loop stopped before Future completed."
 
 
 
 
-Wiki doc:
+Wiki doc?
 http://www.django-rest-framework.org/api-guide/requests/
 
 
 
-upload a file
-  https://stackoverflow.com/questions/12667797/using-curl-to-upload-post-data-with-files
 
 vhosts -- how to do this? I don't like sanic's, maybe do cherrypy's redir
   sanic:
@@ -37,18 +106,13 @@ vhosts -- how to do this? I don't like sanic's, maybe do cherrypy's redir
 
 
 
-rate limit in C
-Make conn/req timeouts as arguments  (20 / 5 right now)
-
-todo add test >128k byte response body to test realloc of response buffer
-
-?? ip = cherrypy.request.remote.ip
-Allow setting custom error pages 
+rate limit in C? Nginx and our cdn can do this for us?
 
 
 
-Why is 404 so slow?
-  raised. We could try to cache it. Create a bytes obj and test just writing that. Or not use the raise method app.404 or something
+
+
+
 
 This is slow so do it in C to speed up forms
   urllib.parse.parse_qsl('foo=bar&baz=foor&dogsdont=likecats')
@@ -56,7 +120,9 @@ This is slow so do it in C to speed up forms
    curl -d "param1=value1&param2=value2" -X POST http://localhost:8080/form --verbose -H "Content-Type: application/x-www-form-urlencoded; charset=UTF-8"
 
 
-examples/5_router.py -- methods?
+
+
+
 
 logging 
 
@@ -72,8 +138,7 @@ Flask:
 https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world
 
 
-Create an async memcached client - needed for clustering
-  embed it in app
+
 
 
 Look at a mysql C client?  We can do better than aiomysql.  Either libmysqlclient or our own

@@ -74,13 +74,17 @@ void Request_dealloc(Request* self) {
   Py_XDECREF(self->py_args);
   Py_XDECREF(self->py_path);
   Py_XDECREF(self->py_method);
+  Py_XDECREF(self->py_ip);
+  Py_XDECREF(self->response);
+  Py_XDECREF(self->set_user);
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 
 int Request_init(Request* self, PyObject *args, PyObject* kw)
 {
-  
+
+  //self->hreq.headers = malloc( sizeof(*(self->hreq.headers))*100 ); //TODO
   self->headers = malloc( sizeof(*(self->headers))*100 ); //TODO
   if(!(self->response = (Response*)PyObject_GetAttrString((PyObject*)self, "response"))) return -1;
   if(!(self->set_user = PyObject_GetAttrString((PyObject*)self, "set_user"))) return -1;
@@ -93,14 +97,12 @@ int Request_init(Request* self, PyObject *args, PyObject* kw)
 void Request_reset(Request *self) {
   self->inprog = false;
   self->session_id = NULL;
-  Py_XDECREF(self->py_headers);
-  Py_XDECREF(self->py_body);
-  Py_XDECREF(self->py_path);
-  Py_XDECREF(self->py_method);
-  self->py_headers = NULL;
-  self->py_body = NULL;
-  self->py_path = NULL;
-  self->py_method = NULL;
+  Py_XDECREF(self->py_headers); self->py_headers = NULL;
+  Py_XDECREF(self->py_body); self->py_body = NULL;
+  Py_XDECREF(self->py_path); self->py_path = NULL;
+  Py_XDECREF(self->py_method); self->py_method = NULL;
+  Py_XDECREF(self->py_cookies); self->py_cookies = NULL; // TODO Benchmark just clearing it here, but need a flag to reload cookies each request
+  Py_XDECREF(self->hreq.ip); self->hreq.ip = NULL;
   self->num_headers = 0;
   Response_reset(self->response);
 }
@@ -120,6 +122,7 @@ void request_load(Request* self, char* method, size_t method_len, char* path, si
   //self->headers = headers;
   //self->num_headers = num_headers;
   //self->keep_alive = KEEP_ALIVE_UNSET;
+
 
 }
 PyObject* Request_cleanup(Request* self) {
@@ -147,6 +150,47 @@ PyObject* Request_get_transport(Request* self, void* closure) {
 
 //#ifdef __SSE4_2__
 
+// Search for a range of characters and return a pointer to the location or buf_end if none are found
+static char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
+{
+    *found = 0;
+    __m128i ranges16 = _mm_loadu_si128((const __m128i *)ranges);
+    if (likely(buf_end - buf >= 16)) {
+
+        size_t left = (buf_end - buf) & ~15;
+        do {
+            __m128i b16 = _mm_loadu_si128((const __m128i *)buf);
+            int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
+            if (unlikely(r != 16)) {
+                buf += r;
+                *found = 1;
+                return buf;
+            }
+            buf += 16;
+            left -= 16;
+        } while (likely(left != 0));
+
+    }
+
+    size_t left = buf_end - buf;
+    if ( left != 0 ) {
+      static char sbuf[16] = {0};
+      memcpy( sbuf, buf, left );
+      __m128i b16 = _mm_loadu_si128((const __m128i *)sbuf);
+      int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
+      if (unlikely(r != 16) && r < left) {
+        buf += r;
+        *found = 1;
+        return buf;
+      } else {
+        buf = buf_end;
+      }
+    }
+
+    *found = 0;
+    return buf;
+}
+/*
 static char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
 {   
     *found = 0;
@@ -170,7 +214,7 @@ static char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges
     *found = 0; 
     return buf;
 }
-
+*/
 // /spanish/objetos%20voladores%20no%20identificados?foo=bar
 static inline size_t sse_decode(char* path, ssize_t length, size_t *qs_len) {
   //DBG printf("sse_decode >%.*s<\n", (int)length, path);
@@ -331,26 +375,32 @@ PyObject* Request_get_headers(Request* self, void* closure) {
   Py_XINCREF(self->py_headers);
   return self->py_headers;
 }
+PyObject* Request_get_ip(Request* self, void* closure) {
+  if(!self->py_ip) self->py_ip = PyUnicode_FromStringAndSize(self->hreq.ip, self->hreq.ip_len);
+  Py_XINCREF(self->py_ip);
+  return self->py_ip;
+}
 
 static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
   char *end = buf + buflen;
   char *last = buf;
   PyObject* cookies = PyDict_New();
+  //return cookies;
   PyObject* key = NULL; PyObject* value = NULL;
 
-  //DBG printf("parse cookies: %.*s\n",buflen, buf);
+  printf("parse cookies: %.*s\n",buflen, buf);
 
   static char ALIGNED(16) ranges1[] = "==" ";;";
   int found;
   int state = 0;
   int grab_session = 0;
-//Cookie: key=session_key; bar=2;
+//Cookie: key=session_key; bar=2; nosemi=foo
   do { 
     last = buf;
     buf = findchar_fast(buf, end, ranges1, sizeof(ranges1) - 1, &found);
     if ( found ) {
       if ( *buf == '=' ) {
-        // Save out the mrsession id TODO use a separate function since we dont need this all the time
+        // Save out the mrsession id 
         if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
           DBG printf("Grab session\n");
           grab_session = 1;
@@ -365,6 +415,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
         if (grab_session) {
           grab_session = 0;
           r->session_id = last;
+          r->session_id_sz = buf-last;
         }
         value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
         state = 0;
@@ -384,6 +435,20 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
       //}
     }
   } while( found );
+
+  if (state) {
+    if (grab_session) {
+      grab_session = 0;
+      r->session_id = last;
+      r->session_id_sz = buf-last;
+    }
+    value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+    PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
+    Py_XDECREF(key);
+    Py_XDECREF(value);
+  }
+
+/*
   // May have 15 extra bytes
   for (;buf <= end;) {
     
@@ -392,6 +457,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
       if (grab_session) {
         grab_session = 0;
         r->session_id = last;
+        r->session_id_sz = buf-last;
       }
       value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
       state = 0;
@@ -414,7 +480,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
     }
     buf++;
   }
-
+*/
   return cookies;
 }
 
@@ -431,12 +497,12 @@ static inline PyObject* Request_decode_cookies(Request* self)
 void Request_load_cookies(Request* self) {
   if(!self->py_headers) self->py_headers = Request_decode_headers(self);
   if(!self->py_cookies) self->py_cookies = Request_decode_cookies(self);
+  //self->py_cookies = Request_decode_cookies(self);
 }
 
 PyObject* Request_get_cookies(Request* self, void* closure) {
   if(!self->py_headers) self->py_headers = Request_decode_headers(self);
   if(!self->py_cookies) self->py_cookies = Request_decode_cookies(self);
-  Py_XINCREF(self->py_cookies);
   return self->py_cookies;
 }
 

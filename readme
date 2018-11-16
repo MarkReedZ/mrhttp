@@ -24,7 +24,7 @@ memcached -l 127.0.0.1 -p 11212 -d -m 50
 gdb python3
 attach to child process
 
-Memory issues:  TODO AddressSanitizer false positives on the ranges* see if I can fix that
+Memory issues:  TODO AddressSanitizer false positives on the ranges* see if I can ignore
 CFLAGS='-Wall -O0 -g -fsanitize=address -fno-omit-frame-pointer -fsanitize-recover=address' python setup.py install --force
 ASAN_OPTIONS=halt_on_error=0 LD_PRELOAD=/usr/lib/gcc/x86_64-linux-gnu/7/libasan.so python tst.py
 
@@ -43,25 +43,39 @@ Accept: */*
 
 <<<
 
+curl http://localhost:8080/
 
 Valgrind doesn't work with AVX2 ... 
 valgrind --tool=memcheck --suppressions=valgrind-python.supp python3 -E -tt ./tst.py
 
 FORM urlencoded TODO more params.  Can we fix the performance here?
-curl -d "param1=value1&param2=value2" -X POST http://localhost:8080/form
+curl -d "param1=value1&param2=value2" -X POST http://localhost:8080/form -H "Content-Type: application/x-www-form-urlencoded"
 wrk -t4 -c32 -d1s http://localhost:8080/form -s tests/lua/form.lua
+
+cookie test:
+curl -i --raw http://localhost:8080/printCookies -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb; foo=fdsfdasdfasdfdsfasdfsdfsdfasdfas; short=fazc;"
+wrk -t4 -c32 -d1s http://localhost:8080/printCookies -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb; foo=fdsfdasdfasdfdsfasdfsdfsdfasdfas; short=fazc;"
 
 JSON post:
 curl -H "Content-Type: application/json" -X POST -d '{"username":"xyz","password":"xyz"}' http://localhost:8080/
 curl -H "Content-Type: application/json" -X POST -d '[1,2,3,4,5,6,7,8,9]' http://localhost:8080/printPostBody
+curl -H "Content-Type: application/json" -X POST -d '{"name":"MalthusianProphet","tl":2004,"dankmemes":true,"list":[1,2,3,4,5,6]}' http://localhost:8080/json
 
-wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -s tests/lua/post.lua
+
+wrk -t4 -c32 -d1s http://localhost:8080/json -s tests/lua/json.lua
+wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -s tests/lua/json.lua
 wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -s tests/lua/q-pipeline.lua
 
 MRQ test:
-curl -i --raw http://localhost:8080/q/0/0/ -H "Cookie: mrsession=43709dd361cc443e976b057145832e84;" -X POST -d '{"username":"xyz","type":"add"}' 
-wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;" -s tests/lua/post.lua
+curl -i --raw http://localhost:8080/q/0/0/ -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;" -X POST -d '{"username":"xyz","type":"add"}' 
+wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;" -s tests/lua/json.lua
 
+wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -H "Content-Type: application/mrpacker" -s tests/lua/mrpacker.lua
+curl -H "Content-Type: application/mrpacker" --data-binary @tests/lua/test.mrp http://localhost:8080/q/1/2
+
+mrpacker test:
+wrk -t4 -c32 -d1s http://localhost:8080/mrpacker -s tests/lua/mrpacker.lua
+curl -H "Content-Type: application/mrpacker" --data-binary @tests/lua/test.mrp http://localhost:8080/mrpacker
 
 Session testing
 curl -i --raw http://localhost:8080/s -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
@@ -79,3 +93,17 @@ wrk -t4 -c32 -d2s http://localhost:8080/ -H "Accept: text/html,application/xhtml
 
 Template testing
 curl -d '{"name": "r0fls"}' http://localhost:8080/template
+
+File upload
+curl -F "data=@todo" -i --raw http://localhost:8080/f
+
+
+curl -H "Content-Type: application/json" -X POST -d '{ "name":"MalthusianProphet", "tl":2004, "dankmemes":true "list":[1,2,3,4,5,6] }' http://localhost:8080/json
+
+
+s_bench:
+wrk -t4 -c32 -d1s http://localhost:8080/s -H "Cookie: mrsession=11111111111111111111110000000001;"
+wrk -t4 -c32 -d1s http://localhost:8080/mrq/1 -H "Cookie: mrsession=11111111111111111111110000000001;" -s tests/lua/json.lua
+wrk -t4 -c32 -d1s http://localhost:8080/mrpackerpy -H "Cookie: mrsession=11111111111111111111110000000001;" -s tests/lua/mrpacker.lua
+
+

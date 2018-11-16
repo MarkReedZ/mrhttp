@@ -1,0 +1,33 @@
+12a13,20
+> static __inline__ unsigned long long rdtsc(void)
+> { 
+>   unsigned long lo, hi;
+>   __asm__ volatile( "rdtsc" : "=a" (lo), "=d" (hi) );
+>   return( lo | ( hi << 32 ) );
+> }
+> 
+> 
+37d44
+<     DBG printf(" %02x \n", *s);
+162a170
+>     //printf("new dict of len %d\n", l);
+182a191
+>     //printf("new dict of len %d\n", l);
+205a215,216
+>     //PyList_Append( parents[depth],o );
+>     Py_DECREF(o);
+219a231
+>       Py_DECREF(keys[depth]); Py_DECREF(o);
+233,239d244
+< PyObject* unpackc( unsigned char *p, int len ) {
+<   return decode( p, p+len );
+< }
+< void initmrpacker(void) {
+< }
+< 
+< 
+260a266,269
+>   //unsigned long long cycles = rdtsc();
+>   //PyObject *ret = decode( p, p+l );
+>   //printf(" took %lld\n", rdtsc() - cycles);
+>   //return ret;

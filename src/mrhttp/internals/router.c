@@ -1,5 +1,4 @@
 
-
 #include <Python.h>
 #include <stdbool.h>
 
@@ -80,13 +79,14 @@ PyObject *Router_setupRoutes (Router* self) {
     if ( Py_True == PyDict_GetItemString( r, "session" ) ) rte->session = true;
     if ( Py_True == PyDict_GetItemString( r, "mrq" ) ) rte->mrq = true;
     if ( Py_True == PyDict_GetItemString( r, "append_user" ) ) rte->append_user = true;
-    if ( Py_True == PyDict_GetItemString( r, "append_user" ) ) printf("mrq append user set\n");
+    //if ( Py_True == PyDict_GetItemString( r, "append_user" ) ) printf("mrq append user set\n");
     o = PyDict_GetItemString( r, "type"  );
     if (o) rte->mtype = PyLong_AsLong(o);
     rte->user_key = PyDict_GetItemString( r, "user_key" );
 
     DBG printf(" path %.*s func ptr %p\n", (int)rte->len, rte->path, rte->func);
   }
+  Py_DECREF(sroutes);
 
   rte = self->staticRoutes;
   for (int i = 0; i<l; i++,rte++ ) {
@@ -112,9 +112,10 @@ PyObject *Router_setupRoutes (Router* self) {
     DBG printf( " path len %ld str %.*s\n", rte->len, (int)rte->len, rte->path );
 
     rte->iscoro  = false; rte->session = false; rte->mrq = false;
-    if ( Py_True == PyDict_GetItemString( r, "iscoro"  ) ) rte->iscoro = true;
-    if ( Py_True == PyDict_GetItemString( r, "session" ) ) rte->session = true;
-    if ( Py_True == PyDict_GetItemString( r, "mrq" ) ) rte->mrq = true;
+    if ( Py_True == PyDict_GetItemString( r, "iscoro"      ) ) rte->iscoro = true;
+    if ( Py_True == PyDict_GetItemString( r, "session"     ) ) rte->session = true;
+    if ( Py_True == PyDict_GetItemString( r, "mrq"         ) ) rte->mrq = true;
+    if ( Py_True == PyDict_GetItemString( r, "append_user" ) ) rte->append_user = true;
     o = PyDict_GetItemString( r, "type"  );
     if (o) rte->mtype = PyLong_AsLong(o);
 
@@ -123,13 +124,14 @@ PyObject *Router_setupRoutes (Router* self) {
     if ( rte->path[rte->len-1] == '/' ) numSegs -= 1;
     rte->numSegs = numSegs;
     DBG printf( " num segs %d\n", numSegs );
-    rte->segs    = malloc( numSegs * sizeof(*(rte->segs)) );
-    rte->segLens = malloc( numSegs * sizeof(int)  );
+    rte->segs     = malloc( numSegs * sizeof(*(rte->segs)) );
+    rte->segLens  = malloc( numSegs * sizeof(int)  );
     char* rest = rte->path+1;
     size_t rest_len = rte->len-1;
     DBG printf( " rest %.*s\n", (int)rest_len, rest );
     for ( int j = 0; j < numSegs; j++ ) {
       char* slash = memchr(rest, '/', rest_len);
+
       if ( slash ) {
         rte->segs[j] = rest;
         rte->segLens[j] = slash - rest;
@@ -151,6 +153,7 @@ PyObject *Router_setupRoutes (Router* self) {
     }
     
   }
+  Py_DECREF(routes);
 
   Py_RETURN_NONE;
 error:
@@ -168,18 +171,18 @@ Route* router_getRoute(Router* self, Request* request) {
   DBG printf("router getRoute\n");
   request_decodePath( request );
   int plen = request->path_len;
-  DBG printf("DELME path >%.*s<\n", plen, request->path );
  
+  request->numArgs = 0;
+
   Route *r = self->staticRoutes;
   for (int i = 0; i<self->numStaticRoutes; i++,r++ ) {
-    DBG printf("request path %.*s\n", (int)request->path_len, request->path);
+    //DBG printf("request path %.*s\n", (int)request->path_len, request->path);
     if ( plen == r->len && !memcmp(r->path, request->path, plen) ) {
       DBG printf("router found path %.*s == %.*s\n", (int)r->len, r->path, (int)request->path_len, request->path);
       return r;
     }
   }
 
-  request->numArgs = 0;
 
   int numSegs = numInString( '/', request->path, plen );
   if ( request->path[plen-1] == '/' ) numSegs -= 1;
@@ -200,8 +203,10 @@ Route* router_getRoute(Router* self, Request* request) {
         if ( !slash ) seglen = plen;
         else          seglen = slash - p;
         if ( r->segs[j][0] == '{' ) {
-          request->args[   request->numArgs] = p;
-          request->argLens[request->numArgs] = seglen;
+          request->args[    request->numArgs] = p;
+          request->argLens[ request->numArgs] = seglen;
+          request->argTypes[request->numArgs] = 0;
+          if ( r->segs[j][1] == 'n' ) request->argTypes[request->numArgs] = 1;
           request->numArgs += 1;
         } else {
           if ( seglen != r->segLens[j] ) goto no_match;

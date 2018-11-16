@@ -16,12 +16,15 @@ typedef struct {
   PyObject* check_interval;
   PyObject* loop;
 
+  // Custom error pages
+  PyObject* err404;
 
   // Request pool
   PyObject *func_expand_requests;
   PyObject *requests;
   //Request **requests;
   int numRequests, nextRequest,freeRequests; 
+  int numGets, numReleases;
 
 } MrhttpApp;
 
@@ -38,4 +41,4 @@ PyObject *MrhttpApp_updateDate(MrhttpApp *self, PyObject *date);
 PyObject *MrhttpApp_check_idle(MrhttpApp *self);
 PyObject *MrhttpApp_test_fut(MrhttpApp *self);
 
-
+void MrhttpApp_setup_error_pages(MrhttpApp* self);

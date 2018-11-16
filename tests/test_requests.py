@@ -18,6 +18,8 @@ def setup():
 def test_one():
   r = requests.get('http://localhost:8080/foo')
   eq(r.status_code, 200)
+  r = requests.get('http://localhost:8080/to64')
+  eq(r.text, "ok")
   r = requests.get('http://localhost:8080/foo/baz/whatever')
   eq(r.text, "foo2")
   r = requests.get('http://localhost:8080/foo/bar/whatever')

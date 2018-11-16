@@ -22,8 +22,8 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef picohttpparser_h
-#define picohttpparser_h
+#ifndef mrhttpparser_h
+#define mrhttpparser_h
 
 #include <sys/types.h>
 
@@ -72,15 +72,40 @@ static const unsigned char __lct[] __attribute__((aligned(64))) = {
   0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff
 };
 
+ //rc = mr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, request->headers, &(request->num_headers), prevbuflen);
+ 
 // name: value pair from the headers
 struct mr_header {
     const char *name, *value;
     size_t name_len, value_len;
 };
 
+struct mr_request {
+/*
+  char* method;
+  size_t method_len;
+  char* path;
+  size_t path_len;
+  //bool path_decoded;
+  //bool qs_decoded;
+  size_t qs_len;
+  int minor_version;
+  struct mr_header* headers;
+  size_t num_headers;
+  int body_length;
+  char* content_type;
+  size_t content_type_len;
+*/
+  int flags;
+  char* ip;
+  size_t ip_len;
+
+}; 
+
+
 // These functions return -2 if partial request, -1 if parsing failed, and the number of bytes parsed otherwise
 int mr_parse_request(const char *buf, size_t len, const char **method, size_t *method_len, const char **path, size_t *path_len,
-                      int *minor_version, struct mr_header *headers, size_t *num_headers, size_t last_len);
+                      int *minor_version, struct mr_header *headers, size_t *num_headers, size_t last_len, struct mr_request *mrr);
 int mr_parse_response(const char *_buf, size_t len, int *minor_version, int *status, const char **msg, size_t *msg_len,
                        struct mr_header *headers, size_t *num_headers, size_t last_len);
 int mr_parse_headers(const char *buf, size_t len, struct mr_header *headers, size_t *num_headers, size_t last_len);

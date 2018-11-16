@@ -1,4 +1,3 @@
-
 #include <Python.h>
 #include <stdbool.h>
 
@@ -79,9 +78,11 @@ void MrqClient_connection_lost( MrqClient* self, MrqProtocol *conn ) {
   MrqServer_connection_lost( srv, conn );
 
   PyObject* func = PyObject_GetAttrString((PyObject*)self, "lost_connection");
-  PyObject* tmp = PyObject_CallFunctionObjArgs(func, PyLong_FromLong(conn->server_num), NULL);
+  PyObject* snum = PyLong_FromLong(conn->server_num);
+  PyObject* tmp = PyObject_CallFunctionObjArgs(func, snum, NULL);
   Py_XDECREF(func);
   Py_XDECREF(tmp);
+  Py_DECREF(snum);
   
 
   int no_servers = 1;
@@ -104,10 +105,22 @@ void MrqClient_connection_lost( MrqClient* self, MrqProtocol *conn ) {
 }
 
 
+PyObject *MrqClient_get(MrqClient* self, PyObject *args) {
+  int slot;
+  PyObject *getargs;
+  if(!PyArg_ParseTuple(args, "iO", &slot, &getargs)) return NULL;
+  int srv = server_slotmap[slot];
+  if ( srv == -1 ) return NULL;
+  MrqServer_get( self->servers[srv], slot, getargs); //TODO error check
+  return PyLong_FromLong(srv);
+}
 
+// TODO We trust the slot is & 0xFF
 int MrqClient_push(MrqClient* self, int topic, int slot, char *d, int dsz) {
+  DBG_MRQ printf(" MrqClient_push topic %d slot %d\n", topic, slot );
   int server = server_slotmap[slot];
   DBG_MRQ printf(" MrqClient_push server %d\n", server );
+  DBG_MRQ printf(" MrqClient_push >%.*s<\n", dsz, d );
   if ( server == -1 ) return -1;
   int rc = MrqServer_push( self->servers[server], topic, slot, d, dsz );
   return rc;
@@ -149,18 +162,41 @@ void MrqServer_connection_lost( MrqServer* self, MrqProtocol* conn ) {
 
 }
 
+int MrqServer_get(MrqServer* self, int slot, PyObject *args ) {
+  if ( self->num_conns == 0 ) return -1;
+  int c = self->next_conn++;
+  if ( self->next_conn >= self->num_conns ) self->next_conn = 0;
+
+  char *b;
+  Py_ssize_t bsz;
+  if(PyBytes_AsStringAndSize(args, &b, &bsz) == -1) return -1;
+
+  MrqProtocol_get( self->conns[c], slot, b, bsz );
+  return 0;
+}
+
 int MrqServer_push(MrqServer* self, int topic, int slot, char *d, int dsz) {
   DBG_MRQ printf("  MrqServer push num conns %d\n", self->num_conns);
   if ( self->num_conns == 0 ) return -1;
   int c = self->next_conn++;
   if ( self->next_conn >= self->num_conns ) self->next_conn = 0;
 
-  //printf("mrq server push: %.*s\n",dsz, d);
+  DBG_MRQ printf("mrq server push: %.*s\n",dsz, d);
   MrqProtocol_push( self->conns[c], topic, slot, d, dsz );
   return 0;
 }
 
+/*
+int MrqServer_push(MrqServer* self, int topic, int slot, char *d, int dsz) {
+  DBG_MRQ printf("  MrqServer push num conns %d\n", self->num_conns);
+  if ( self->num_conns == 0 ) return -1;
+  int c = self->next_conn++;
+  if ( self->next_conn >= self->num_conns ) self->next_conn = 0;
 
-
+  DBG_MRQ printf("mrq server push: %.*s\n",dsz, d);
+  MrqProtocol_push( self->conns[c], topic, slot, d, dsz );
+  return 0;
+}
+*/
 
 

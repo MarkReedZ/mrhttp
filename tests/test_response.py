@@ -20,6 +20,10 @@ def test_one():
   eq(r.status_code, 200)
   eq(r.headers["Content-Type"],"text/plain")
 
+  r = requests.get('http://localhost:8080/long')
+  eq(r.status_code, 200)
+  eq(r.headers["Content-Type"],"text/plain")
+
   r = requests.get('http://localhost:8080/')
   eq(r.status_code, 200)
   eq(len(r.headers.keys()),6)

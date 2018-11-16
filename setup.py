@@ -20,6 +20,7 @@ m1 = Extension(
       './src/mrhttp/internals/hash/city.c',
       './src/mrhttp/internals/hash/assoc.c',
       './src/mrhttp/internals/utils.c',
+      './src/mrhttp/utils/unpack.c',
      ],
      include_dirs = ['./src/mrhttp/internals'],
      extra_compile_args = ['-msse4.2', '-mavx2', '-mbmi2', '-Wunused-variable','-std=c99','-Wno-discarded-qualifiers', '-Wno-unused-variable','-Wno-unused-function'],

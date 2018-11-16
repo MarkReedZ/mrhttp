@@ -1,7 +1,7 @@
 
 import asyncio
 import os
-import mrhttp
+import mrhttp, mrjson
 
 
 #TODO
@@ -11,13 +11,14 @@ import mrhttp
 #   This prevents two servers from working on the same partition at the same time
 
 class MrqServer():
-  def __init__(self, host, port, pool_size=2):
+  def __init__(self, host, port, loop, pool_size=2):
     self.host = host
     self.port = port
     self.pool_size = 2
     self.num_connections = 0
     self.reconnecting = False
     self.reconnect_attempts = 0
+    self.q = asyncio.Queue( loop=loop )
     
        
 class MrqClient(mrhttp.CMrqClient):
@@ -30,14 +31,13 @@ class MrqClient(mrhttp.CMrqClient):
     self.loop = loop
     self.servers = []
     for s in servers:
-      self.servers.append( MrqServer(s[0], s[1], pool_size) )
-
+      self.servers.append( MrqServer(s[0], s[1], loop, pool_size) )
 
     try:
       snum = 0
       for s in self.servers:
         for c in range(pool_size):
-          coro = loop.create_connection(lambda: mrhttp.MrqProtocol(self,snum), s.host, s.port)
+          coro = loop.create_connection(lambda: mrhttp.MrqProtocol(self,snum,s.q), s.host, s.port)
           loop.run_until_complete(coro)
           s.num_connections += 1
         snum += 1
@@ -53,7 +53,7 @@ class MrqClient(mrhttp.CMrqClient):
     s = self.servers[srv]
     #for c in range(pool_size):
     try:
-      await loop.create_connection(lambda: mrhttp.MrqProtocol(self,srv), s.host, s.port)
+      await loop.create_connection(lambda: mrhttp.MrqProtocol(self,srv,s.q), s.host, s.port)
     except ConnectionRefusedError:
       print("Could not connect to the MrQ server(s)")
       return False
@@ -67,7 +67,7 @@ class MrqClient(mrhttp.CMrqClient):
     s = self.servers[srv]
     while True:
       try:
-        await self.loop.create_connection(lambda: mrhttp.MrqProtocol(self,srv), s.host, s.port)
+        await self.loop.create_connection(lambda: mrhttp.MrqProtocol(self,srv,s.q), s.host, s.port)
         s.num_connections += 1
         s.reconnect_attempts = 0
         s.reconnecting = False  #TODO make sure open pool size number of conns
@@ -79,7 +79,13 @@ class MrqClient(mrhttp.CMrqClient):
         print(e)
         await asyncio.sleep(30)
 
-     
+
+  async def get(self, slot, o):
+    #print("mrqpy get", o)
+    b = mrjson.dumpb(o)
+    srv = self._get(slot, b)
+    #print("After _get srv ",srv, " qsize ", self.servers[srv].q.qsize())
+    return await self.servers[srv].q.get()
   
   def lost_connection(self, srv):
     s = self.servers[srv]

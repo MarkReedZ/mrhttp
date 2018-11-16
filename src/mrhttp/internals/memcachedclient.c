@@ -112,6 +112,16 @@ int MemcachedClient_get(MemcachedClient* self, char *key, void *fn, void *connec
   int rc = MemcachedServer_get( self->servers[server], key, fn, connection );
   return rc;
 }
+int MemcachedClient_get2(MemcachedClient* self, char *key, int ksz, void *fn, void *connection ) {
+
+  int hash = (hexchar[(uint8_t)key[ksz-3]]<<8) | (hexchar[(uint8_t)key[ksz-2]]<<4) | hexchar[(uint8_t)key[ksz-1]];
+  int server = connmap[hash];
+  DBG_MEMCAC printf("  memcached get server %d\n",server); 
+  if ( server == -1 ) return -1;
+
+  int rc = MemcachedServer_get2( self->servers[server], key, ksz, fn, connection );
+  return rc;
+}
 
 // Args Session key bytes, user bytes
 PyObject *MemcachedClient_set(MemcachedClient* self, PyObject *args) {
@@ -143,9 +153,11 @@ void MemcachedClient_connection_lost( MemcachedClient* self, MemcachedProtocol* 
   MemcachedServer_connection_lost( self->servers[server], conn );
 
   PyObject* func = PyObject_GetAttrString((PyObject*)self, "lost_connection");
-  PyObject* tmp = PyObject_CallFunctionObjArgs(func, PyLong_FromLong(server), NULL);
+  PyObject* snum = PyLong_FromLong(server);
+  PyObject* tmp = PyObject_CallFunctionObjArgs(func, snum, NULL);
   Py_XDECREF(func);
   Py_XDECREF(tmp);
+  Py_DECREF(snum);
 
   // If we have no more connections to this server remove it 
   if ( self->servers[server]->num_conns == 0 ) {
@@ -204,7 +216,13 @@ int MemcachedServer_get( MemcachedServer *self, char *k, void *fn, void *connect
 }
 
 
-
+int MemcachedServer_get2( MemcachedServer *self, char *k, int ksz, void *fn, void *connection ) {
+  if ( self->num_conns == 0 ) return -1;
+  int c = self->next_conn++;
+  if ( self->next_conn == self->num_conns ) self->next_conn = 0;
+  MemcachedProtocol_asyncGet2( self->conns[c], k, ksz, fn, connection );
+  return 0;
+}
 
 
 

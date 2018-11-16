@@ -19,7 +19,12 @@
   //{NULL}
 //};
 static PyMethodDef mod_methods[] = {
-  {"randint", (PyCFunction)myrandint, METH_VARARGS, "Generate a random integer in the interval [0,range]"},
+  {"randint",   (PyCFunction)myrandint, METH_VARARGS,   "Generate a random integer in the interval [0,range]"},
+  {"escape",    (PyCFunction)escape_html, METH_O,       "Escape <>&\" from a string" },
+  {"to64",      (PyCFunction)to64,        METH_O,       "Number to base64 string"    },
+  {"from64",    (PyCFunction)from64,      METH_O,       "Base64 string to number"    },
+  {"timesince", (PyCFunction)timesince,   METH_O,       "Timestamp difference as string"},
+  {"hot",       (PyCFunction)hot,         METH_VARARGS, "Chatt1r's hot algorithm"    },
   {NULL}
 };
 
@@ -66,6 +71,7 @@ static PyMethodDef MrhttpApp_methods[] = {
 };
 static PyMethodDef MrqClient_methods[] = {
   {"cinit", (PyCFunction)MrqClient_cinit, METH_NOARGS,   ""},
+  {"_get",  (PyCFunction)MrqClient_get,   METH_VARARGS,  ""},
   {NULL}
 };
 static PyMethodDef MemcachedClient_methods[] = {
@@ -84,6 +90,7 @@ static PyGetSetDef Request_getset[] = {
   {"method", (getter)Request_get_method, NULL, "", NULL},
   {"transport", (getter)Request_get_transport, NULL, "", NULL},
   {"headers", (getter)Request_get_headers, NULL, "", NULL},
+  {"ip", (getter)Request_get_ip, NULL, "", NULL},
   {"cookies", (getter)Request_get_cookies, NULL, "", NULL},
   {"body", (getter)Request_get_body, NULL, "", NULL},
   {"query_string", (getter)Request_get_query_string, NULL, "", NULL},

@@ -36,6 +36,7 @@ app.run(cores=2)
 # curl -i --raw 'http://localhost:8080/?foo=bar' -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
 
 # Post json
+# Note that if you don't use the r.json you must check the application/json header to avoid a security vulnerability
 # curl -i --raw 'http://localhost:8080/' -H "Content-Type: application/json" -X POST -d '[1,2,3,4,5,6,7,8,9]'
 
 # Form:

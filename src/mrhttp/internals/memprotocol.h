@@ -25,8 +25,9 @@ typedef struct {
   int queue_start;
   int queue_end;
 
-  char get_cmd[64];
+  char get_cmd[128];
   char *set_cmd;
+  char get_cmd2[256];
   int set_cmd_sz;
 
 } MemcachedProtocol;

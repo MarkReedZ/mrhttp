@@ -1,4 +1,5 @@
 
+
 #include "protocol.h"
 #include "common.h"
 #include "module.h"
@@ -63,12 +64,14 @@ void Protocol_dealloc(Protocol* self)
   Py_XDECREF(self->writelines);
   Py_XDECREF(self->create_task);
   Py_XDECREF(self->task_done);
+  Py_XDECREF(self->memclient);
+  Py_XDECREF(self->mrqclient);
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 int Protocol_init(Protocol* self, PyObject *args, PyObject *kw)
 {
-  DBG printf("protocol init\n");
+  DBG printf("protocol init %p\n",self);
   self->closed = true;
 
   if(!PyArg_ParseTuple(args, "O", &self->app)) return -1;
@@ -88,6 +91,7 @@ int Protocol_init(Protocol* self, PyObject *args, PyObject *kw)
   self->queue_end = 0;
   if(!(self->task_done   = PyObject_GetAttrString((PyObject*)self, "task_done"  ))) return -1;
   if(!(self->create_task = PyObject_GetAttrString(loop, "create_task"))) return -1;
+  DBG printf("protocol init task done %p\n",self->task_done);
   Py_XDECREF(loop);
   return 0;
 }
@@ -112,31 +116,12 @@ typedef struct {
 
 PyObject* Protocol_connection_made(Protocol* self, PyObject* transport)
 {
-// TODO keep a request timer so we can timeout
-//self._request_timeout_handler = self.loop.call_later( self.request_timeout, self.request_timeout_callback)
-//if self._request_timeout_handler: self._request_timeout_handler.cancel()
 
+  DBG printf("conn made %p\n",self);
   PyObject* connections = NULL;
   self->transport = transport;
   Py_INCREF(self->transport);
-
-  // Set TCP_NODELAY which disables Nagles. TODO dynamic based on response size?
-/* Doesn't work with .91 psuedo socket
-  PyObject* get_extra_info = NULL;
-  PySocketSockObject* socket = NULL;
-  if(!(get_extra_info   = PyObject_GetAttrString(transport, "get_extra_info"))) return NULL;
-  if(!(socket = (PySocketSockObject*)PyObject_CallFunctionObjArgs( get_extra_info, socket_str, NULL))) return NULL;
-
-  const int on = 1;
-  if(setsockopt(socket->sock_fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on)) != 0) {
-    char msg[80]; sprintf(msg, "Error setting socket options: %s\n", strerror(errno));
-    PyErr_SetString(PyExc_ConnectionError,msg);
-    return NULL;
-  }
-  Py_XDECREF(socket);
-  Py_XDECREF(get_extra_info);
-*/
-
+  self->closed = false;
 
   if(!(self->write      = PyObject_GetAttrString(transport, "write"))) return NULL;
   if(!(self->writelines = PyObject_GetAttrString(transport, "writelines"))) return NULL;
@@ -150,7 +135,6 @@ PyObject* Protocol_connection_made(Protocol* self, PyObject* transport)
   self->memclient = (MemcachedClient*)PyObject_GetAttrString(self->app, "_mc");
   self->mrqclient = (MrqClient*)PyObject_GetAttrString(self->app, "_mrq");
 
-  self->closed = false;
   Py_RETURN_NONE;
 }
 
@@ -165,6 +149,7 @@ void* Protocol_close(Protocol* self)
   if(!tmp) return NULL;
   Py_DECREF(tmp);
   self->closed = true;
+  printf("DELME protocol closed\n");
 
   return result;
 
@@ -178,7 +163,7 @@ PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
 {
   DBG printf("conn lost\n");
   self->closed = true;
-  //MrhttpApp_release_request( (MrhttpApp*)self->app, self->request );
+  MrhttpApp_release_request( (MrhttpApp*)self->app, self->request );
 
   PyObject* connections = NULL;
 
@@ -190,11 +175,12 @@ PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
   Py_XDECREF(connections);
   if ( rc == -1 ) return NULL;
 
-  //if(!Protocol_pipeline_cancel(self)) return NULL;
+  if(!Protocol_pipeline_cancel(self)) return NULL;
 
   //Py_XDECREF(self->write);
   //Py_XDECREF(self->writelines);
-  Py_XDECREF(self->task_done); // TODO Why is this helping
+  //Py_XDECREF(self->task_done); // TODO Why is this helping
+
 
   Py_RETURN_NONE;
 }
@@ -223,7 +209,7 @@ PyObject* Protocol_data_received(Protocol* self, PyObject* data)
 
 PyObject* pipeline_queue(Protocol* self, PipelineRequest r)
 { 
-  DBG printf("Queueing\n");
+  DBG printf("Queueing proto %p\n",self);
   PyObject* result = Py_None; 
   PyObject* add_done_callback = NULL;
 
@@ -238,7 +224,7 @@ PyObject* pipeline_queue(Protocol* self, PipelineRequest r)
   pipeline_INCREF(r);
   
   self->queue_end++;
-  DBG printf("Queueing in position %ld\n", self->queue_end);
+  DBG printf("Queueing in position %ld task done %p\n", self->queue_end,self->task_done);
   
   if(pipeline_is_task(r)) {
     DBG printf(" is task\n");
@@ -273,6 +259,8 @@ Protocol* Protocol_on_headers(Protocol* self, char* method, size_t method_len,
   return result;
 }
 
+static inline bool _isdigit(char c)  { return  c >= '0'  && c <= '9'; }
+
 PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *request ) {
   PyObject* ret = NULL;
 
@@ -283,14 +271,28 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *req
     PyObject **args = malloc( numArgs * sizeof(PyObject*) );
     
     for (int i=0; i<numArgs; i++) { 
-      //printf(" arg%d len %d\n", i, self->request->argLens[i]);
-      //printf(" arg%d %.*s\n", i, self->request->argLens[i], self->request->args[i] );
 
-      //PyObject *arg = PyUnicode_FromStringAndSize( self->request->args[i],  self->request->argLens[i] );
-      args[i] = PyUnicode_FromStringAndSize( request->args[i],  request->argLens[i] );
-      //TODO error?
-      //int rc = PyTuple_SetItem( args, i, arg );
-      //if (rc) return NULL;
+      if ( request->argTypes[i] == 1 ) {
+        char *p = request->args[i];
+
+        int cnt = request->argLens[i];
+
+        if ( cnt < 20 ) {
+          long l = 0;
+          while (_isdigit(*p) && (--cnt != 0)) l = (l * 10) + (*p++ - '0');
+          if ( !cnt ) {
+            args[i] = PyLong_FromLong(l);
+          } else {
+            args[i] = PyUnicode_FromStringAndSize( request->args[i],  request->argLens[i] );
+          }
+        } else {
+          args[i] = PyUnicode_FromStringAndSize( request->args[i],  request->argLens[i] );
+          args[i] = PyLong_FromUnicodeObject( args[i], 10 );
+        }
+
+      } else {
+        args[i] = PyUnicode_FromStringAndSize( request->args[i],  request->argLens[i] );
+      }
     }
     switch (numArgs) {
       case 1: ret = PyObject_CallFunctionObjArgs(func, request, args[0], NULL); break;
@@ -304,9 +306,7 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *req
       Py_DECREF(args[i]);
     }
     free(args);
-    //return PyObject_CallFunctionObjArgs(func, args, NULL);
   } else {
-    DBG printf("num args is 0 so just call func %p\n",func);
     return PyObject_CallFunctionObjArgs(func, request, NULL);
   }
   //TODO num args > 6 fail at start 
@@ -319,10 +319,12 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
 
   DBG_MEMCAC printf(" memcached reply data len %d data %.*s\n",data_sz,data_sz,data);
 
+
   // TODO if mrq we pass it on so can skip this?
   if ( data_sz ) {
     PyObject *session = PyUnicode_FromStringAndSize( data, data_sz );
     PyObject_CallFunctionObjArgs(req->set_user, session, NULL);
+    Py_XDECREF(session); 
   } 
   
   free(mcd);
@@ -330,22 +332,22 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
 
     Route *r = req->route;
     if ( r->mrq ) { 
-      // TODO Get slot from url A
-        //rte->segs[rte->numSegs-1] = rest; //TODO last one?
-          //rte->segLens[j] = rest_len;
       int slot = 0;
       int topic = 0;
+
+      // Pull slot from the first arg. Must be a number though a string won't break
       if ( req->numArgs > 0 ) {
         int len = req->argLens[0];
         char *p = req->args[0];
         while (len--) slot = (slot * 10) + (*p++ - '0');
+        slot &= 0xff;
       }
-
 
       // Only push to mrq if we found a session for the user's key
       if ( data_sz ) {
         // push [ user, json ] if append_user is set
         if ( r->append_user ) {
+          // TODO Test using a static buffer
           char *tmp = malloc( req->body_len + data_sz + 16 );
           tmp[0] = '[';
           char *p = tmp+1;
@@ -356,12 +358,14 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
           p += data_sz;
           *p++ = ']';
           int rc = MrqClient_push( self->mrqclient, topic, slot, tmp, (int)(p-tmp) );
+          free(tmp);
           if ( rc == -1 ) {
             rc = PyObject_SetAttrString((PyObject*)req, "servers_down", Py_True );
+            Py_DECREF(Py_True);
           }
         }
 
-  // TODO Delete the below and just keep append user
+  // TODO Delete the below and just keep append user? This pulls a user defined key from the json and sends that object
         /*
         else if ( r->user_key ) { 
           //request.user has a dict and we need r->user_key key
@@ -401,20 +405,13 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
 
     Protocol_handle_request( self, req, req->route );
   } else {
-    printf("DELME closed?\n");
+    printf("DELME closed?\n"); // TODO Need to do anything if they dropped connection before the memcached reply?
   }
   Py_DECREF(self);
 }
 
 Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   DBG printf("protocol - on body\n");
-
-  //Protocol* result = self;
-  //PyObject* response_text = NULL;
-  //if(!(func = PyObject_GetAttrString(self->app, "default"))) {
-    //printf("app.default handler doesn't exist");
-    //return NULL;
-  //}
 
   Request* request = self->request;
 
@@ -423,13 +420,11 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
 
   request->transport = self->transport;
   request->app = self->app; //TODO need this?
-  //Py_INCREF(self->transport);//TODO non static req
-  //Py_INCREF(self->app);//TODO non static req
 
   Route *r = router_getRoute( self->router, self->request );
   if ( r == NULL ) {
     // TODO If the pipeline isn't empty...
-    protocol_write_error_response(self, 404,"Not Found","The requested page was not found");
+    if ( ((MrhttpApp*)self->app)->err404 ) protocol_write_error_response_bytes(self, ((MrhttpApp*)self->app)->err404);
     return self;
   }
 
@@ -446,9 +441,10 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
       // We need to call asyncGet and save this request so when our CB is called we continue processing
       MemcachedCallbackData *mcd = malloc( sizeof(MemcachedCallbackData));
       mcd->protocol = self;
-      Py_INCREF(self);
+      Py_INCREF(self); // Incref so we don't get GC'd before the response comes back
       mcd->request  = self->request;
-      int rc = MemcachedClient_get( self->memclient, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+      //int rc = MemcachedClient_get( self->memclient, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+      int rc = MemcachedClient_get2( self->memclient, self->request->session_id, self->request->session_id_sz, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
 
       // If the get failed (no servers) then we're done
       if ( rc != 0 ) {
@@ -460,7 +456,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
       return self;
     }
 
-    // if mrq we need to return now so we don't push the json on if user is not logged in
+    // if mrq return now as the user is not logged in
     if ( r->mrq ) {
       return Protocol_handle_request( self, self->request, r );
     }
@@ -469,11 +465,14 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   }
   if ( r->mrq ) { //TODO
     DBG printf("Route uses mrq\n"); 
-    // TODO Get slot from url A
-       //rte->segs[rte->numSegs-1] = rest; //TODO last one?
-        //rte->segLens[j] = rest_len;
     int slot = 0;
     int topic = 0;
+    // Pull slot from the first arg. Must be a number
+    if ( self->request->numArgs > 0 ) {
+      int len = self->request->argLens[0];
+      char *p = self->request->args[0];
+      while (len--) slot = (slot * 10) + (*p++ - '0');
+    }
 
     // Send body to mrq
     MrqClient_push( self->mrqclient, topic, slot, self->request->body, self->request->body_len );
@@ -481,9 +480,6 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     // TODO set a client member to say success/fail? Have to start failing if slow consumer / connection gone.
 
   }
-  // TODO for memcached
-  //  Need to set app->request or pass to page handlers
-  //  memcached CB needs to set the user based on the returned json  see aiomcache wrapper
 
   return Protocol_handle_request( self, self->request, r );
 }
@@ -505,7 +501,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
     DBG printf("Page handler call failed with an exception\n");
     PyObject *type, *value, *traceback;
     PyErr_Fetch(&type, &value, &traceback);
-    PyErr_NormalizeException(&type, &value, &traceback);
+    //PyErr_NormalizeException(&type, &value, &traceback);
     if (value) {
       PyObject *msg = PyObject_GetAttrString(value, "_message");
 
@@ -595,7 +591,11 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
   // Make sure the result is a string
   if ( !PyUnicode_Check( result ) ) {
     protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
-    PyErr_SetString(PyExc_ValueError, "Page handler did not return a string");
+    if ( PyCoro_CheckExact( result ) ) {
+      PyErr_SetString(PyExc_ValueError, "Page handler must return a string, did you forget to await an async function?");
+    } else {
+      PyErr_SetString(PyExc_ValueError, "Page handler must return a string");
+    }
     return NULL;
   }
 
@@ -669,6 +669,7 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
   if ( req->response->mtype ) response_setHtmlHeader();
 
   if ( req != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, req );
+  else                        Request_reset(req);
   return self;
 }
 
@@ -682,7 +683,15 @@ static inline Protocol* protocol_write_redirect_response(Protocol* self, int cod
   return self;
 }
 
-// TODO rename
+// TODO rename write response bytes doesn't have to be error
+static inline Protocol* protocol_write_error_response_bytes(Protocol* self, PyObject *bytes) { 
+  if ( !bytes ) return NULL;
+  PyObject *o;
+  if(!(o = PyObject_CallFunctionObjArgs(self->write, bytes, NULL))) return NULL;
+  Py_DECREF(o);
+  return self;
+}
+// TODO rename Why? 
 static inline Protocol* protocol_write_error_response(Protocol* self, int code, char *reason, char *msg) { 
   PyObject *bytes = response_getErrorResponse( code, reason, msg );
   if ( !bytes ) return NULL;
@@ -707,6 +716,16 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
       goto error;
 
     if(!(response = PyObject_CallFunctionObjArgs(get_result, NULL))) {
+      Py_XDECREF(get_result);
+
+      if ( self->closed ) { // Probably CancelledError, but don't bother to check as we're done
+        DBG printf("    connection closed so dropping exception\n");
+        PyErr_Clear();
+        self->num_requests_popped++; 
+        if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
+        return self;
+      }
+
       DBG printf("  exception in coro page handler\n");
       // TODO exception
       //Protocol_catch_exception(request);
@@ -751,6 +770,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
       protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
       return self;
     }
+    Py_XDECREF(get_result);
 
   } else {
     response = task;
@@ -764,16 +784,21 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
 
   if ( !PyUnicode_Check( response ) ) {
     if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
+
     protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
-    PyErr_SetString(PyExc_ValueError, "Page handler did not return a string");
+    if ( PyCoro_CheckExact( response ) ) {
+      PyErr_SetString(PyExc_ValueError, "Page handler must return a string, did you forget to await an async function?");
+    } else {
+      PyErr_SetString(PyExc_ValueError, "Page handler must return a string");
+    }
     return NULL;
   }
 
   if(!self->closed) {
     if(!protocol_write_response(self, request, response)) goto error;
   } else {
-    // TODO: Send that to protocol_error
-    //printf("Connection closed, response dropped\n");
+    // If closed then just drop it
+    DBG printf("Connection closed, response dropped prot %p\n",self);
   }
 
   // important: this breaks a cycle in case of an exception
@@ -786,14 +811,13 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
 
   finally:
   if(pipeline_is_task(r)) Py_XDECREF(response);
-  Py_XDECREF(get_result);
   return self;
 }
 
 
 PyObject* protocol_task_done(Protocol* self, PyObject* task)
 {
-  DBG printf("  coro task done\n");
+  DBG printf("  coro task done proto %p\n",self);
   PyObject* result = Py_True;
   PipelineRequest *r;
 
@@ -894,6 +918,7 @@ PyObject* Protocol_get_transport(Protocol* self)
   return self->transport;
 }
 
+// TODO Is task_done call the correct thing? Redo the pipeline
 void Protocol_timeout_request(Protocol* self) {
   if ( !PIPELINE_EMPTY(self) ) {
     self->queue_start++; // Drop the request

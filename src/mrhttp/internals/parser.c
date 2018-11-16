@@ -7,7 +7,15 @@
 #include "parser.h"
 #include "common.h"
 #include "module.h"
+#include "unpack.h"
 //#include "cpu_features.h"
+
+static __inline__ unsigned long long rdtsc(void)
+{
+  unsigned long lo, hi;
+  __asm__ volatile( "rdtsc" : "=a" (lo), "=d" (hi) );
+  return( lo | ( hi << 32 ) );
+}
 
 
 //#include "protocol.h"
@@ -92,7 +100,8 @@ parse_headers:
   request->num_headers = 100; // Max allowed headers
   DBG_PARSER printf("before parser requests\n");
 
-  rc = mr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, request->headers, &(request->num_headers), prevbuflen);
+  rc = mr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, request->headers, &(request->num_headers), prevbuflen, &(request->hreq));
+
   DBG_PARSER printf("parser requests rc %d\n",rc);
   if ( rc < 0 ) return rc; // -2 incomplete, -1 error otherwise byte len of headers
 
@@ -111,6 +120,8 @@ parse_headers:
   if(minor_version == 0) self->conn_state = CONN_CLOSE;
   else                   self->conn_state = CONN_KEEP_ALIVE;
  
+  //self->body_length = request->hreq.body_length;
+
 #define header_name_equal(val) \
   header->name_len == strlen(val) && fast_compare(header->name, val, header->name_len) == 0
 #define header_value_equal(val) \
@@ -120,39 +131,10 @@ parse_headers:
       header < request->headers + request->num_headers;
       header++) {
 
-/*
-Transfer-Encoding: chunked
-Transfer-Encoding: compress
-Transfer-Encoding: deflate
-Transfer-Encoding: gzip
-Transfer-Encoding: identity
-
-// Several values can be listed, separated by a comma
-Transfer-Encoding: gzip, chunked
-
-with nginx proxy_request_buffering on which is the default we will never see chunked
-    if(header_name_equal("Transfer-Encoding")) {
-      if(header_value_equal("chunked"))
-        self->transfer = PARSER_CHUNKED;
-      else if(header_value_equal("identity"))
-        self->transfer = PARSER_IDENTITY;
-*/
 
     if(header_name_equal("Content-Length")) {
-      //if(!header->value_len) {
-        //error = invalid_headers;
-        //goto on_error;
-      //}
       char * endptr = (char *)header->value + header->value_len;
       self->body_length = strtol(header->value, &endptr, 10);
-/* This would be faster than strol, but loses error checking
-    unsigned int x = 0;
-    while (*p != '\0') {
-        x = (x*10) + (*p - '0');
-        ++p;
-    }
-    return x;
-*/
       // 0 means error from strtol, but it is also a valid value
       if ( self->body_length == 0 && !( header->value_len == 1 && *(header->value) == '0') ) { 
         //TODO ERROR
@@ -174,6 +156,24 @@ with nginx proxy_request_buffering on which is the default we will never see chu
     }
   } 
 
+/*
+Transfer-Encoding: chunked
+Transfer-Encoding: compress
+Transfer-Encoding: deflate
+Transfer-Encoding: gzip
+Transfer-Encoding: identity
+
+// Several values can be listed, separated by a comma
+Transfer-Encoding: gzip, chunked
+
+with nginx proxy_request_buffering on which is the default we will never see chunked
+    if(header_name_equal("Transfer-Encoding")) {
+      if(header_value_equal("chunked"))
+        self->transfer = PARSER_CHUNKED;
+      else if(header_value_equal("identity"))
+        self->transfer = PARSER_IDENTITY;
+*/
+
   if(!Protocol_on_headers( self->protocol, method, method_len, path, path_len, minor_version, request->headers, request->num_headers)) goto error; 
 
 body:
@@ -185,6 +185,20 @@ body:
 
   // Need more data
   if ( self->body_length > ( self->end - self->start ) ) return -2;
+
+  if ( request->hreq.ip_len ) {
+    PyObject *ip  = PyUnicode_FromStringAndSize(request->hreq.ip, request->hreq.ip_len);
+    if ( ip ) { PyObject_SetAttrString((PyObject*)request, "_ip", ip); Py_DECREF(ip); }
+  }
+
+  if ( request->hreq.flags == 2 ) {
+    //unsigned long long cycles = rdtsc();
+    PyObject *obj = unpackc( self->start, self->body_length ); 
+    //unsigned long long ecyc = rdtsc();
+    //printf(" took %lld\n", ecyc - cycles);
+    PyObject_SetAttrString((PyObject*)request, "mrpack", obj);
+    Py_XDECREF(obj);
+  }
 
   if(!Protocol_on_body(self->protocol, self->start, self->body_length)) return -1;
 

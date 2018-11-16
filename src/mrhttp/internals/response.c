@@ -39,11 +39,11 @@ void response_setupResponseBuffer(void) {
 }
 
 void Response_dealloc(Response* self) {
-  Py_TYPE(self)->tp_free((PyObject*)self);
   //free(self->rbuf);
   //free(self->errbuf);
   Py_XDECREF(self->cookies);
   Py_XDECREF(self->headers);
+  Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 void Response_reset(Response *self) {
@@ -142,7 +142,7 @@ int response_add_headers( Response *self, char *p ) {
     if(!(k = PyUnicode_AsUTF8AndSize(name, &klen))) return 0;
     if ( v == NULL ) return 0;
 
-    // If Content-Type modify that header
+    // If Content-Type modify that header TODO Right now we what add a second one? Which works?
     //if ( k[0] == 'C' && klen == 12 && k[11] == 'e' ) {
       //memcpy( rbuf+117, v, (size_t)vlen );
     //} else {

@@ -2,11 +2,13 @@
 
 #include <Python.h>
 #include <stdbool.h>
+#include <math.h>
 
 #include "request.h"
 #include "common.h"
 #include "module.h"
 #include "time.h"
+#include "unpack.h"
 
 PyObject *MrhttpApp_new(PyTypeObject* type, PyObject *args, PyObject *kwargs) {
   MrhttpApp* self = NULL;
@@ -16,22 +18,25 @@ PyObject *MrhttpApp_new(PyTypeObject* type, PyObject *args, PyObject *kwargs) {
 
 
 void MrhttpApp_dealloc(MrhttpApp* self) {
+  Py_XDECREF( self->check_interval ); 
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 int MrhttpApp_init(MrhttpApp* self, PyObject *args, PyObject *kwargs) {
-  srand(time(0)); // TODO seed utils.randint
   return 0;
 }
 
 PyObject *MrhttpApp_cinit(MrhttpApp* self) {
-
+  srand(time(0)); // TODO seed utils.randint
+  initmrpacker();
   self->requests  = PyObject_GetAttrString((PyObject*)self, "requests");
   int l = PyList_Size(self->requests);
 
   self->numRequests = l;
   self->nextRequest = 0;
   self->freeRequests = l;
+
+  self->numGets = self->numReleases = 0;
 
   // Idle timeouts (conn and request)
   PyObject* loop = NULL;
@@ -48,8 +53,7 @@ PyObject *MrhttpApp_cinit(MrhttpApp* self) {
 
   response_setupResponseBuffer();
 
-
-  
+  MrhttpApp_setup_error_pages(self);
 
   Py_RETURN_NONE;
 error:
@@ -60,6 +64,15 @@ void MrhttpApp_release_request(MrhttpApp* self, Request *r) {
   //r->inprog = false;
   Request_reset(r);
   self->freeRequests++;
+  self->numReleases++;
+  //printf("DELME release gets %d rels %d free %d\n", self->numGets, self->numReleases, self->freeRequests); 
+  int cnt = 0;
+  int numinprog = 0;
+  while (cnt < self->numRequests) {
+    r = (Request*)PyList_GET_ITEM( self->requests, cnt );
+    if ( r->inprog ) numinprog++;
+    cnt++;
+  }
 }
 
 void MrhttpApp_double_requests(MrhttpApp* self) {
@@ -79,11 +92,13 @@ PyObject *MrhttpApp_get_request(MrhttpApp* self) {
   PyObject *ret = PyList_GET_ITEM( self->requests, self->nextRequest );
   Request *r = (Request*)ret;
   self->freeRequests--;
-  //printf("DELME get req free %d!\n", self->freeRequests); 
+  self->numGets++;
+  DBG printf(" get request index %d\n", self->nextRequest ); 
 
   // If we wrap and hit an in progress request double the number of requests and 
   // start at the new ones. 
   if ( r->inprog ) {
+    //printf("DELME get req free %d num %d\n", self->freeRequests, self->numRequests); 
     // Double the number of requests if necessary
     if ( self->freeRequests < 10 ) {
       MrhttpApp_double_requests(self);
@@ -95,7 +110,7 @@ redo:
     while (r->inprog) {
       cnt++; 
       if ( cnt > self->numRequests ) { 
-        //printf("DELME ARGH %d > %d free %d!\n", cnt, self->numRequests,self->freeRequests); 
+        printf("DELME ARGH %d > %d free %d!\n", cnt, self->numRequests,self->freeRequests); 
         break; 
       }
       self->nextRequest = (self->nextRequest+1)%self->numRequests;
@@ -141,9 +156,6 @@ PyObject *MrhttpApp_check_idle(MrhttpApp *self) {
   
   unsigned long check_interval = PyLong_AsLong(self->check_interval);
   while((c = (Protocol*)PyIter_Next(iterator))) {
-    //debug_print(
-      //"conn %p, idle_time %ld, read_ops %ld, last_read_ops %ld",
-      //conn, conn->idle_time, conn->read_ops, conn->last_read_ops);
 
     // Connection hung
     if ( c->num_data_received == 0 ) {
@@ -183,5 +195,21 @@ PyObject *MrhttpApp_check_idle(MrhttpApp *self) {
   Py_XDECREF(self->check_idle_handle);
   self->check_idle_handle = PyObject_CallFunctionObjArgs( self->call_later, self->check_interval, self->check_idle, NULL);
   Py_RETURN_NONE;
+}
+
+void MrhttpApp_setup_error_pages(MrhttpApp* self) {
+  PyObject *u = PyObject_GetAttrString((PyObject*)self, "err404");
+  if ( !u ) return;
+
+  Py_ssize_t l;
+  char *body = PyUnicode_AsUTF8AndSize( u, &l );
+
+  char *resp = malloc( l + 1024 );
+  sprintf(resp, "HTTP/1.1 404 Not Found\r\nServer: MrHTTP/0.1.1\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %ld\r\n\r\n", l);
+  char *p = resp + strlen(resp);
+  memcpy(p, body, l);
+
+  self->err404 = PyBytes_FromStringAndSize( resp, (p-resp) + l );
+ 
 }
 

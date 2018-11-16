@@ -8,6 +8,7 @@ import tests
 # TODO
 #  Check for memcached being up and add the session key so we hit and load the json 43709dd361cc443e976b05714581a7fb
 
+
 if 1:
   package = tests
   for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
@@ -93,32 +94,39 @@ loop = uvloop.new_event_loop()
 
 asyncio.set_event_loop(loop)
 
-server_fut = asyncio.create_subprocess_exec( 'python3', 'tests/s_bench.py', stdout=asyncio.subprocess.PIPE )
+server_fut = asyncio.create_subprocess_exec( 'python', 'tests/s_bench.py', stdout=asyncio.subprocess.PIPE )
 server = loop.run_until_complete(server_fut)
 process = psutil.Process(server.pid)
 
 time.sleep(1)
 try:
 
-  opts = ('-H','Cookie: mrsession=43709dd361cc443e976b05714581a7fb;')
-  print ("Hello pipelined", run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
+  opts = ('-H','Cookie: mrsession=43709dd361cc443e976b05714581a7fb; foo=fdsfdasdfasdfdsfasdfsdfsdfasdfas; short=fazc;')
+  #print ("Hello pipelined", run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
   print ("Hello          ", run_wrk(loop, 'http://localhost:8080/'),             "Requests/second" )
-  print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies'), "Requests/second" )
-
-  # TODO Look into speeding this up
-  print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
+  print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies', options=opts), "Requests/second" )
+  print ("many args      ", run_wrk(loop, 'http://localhost:8080/sixargs/one/two/three/four/five/six'), "Requests/second" )
+  print ("404 natural    ", run_wrk(loop, 'http://localhost:8080/dfads404/'), "Requests/second" )
 
   # TODO Look into speeding this up
   print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
 
   print ("Templates      ", run_wrk(loop, 'http://localhost:8080/template'),            "Requests/second" )
+
   print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
   print ("Sessions (py)  ", run_wrk(loop, 'http://localhost:8080/pys',   options=opts), "Requests/second" )
+  #print ("Session login  ", run_wrk(loop, 'http://localhost:8080/login'),               "Requests/second" )
 
-  # TODO - We should be able to speed this up by generating the session id in C not python. 
-  print ("Session login  ", run_wrk(loop, 'http://localhost:8080/login'),               "Requests/second" )
+  print ("json post      ", run_wrk(loop,'http://localhost:8080/json',lua='tests/lua/json.lua'), "Requests/second" )
+  #print ("mrpacker       ", run_wrk(loop,'http://localhost:8080/mrpacker',lua='tests/lua/mrpacker.lua'), "Requests/second" )
+  #print ("mrpacker py    ", run_wrk(loop,'http://localhost:8080/mrpackerpy',lua='tests/lua/mrpacker.lua'), "Requests/second" )
+  #print ("msgpack py     ", run_wrk(loop,'http://localhost:8080/msgpack',lua='tests/lua/msgpack.lua'), "Requests/second" )
 
-  #print ("json post      ", run_wrk(loop,'http://localhost:8080/form'), "Requests/second" )
+
+  #opts = ('-H','X-Real-IP: 1.2.3.4')
+  #print ("get ip         ", run_wrk(loop,'http://localhost:8080/getip',options=opts), "Requests/second" )
+  #print ("many num args  ", run_wrk(loop, 'http://localhost:8080/sixargs/155/2001/29999/25/29999543/93243242394'), "Requests/second" )
+  #print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
 
 except KeyboardInterrupt:
   pass

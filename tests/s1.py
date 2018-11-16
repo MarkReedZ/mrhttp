@@ -40,6 +40,14 @@ def error500(r):
   z = x["foo"]
   return 'Hello World!'
 
+@app.route('/to64')
+def to64test(r):
+ 
+  if 'uHfE' != mrhttp.to64(1234567): return 'failed1'
+  if mrhttp.from64('uHfE') != 1234567: return 'failed2'
+  if '3mM' != mrhttp.to64(12345): return 'failed3'
+  return 'ok'
+
 @app.route('/foo/{}')
 def foo1(r, foo):
   return 'foo1'
@@ -58,26 +66,33 @@ def barmid(r, foo, bar):
 
 @app.route('/content')
 def content(r):
-  print( r.mime_type )
-  print( r.encoding )
+  #print( r.mime_type )
+  #print( r.encoding )
   return r.mime_type
 
 @app.route('/query_string')
 def query_string(r):
   return str(r.args)
 
-
-
+@app.route('/json')
+def parseJ(r):
+  return r.json["name"]
 
 @app.route('/form')
 def parseForm(r):
-  print(r.form)
   if r.form == None: return "No form"
   return r.form["param2"]
 
 @app.route('/s',options=['session'])
-def session(req):
+def session(r):
+  if r.user:
+    return r.user["user"]
   return "session"
+
+@app.route('/noreturn')
+def noreturn(r):
+  pass
+
 
 app.run(cores=1)
 

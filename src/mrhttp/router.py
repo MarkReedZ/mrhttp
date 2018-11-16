@@ -24,21 +24,22 @@ class Router(mrhttp.CRouter):
 
     self.funcs.append(handler) # Store the handler to increment the ref count as we save the memory location below
 
-    numArgs = uri.count("{}")
+    numArgs = uri.count("{}") + uri.count("{num}")
     if numArgs == 0 and len(inspect.signature(handler).parameters) == 0:
       raise ValueError("Page handler must take a request object as an argument")
     if numArgs != (len(inspect.signature(handler).parameters)-1):
       print( "ERROR: Number of function args {} not equal to route args {}".format( len(inspect.signature(handler).parameters), numArgs) )
       print( "  ", inspect.signature(handler), " vs ", uri )
       raise ValueError("Number of route arguments not equal to function arguments")
-    
+   
+    # TODO Add {num}  change sortlen 
      
     r = {}
     r["handler"] = id(handler)
     r["iscoro"]  = asyncio.iscoroutinefunction(handler)
     r["path"]    = uri
     r["methods"] = methods
-    r["sortlen"] = len(uri.replace("{}",""))
+    r["sortlen"] = len(uri.replace("{}","").replace("{num}",""))
     r["type"] = 0
     if type == "text": r["type"] = 1
     if type == "json": r["type"] = 2
@@ -61,3 +62,5 @@ class Router(mrhttp.CRouter):
       r["segs"] = segs
       r["num_segs"] = len(segs)
       self.routes.append( r )
+
+

@@ -58,6 +58,14 @@
 
 #define IS_PRINTABLE_ASCII(c) ((unsigned char)(c)-040u < 0137u)
 
+static void print_buffer( char* b, int len ) {
+  for ( int z = 0; z < len; z++ ) {
+    printf( "%02x ",(int)b[z]);
+  }
+  printf("\n");
+}
+
+
 #define TFW_LC_INT  0x20202020
 #define TFW_LC_LONG 0x2020202020202020UL
 #define TFW_CHAR4_INT(a, b, c, d)         \
@@ -275,7 +283,7 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
 
 
 static const char *parse_headers(const char *buf, const char *buf_end, struct mr_header *headers, size_t *num_headers,
-                                 size_t max_headers, int *ret)
+                                 size_t max_headers, int *ret, struct mr_request *mrr)
 {
     if ( buf_end <= buf ) {
       *ret = -2;
@@ -298,6 +306,14 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
         //printf(">%.*s<", 10, buf);
         // Listed small to larger - probably best as most used TODO check bounds
         switch ( TOLC(*buf) ) {
+          case 'h': // Host
+            if ( TFW_CHAR4_INT('o', 's', 't',':') == *((unsigned int *)(buf+1)) ) {
+              headers[*num_headers].name = buf;
+              headers[*num_headers].name_len = 4;
+              buf += 6;
+              goto hvalue;
+            }
+            break;
           case 'c': 
             if ( buf[6] == ':' && TFW_CHAR4_INT('o', 'o', 'k','i') == *((unsigned int *)(buf+1)) ) { // Cookie:
               headers[*num_headers].name = buf;
@@ -321,7 +337,12 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 12;
               buf += 14;
-              goto hvalue;
+              //goto hvalue;
+              if ( buf[0] == 'a' && buf[13] == 'r' ) { //"application/mrpacker"
+                mrr->flags = 2;
+              } 
+              buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret); 
+              goto skipvalue;
             }
             if ( buf[13] == ':' ) { // Cache-Control:
               headers[*num_headers].name = buf;
@@ -334,21 +355,62 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               headers[*num_headers].name_len = 14;
               buf += 16;
               goto hvalue;
+/*
+              //print_buffer( buf, 16 ); //DELME
+              headers[*num_headers].value = buf;
+              mrr->body_length = 0;
+              //headers[*num_headers].value_len = 0;
+              while (*buf != 13) {
+                mrr->body_length = (mrr->body_length*10) + (*buf++ - '0');
+              }
+              headers[*num_headers].value_len = buf - headers[*num_headers].value;
+              buf+=2;
+              //print_buffer( buf, 4 ); //DELME
+              //headers[*num_headers].value_len = 0;
+
+              goto skipvalue;
+*/
             }
             break;
             //printf( "%.*s\n" , 10, buf);
             //printf( "Host: %08x == %08x\n" , TFW_CHAR4_INT('o', 's', 't',':'), *((unsigned int *)(buf+1)));
           case 'd':
+            if ( buf[4] == ':' ) { // Date:
+              headers[*num_headers].name = buf;
+              headers[*num_headers].name_len = 4;
+              buf += 6;
+              goto hvalue;
+            }
             if ( buf[3] == ':' ) { // DNT:       
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 3;
               buf += 5;
               goto hvalue;
             }
-            if ( buf[4] == ':' ) { // Date:
+            break;
+          case 'x':
+            if ( buf[1] == '-' && buf[8] == ':' ) { // X-Real-IP
               headers[*num_headers].name = buf;
-              headers[*num_headers].name_len = 4;
-              buf += 6;
+              headers[*num_headers].name_len = 8;
+              buf += 10;
+              //goto hvalue;
+              mrr->ip = buf;
+              buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret); 
+              mrr->ip_len = headers[*num_headers].value_len;
+              //print_buffer( buf, 16 );
+              //print_buffer( mrr->cookie, 16 );
+              goto skipvalue;
+            }
+            if ( buf[1] == '-' && buf[15] == ':' ) { // X-Forwarded-For:       
+              headers[*num_headers].name = buf;
+              headers[*num_headers].name_len = 15;
+              buf += 17;
+              goto hvalue;
+            }
+            if ( buf[1] == '-' && buf[16] == ':' ) { // X-Forwarded-Host:       
+              headers[*num_headers].name = buf;
+              headers[*num_headers].name_len = 16;
+              buf += 18;
               goto hvalue;
             }
             break;
@@ -363,14 +425,6 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 9;
               buf += 11;
-              goto hvalue;
-            }
-            break;
-          case 'h': // Host
-            if ( TFW_CHAR4_INT('o', 's', 't',':') == *((unsigned int *)(buf+1)) ) {
-              headers[*num_headers].name = buf;
-              headers[*num_headers].name_len = 4;
-              buf += 6;
               goto hvalue;
             }
             break;
@@ -426,23 +480,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               goto hvalue;
             }
             break;
-          case 'x':
-            if ( buf[1] == '-' && buf[15] == ':' ) { // X-Forwarded-For:       
-              headers[*num_headers].name = buf;
-              headers[*num_headers].name_len = 15;
-              buf += 17;
-              goto hvalue;
-            }
-            if ( buf[1] == '-' && buf[16] == ':' ) { // X-Forwarded-Host:       
-              headers[*num_headers].name = buf;
-              headers[*num_headers].name_len = 16;
-              buf += 18;
-              goto hvalue;
-            }
-            break;
           case 'a':
-            //printf("?? %c\n", buf[13] );
-            //printf(">%.*s<", 16, buf);
             if ( buf[6] == ':' ) { // Accept: 
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 6;
@@ -534,6 +572,8 @@ hvalue:
         if ((buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret)) == NULL) {
             return NULL;
         }
+skipvalue:
+      ;
     }
     return buf;
 }
@@ -542,7 +582,7 @@ hvalue:
 
 static const char *parse_request(const char *buf, const char *buf_end, const char **method, size_t *method_len, const char **path,
                                  size_t *path_len, int *minor_version, struct mr_header *headers, size_t *num_headers,
-                                 size_t max_headers, int *ret)
+                                 size_t max_headers, int *ret, struct mr_request *mrr)
 {
     /* skip first empty line (some clients add CRLF after POST content) */
     CHECK_EOF();
@@ -586,7 +626,7 @@ endfirst:
         return NULL;
     }
 
-    return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret);
+    return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret, mrr);
 }
 
 static __inline__ unsigned long long rdtsc(void)
@@ -597,13 +637,12 @@ static __inline__ unsigned long long rdtsc(void)
 }
 
 int mr_parse_request(const char *buf_start, size_t len, const char **method, size_t *method_len, const char **path,
-                      size_t *path_len, int *minor_version, struct mr_header *headers, size_t *num_headers, size_t last_len)
+                      size_t *path_len, int *minor_version, struct mr_header *headers, size_t *num_headers, size_t last_len,struct mr_request *mrr)
 {
     const char *buf = buf_start, *buf_end = buf_start + len;
     size_t max_headers = *num_headers;
     int r;
 
-    //printf("1\n");
     //unsigned long long cycles = rdtsc();
 
     *method = NULL;
@@ -620,8 +659,7 @@ int mr_parse_request(const char *buf_start, size_t len, const char **method, siz
         return r;
     }
 
-    if ((buf = parse_request(buf, buf_end, method, method_len, path, path_len, minor_version, headers, num_headers, max_headers,
-                             &r)) == NULL) {
+    if ((buf = parse_request(buf, buf_end, method, method_len, path, path_len, minor_version, headers, num_headers, max_headers, &r, mrr)) == NULL) {
         return r;
     }
     //cycles = rdtsc() - cycles;
@@ -652,7 +690,7 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
       *msg = buf+5; *msg_len = 2;
       buf += 9;
       //printf(">%.*s<", 16, buf);
-      return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret);
+      return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret, NULL);
     }
     /* skip space */
     if (*buf++ != ' ') {
@@ -676,7 +714,7 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
         return NULL;
     }
 
-    return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret);
+    return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret, NULL);
 }
 
 int mr_parse_response(const char *buf_start, size_t len, int *minor_version, int *status, const char **msg, size_t *msg_len,
@@ -719,7 +757,7 @@ int mr_parse_headers(const char *buf_start, size_t len, struct mr_header *header
         return r;
     }
 
-    if ((buf = parse_headers(buf, buf_end, headers, num_headers, max_headers, &r)) == NULL) {
+    if ((buf = parse_headers(buf, buf_end, headers, num_headers, max_headers, &r, NULL)) == NULL) {
         return r;
     }
 

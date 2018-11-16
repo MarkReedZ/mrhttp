@@ -38,8 +38,8 @@ except ImportError:
 
 #import mrmemcache
 
-import uvloop
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+#import uvloop
+#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 signames = {
     int(v): v.name for k, v in signal.__dict__.items()
@@ -71,6 +71,7 @@ class Application(mrhttp.CApp):
     self._mrq = None
     self.uses_session = False
     self.uses_mrq = False
+    self.err404 = "<html><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested page was not found</p></body></html>"
    
   def setup(self, log_request=None, protocol_factory=None, debug=False):
     self._log_request = log_request
@@ -184,6 +185,7 @@ class Application(mrhttp.CApp):
       server = loop.run_until_complete(server_coro)
 
       self.requests = [Request() for x in range(128)]
+      self.bytes404 = self.err404.encode("utf-8")
       self.cinit()
       self.router.finalize_routes()
       self.router.setupRoutes()
@@ -322,7 +324,7 @@ class Application(mrhttp.CApp):
     self._run( host=host, port=port, num_workers=cores, debug=debug)
 
 
-  def setUserSessionAndCookies(self, request, userj, backend="memcached" ):
+  def setUserSessionAndCookies(self, request, userj, cookies={}, backend="memcached" ):
     if self._mc == None:
       raise ValueError("setUserSession called without memcached being setup")
 
@@ -333,6 +335,11 @@ class Application(mrhttp.CApp):
     c['mrsession'] = skey
     c['mrsession']['path'] = '/' #TODO
     c['mrsession']['expires'] = 12 * 30 * 24 * 60 * 60 # 1 year TODO arg
+    for k in cookies.keys():
+      c[k] = cookies[k]
+      c[k]['path'] = '/' 
+      c[k]['expires'] = 12 * 30 * 24 * 60 * 60 
+    
     request.response.cookies = c
 
     self._mc.set( skey, userj )

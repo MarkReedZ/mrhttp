@@ -5,15 +5,15 @@ Async Python 3.5+ web server written in C
 
 ```
 Hello pipelined  4,152,858 Requests/second
-Hello              613,335 Requests/second
-Cookies            564,410 Requests/second
-404                388,735 Requests/second
-Form parsing       230,286 Requests/second
-Templates          274,153 Requests/second
+Hello              633,097 Requests/second
+404                654,053 Requests/second
+Form parsing       214,668 Requests/second
+Parse JSON         510,606 Requests/second
+Templates          257,753 Requests/second
 Sessions           589,414 Requests/second
-Sessions (py)       67,119 Requests/second
+Sessions           193,110 Requests/second
+Sessions (py)       83,119 Requests/second
 Session login      121,745 Requests/second
-Write Queue (MrQ)  428,110 Requests/second
 MrWorkServer       338,891 Requests/second
 ```
 

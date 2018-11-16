@@ -25,6 +25,10 @@ def test_one():
   eq(r.status_code, 500)
   contains(r.text, "Internal Server Error")
 
+  r = requests.get('http://localhost:8080/noreturn')
+  eq(r.status_code, 500)
+  contains(r.text, "Internal Server Error")
+
 
 
   #print( r.status_code, r.headers, r.text )

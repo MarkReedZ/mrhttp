@@ -43,6 +43,7 @@ typedef struct {
   int request_idle_time;
   int num_requests_popped;
   //int last_requests_popped;
+  int responsesSent;
 
   Request *request;
   Router *router;
@@ -83,7 +84,8 @@ void Protocol_timeout_request(Protocol* self);
 
 static inline Protocol* protocol_write_response(Protocol* self, Request *req, PyObject* resp);
 static inline Protocol* protocol_write_redirect_response(Protocol* self, int code, char *url);
-static inline Protocol* protocol_write_error_response(   Protocol* self, int code, char *reason, char *msg);
+static inline Protocol* protocol_write_error_response_bytes( Protocol* self, PyObject* bytes );
+static inline Protocol* protocol_write_error_response      ( Protocol* self, int code, char *reason, char *msg);
 
 static inline void reverse(char* begin, char* end)
 {

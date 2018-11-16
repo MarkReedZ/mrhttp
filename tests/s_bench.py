@@ -3,7 +3,7 @@ from mrhttp import Request
 import mrhttp
 import socket
 import mrasyncmc
-import mrjson
+import mrjson, mrpacker, msgpack
 
 import tenjin
 tenjin.set_template_encoding('utf-8')
@@ -12,7 +12,8 @@ engine = tenjin.Engine(path=['tests/templates'])
 
 
 app = Application()
-app.config["memcache"] = [ ("127.0.0.1", 11211) ]
+app.config["memcache"] = [("127.0.0.1", 11211)]
+app.config["mrq"] =      [("127.0.0.1", 7100 )]
 
 
 @app.on('at_start')
@@ -37,12 +38,31 @@ def index(r):
 def pr(r,foo):
   return foo
 
+@app.route('/sixargs/{}/{}/{}/{}/{}/{}')
+def sixargs(r,a,b,c,d,e,f):
+  return a
+
+@app.route('/sixnumargs/{num}/{num}/{num}/{num}/{num}/{num}')
+def sixnumargs(r,a,b,c,d,e,f):
+  return "num "+str(a)
+
 @app.route('/printPostBody')
 def printPostBody(r):
   return r.body
 @app.route('/printCookies')
 def printCookies(r):
   return str(r.cookies)
+
+@app.route('/printHeaders')
+def printHeaders(r):
+  return str(r.headers)
+
+@app.route('/getip')
+def getip(r):
+  return r.ip
+@app.route('/getip2')
+def getip2(r):
+  return r.getip
 
 @app.route('/foo')
 def foo(r):
@@ -54,8 +74,7 @@ def testing(r):
 
 @app.route('/404/')
 def notFound(r):
-  raise mrhttp.HTTPError(404)
-  return 'Hello World!'
+  return app.err404
 
 @app.route('/500/')
 def error500(r):
@@ -81,21 +100,52 @@ def barmid(r, foo, bar):
 
 @app.route('/content')
 def content(r):
-  print( r.mime_type )
-  print( r.encoding )
   return r.mime_type
 
 @app.route('/form')
 def parseForm(r):
   return r.form["param2"]
 
-#@app.route('/json')
-#def parseJson(r):
-  #return r.form["param2"]
+@app.route('/json')
+def parseJ(r):
+  return r.json["name"]
+
+@app.route('/mrpacker')
+def parseMrpacker(r):
+  return r.mrpack["name"]
+  #return "AY"
+
+@app.route('/mrpackerpy')
+def parsepacker(r):
+  o = mrpacker.unpack(r.body)
+  return o["name"]
+
+@app.route('/msgpack')
+def parsemsgpack(r):
+  o = msgpack.unpackb(r.body,encoding = "utf-8")
+  return o["name"]
 
 @app.route('/s',options=['session'])
-def session(req):
+def session(r):
+  if r.user:
+    if "user" in r.user:
+      return r.user["user"]
+    if "un" in r.user:
+      return r.user["un"]
+    
   return "session"
+
+@app.route('/mrq/{}',options=['session',"mrq","append_user"])
+def mrq(r, tstid):
+  return "ok"
+
+@app.route('/mrqget')
+async def mrqget(r):
+  #o = mrjson.loadb( await app._mrq.get(0,[15,1,0,30]) )
+  pk = await app._mrq.get(0,[15,1,0,30])
+  #print("len pk", len(pk))
+  #j = await app.mcc.get(b"mrqget")
+  return "ok"
 
 @app.route('/login', type="text")
 def login(r):
@@ -106,6 +156,10 @@ def login(r):
 def t2(r):
   context = { "world":"all you python fanatics out there!" } 
   return engine.render('example.ten', context)
+
+@app.route('/long',type='text')
+def longresp(r):
+  return "fart"*128*1000
 
 
 app.run(cores=4)

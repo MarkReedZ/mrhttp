@@ -30,6 +30,7 @@ PyObject *MrqClient_cinit(MrqClient* self);
 
 PyObject *MrqClient_addConnection(MrqClient* self, MrqProtocol *conn, int server);
 void MrqClient_connection_lost( MrqClient* self, MrqProtocol *conn );
+PyObject *MrqClient_get(MrqClient* self, PyObject *args);
 int MrqClient_push(MrqClient* self, int topic, int slot, char *d, int dsz);
 //PyObject *MrqClient_get(MrqClient* self, char *key, void *fn, void *connection );
 //PyObject *MrqClient_set(MrqClient* self, PyObject *args);
@@ -38,4 +39,5 @@ int MrqServer_init( MrqServer *self, MrqClient *client, int server_num );
 int MrqServer_addConnection( MrqServer *self, MrqProtocol *conn) ;
 void MrqServer_connection_lost( MrqServer* self, MrqProtocol* conn );
 
+int MrqServer_get(MrqServer* self, int slot, PyObject *args);
 int MrqServer_push(MrqServer* self, int topic, int slot, char *d, int dsz);

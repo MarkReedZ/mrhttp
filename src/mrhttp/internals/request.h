@@ -3,10 +3,14 @@
 #include <Python.h>
 #include <stdbool.h>
 #include "response.h"
+#include "mrhttpparser.h"
+
 //#include "module.h"
 
 typedef struct {
   PyObject_HEAD
+
+  struct mr_request hreq;
 
   char* method;
   size_t method_len;
@@ -23,10 +27,12 @@ typedef struct {
 
   char *args[16];
   int argLens[16];
+  char argTypes[16];
   int numArgs;
   bool inprog;
 
   char* session_id;
+  int session_id_sz;
   PyObject *set_user;
   //char* session_value;
   void *route;
@@ -35,6 +41,7 @@ typedef struct {
   PyObject* py_method;
   PyObject* transport;
   PyObject* app;
+  PyObject* py_ip;
   PyObject* py_headers;
   PyObject* py_cookies;
   PyObject* py_body;
@@ -62,6 +69,7 @@ PyObject* Request_get_path(Request* self, void* closure);
 PyObject* Request_get_method(Request* self, void* closure);
 PyObject* Request_get_transport(Request* self, void* closure);
 PyObject* Request_get_headers(Request* self, void* closure);
+PyObject* Request_get_ip(Request* self, void* closure);
 PyObject* Request_get_cookies(Request* self, void* closure);
 PyObject* Request_get_body(Request* self, void* closure);
 PyObject* Request_get_query_string(Request* self, void* closure);
