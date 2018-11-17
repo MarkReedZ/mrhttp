@@ -7,9 +7,12 @@
 #include "parser.h"
 #include "common.h"
 #include "module.h"
-#include "unpack.h"
+//#include "unpack.h"
 //#include "cpu_features.h"
 
+    //unsigned long long cycles = rdtsc();
+    //unsigned long long ecyc = rdtsc();
+    //printf(" took %lld\n", ecyc - cycles);
 static __inline__ unsigned long long rdtsc(void)
 {
   unsigned long lo, hi;
@@ -186,19 +189,12 @@ body:
   // Need more data
   if ( self->body_length > ( self->end - self->start ) ) return -2;
 
-  if ( request->hreq.ip_len ) {
-    PyObject *ip  = PyUnicode_FromStringAndSize(request->hreq.ip, request->hreq.ip_len);
-    if ( ip ) { PyObject_SetAttrString((PyObject*)request, "_ip", ip); Py_DECREF(ip); }
-  }
-
-  if ( request->hreq.flags == 2 ) {
-    //unsigned long long cycles = rdtsc();
-    PyObject *obj = unpackc( self->start, self->body_length ); 
-    //unsigned long long ecyc = rdtsc();
-    //printf(" took %lld\n", ecyc - cycles);
-    PyObject_SetAttrString((PyObject*)request, "mrpack", obj);
-    Py_XDECREF(obj);
-  }
+  // 260 vs json's 285k requests per second ... Not sure why it was slower
+  //if ( request->hreq.flags == 2 ) {
+    //PyObject *obj = unpackc( self->start, self->body_length ); 
+    //PyObject_SetAttrString((PyObject*)request, "mrpack", obj);
+    //Py_XDECREF(obj);
+  //}
 
   if(!Protocol_on_body(self->protocol, self->start, self->body_length)) return -1;
 

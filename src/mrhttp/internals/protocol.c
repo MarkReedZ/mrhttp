@@ -1,5 +1,4 @@
 
-
 #include "protocol.h"
 #include "common.h"
 #include "module.h"
@@ -279,7 +278,7 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *req
 
         if ( cnt < 20 ) {
           long l = 0;
-          while (_isdigit(*p) && (--cnt != 0)) l = (l * 10) + (*p++ - '0');
+          while (_isdigit(*p) && (cnt-- != 0)) l = (l * 10) + (*p++ - '0');
           if ( !cnt ) {
             args[i] = PyLong_FromLong(l);
           } else {
@@ -405,7 +404,7 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
 
     Protocol_handle_request( self, req, req->route );
   } else {
-    printf("DELME closed?\n"); // TODO Need to do anything if they dropped connection before the memcached reply?
+    //printf("DELME closed?\n"); // TODO Need to do anything if they dropped connection before the memcached reply?
   }
   Py_DECREF(self);
 }
@@ -443,8 +442,8 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
       mcd->protocol = self;
       Py_INCREF(self); // Incref so we don't get GC'd before the response comes back
       mcd->request  = self->request;
-      //int rc = MemcachedClient_get( self->memclient, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
-      int rc = MemcachedClient_get2( self->memclient, self->request->session_id, self->request->session_id_sz, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+      int rc = MemcachedClient_get( self->memclient, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+      //int rc = MemcachedClient_get2( self->memclient, self->request->session_id, self->request->session_id_sz, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
 
       // If the get failed (no servers) then we're done
       if ( rc != 0 ) {

@@ -338,9 +338,9 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               headers[*num_headers].name_len = 12;
               buf += 14;
               //goto hvalue;
-              if ( buf[0] == 'a' && buf[13] == 'r' ) { //"application/mrpacker"
-                mrr->flags = 2;
-              } 
+              //if ( buf[0] == 'a' && buf[13] == 'r' ) { //"application/mrpacker"
+                //mrr->flags = 2;
+              //} 
               buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret); 
               goto skipvalue;
             }
@@ -393,12 +393,9 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 8;
               buf += 10;
-              //goto hvalue;
               mrr->ip = buf;
               buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret); 
               mrr->ip_len = headers[*num_headers].value_len;
-              //print_buffer( buf, 16 );
-              //print_buffer( mrr->cookie, 16 );
               goto skipvalue;
             }
             if ( buf[1] == '-' && buf[15] == ':' ) { // X-Forwarded-For:       

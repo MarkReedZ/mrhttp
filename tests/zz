@@ -1,0 +1,1946 @@
+diff --git a/dotests.py b/dotests.py
+index e540228..12a803a 100644
+--- a/dotests.py
++++ b/dotests.py
+@@ -72,6 +72,7 @@ def run_wrk(loop, endpoint=None, lua=None, options=None):
+   if retcode != 0:
+     print('\r\n'.join(lines))
+ 
++
+   return rps
+ 
+ 
+@@ -104,29 +105,50 @@ try:
+   opts = ('-H','Cookie: mrsession=43709dd361cc443e976b05714581a7fb; foo=fdsfdasdfasdfdsfasdfsdfsdfasdfas; short=fazc;')
+   #print ("Hello pipelined", run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
+   print ("Hello          ", run_wrk(loop, 'http://localhost:8080/'),             "Requests/second" )
+-  print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies', options=opts), "Requests/second" )
+-  print ("many args      ", run_wrk(loop, 'http://localhost:8080/sixargs/one/two/three/four/five/six'), "Requests/second" )
+-  print ("404 natural    ", run_wrk(loop, 'http://localhost:8080/dfads404/'), "Requests/second" )
+-
+-  # TODO Look into speeding this up
+-  print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
+-
+-  print ("Templates      ", run_wrk(loop, 'http://localhost:8080/template'),            "Requests/second" )
+-
+-  print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
+-  print ("Sessions (py)  ", run_wrk(loop, 'http://localhost:8080/pys',   options=opts), "Requests/second" )
+-  #print ("Session login  ", run_wrk(loop, 'http://localhost:8080/login'),               "Requests/second" )
+-
+-  print ("json post      ", run_wrk(loop,'http://localhost:8080/json',lua='tests/lua/json.lua'), "Requests/second" )
+-  #print ("mrpacker       ", run_wrk(loop,'http://localhost:8080/mrpacker',lua='tests/lua/mrpacker.lua'), "Requests/second" )
+-  #print ("mrpacker py    ", run_wrk(loop,'http://localhost:8080/mrpackerpy',lua='tests/lua/mrpacker.lua'), "Requests/second" )
+-  #print ("msgpack py     ", run_wrk(loop,'http://localhost:8080/msgpack',lua='tests/lua/msgpack.lua'), "Requests/second" )
+ 
++  if 1:
++    #print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies', options=opts), "Requests/second" )
++    #print ("many args      ", run_wrk(loop, 'http://localhost:8080/sixargs/one/two/three/four/five/six'), "Requests/second" )
++    #print ("404 natural    ", run_wrk(loop, 'http://localhost:8080/dfads404/'), "Requests/second" )
++  
++    # TODO Look into speeding this up
++    #print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
++  
++    #print ("Templates      ", run_wrk(loop, 'http://localhost:8080/template'),            "Requests/second" )
++  
++    print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
++    print ("Sessions (py)  ", run_wrk(loop, 'http://localhost:8080/pys',   options=opts), "Requests/second" )
++    #print ("Session login  ", run_wrk(loop, 'http://localhost:8080/login'),               "Requests/second" )
++  
++    #print ("json post      ", run_wrk(loop,'http://localhost:8080/json',lua='tests/lua/json.lua'), "Requests/second" )
++    #print ("mrpacker       ", run_wrk(loop,'http://localhost:8080/mrpacker',lua='tests/lua/mrpacker.lua'), "Requests/second" )
++    #print ("mrpacker py    ", run_wrk(loop,'http://localhost:8080/mrpackerpy',lua='tests/lua/mrpacker.lua'), "Requests/second" )
++    #print ("msgpack py     ", run_wrk(loop,'http://localhost:8080/msgpack',lua='tests/lua/msgpack.lua'), "Requests/second" )
+ 
+-  #opts = ('-H','X-Real-IP: 1.2.3.4')
+-  #print ("get ip         ", run_wrk(loop,'http://localhost:8080/getip',options=opts), "Requests/second" )
+-  #print ("many num args  ", run_wrk(loop, 'http://localhost:8080/sixargs/155/2001/29999/25/29999543/93243242394'), "Requests/second" )
+-  #print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
++  
++    #opts = ('-H','X-Real-IP: 1.2.3.4')
++    #print ("get ip         ", run_wrk(loop,'http://localhost:8080/getip',options=opts), "Requests/second" )
++    #print ("many num args  ", run_wrk(loop, 'http://localhost:8080/sixargs/155/2001/29999/25/29999543/93243242394'), "Requests/second" )
++    #print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
++
++  if 0:
++    lines = []
++    x = 0
++    while 1:
++      x += 1
++      print(x)
++      #if x > 19842: break
++      if x > 21605: break
++      line = loop.run_until_complete(server.stdout.readline())
++      if line:
++        line = line.decode('utf-8')
++        lines.append(line)
++      else:
++        break
++    print ( len(lines) )
++    o = open( "wrkout", "wb" )
++    o.write( (''.join(lines)).encode("utf-8") )
++    o.close()
+ 
+ except KeyboardInterrupt:
+   pass
+diff --git a/examples/3_request.py b/examples/3_request.py
+index 299aa61..06da366 100644
+--- a/examples/3_request.py
++++ b/examples/3_request.py
+@@ -7,38 +7,50 @@ def hello(r):
+   print("Path: ", r.path)
+   print("Method: ", r.method)
+   print("Mime Type: ", r.mime_type)
++  print("IP: ", r.ip)
+   print("Body: ", r.body)
+   print("Json: ", r.json)
+   print("Headers: ", r.headers)
+   print("Form data: ", r.form)
+   print("Cookies: ", r.cookies)
+-  print("Query string arguments are found in r.args: ", r.args)
++  print("Query string arguments (?x=y) are found in:")
++  print("r.args: ", r.args)
+   return 'Hello World!'
+ 
+ @app.route('/{}/')
+ def argpath(r, arg):
+   print("Path arg: ", arg)
+-  print("Path: ", r.path)
+-  print("Method: ", r.method)
+-  print("Body: ", r.body)
+-  print("Headers: ", r.headers)
+-  print("Form data: ", r.form)
+-  print("Cookies: ", r.cookies)
+-  print("Query string arguments are found in r.args: ", r.args)
+   return 'Hello World!'
+ 
++@app.route('/num/{num}/')
++def numarg(r, arg):
++  print("arg is a number")
++  print(type(arg))
++  print(arg)
++  return str(arg)
++
++@app.route('/{}/{}/{}/')
++def multipleargs(r, a,b,c):
++  print(a,b,c)
++  return a+b+c
++
++
+ app.run(cores=2)
+ 
+-# curl -i --raw 'http://localhost:8080/'
+-# curl -i --raw 'http://localhost:8080/testing'
++# curl -i --raw http://localhost:8080/
++# curl -i --raw http://localhost:8080/testing
+ 
+ # Query string, cookie header
+-# curl -i --raw 'http://localhost:8080/?foo=bar' -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
++# curl -i --raw http://localhost:8080/?foo=bar -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
+ 
+ # Post json
+ # Note that if you don't use the r.json you must check the application/json header to avoid a security vulnerability
+-# curl -i --raw 'http://localhost:8080/' -H "Content-Type: application/json" -X POST -d '[1,2,3,4,5,6,7,8,9]'
++# curl -i --raw http://localhost:8080/ -H "Content-Type: application/json" -X POST -d '[1,2,3,4,5,6,7,8,9]'
+ 
+ # Form:
+ # curl http://localhost:8080/ -d "param1=value1&param2=value2" -X POST
+ 
++# Args:
++# curl -i --raw http://localhost:8080/num/99/
++# curl -i --raw http://localhost:8080/one/two/three/
++
+diff --git a/readme b/readme
+index 8759739..27086b6 100644
+--- a/readme
++++ b/readme
+@@ -79,8 +79,6 @@ curl -H "Content-Type: application/mrpacker" --data-binary @tests/lua/test.mrp h
+ 
+ Session testing
+ curl -i --raw http://localhost:8080/s -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
+-#server 1  curl -i --raw http://localhost:8080/ -H "Cookie: mrsession=1234567361cc443e976b05714581a123;"
+-
+ wrk -t4 -c32 -d1s http://localhost:8080/s -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
+ 
+ These are cookies from a couple websites:
+diff --git a/setup.py b/setup.py
+index 8da1851..e6f17bf 100644
+--- a/setup.py
++++ b/setup.py
+@@ -20,7 +20,7 @@ m1 = Extension(
+       './src/mrhttp/internals/hash/city.c',
+       './src/mrhttp/internals/hash/assoc.c',
+       './src/mrhttp/internals/utils.c',
+-      './src/mrhttp/utils/unpack.c',
++      #'./src/mrhttp/utils/unpack.c',
+      ],
+      include_dirs = ['./src/mrhttp/internals'],
+      extra_compile_args = ['-msse4.2', '-mavx2', '-mbmi2', '-Wunused-variable','-std=c99','-Wno-discarded-qualifiers', '-Wno-unused-variable','-Wno-unused-function'],
+diff --git a/src/mrhttp/__init__.py b/src/mrhttp/__init__.py
+index 0b363fb..558ba11 100644
+--- a/src/mrhttp/__init__.py
++++ b/src/mrhttp/__init__.py
+@@ -13,3 +13,4 @@ from .mrqclient import MrqClient
+ from .app import *
+ 
+ from .internals import randint, escape, to64, from64, timesince
++
+diff --git a/src/mrhttp/app.py b/src/mrhttp/app.py
+index 7fae56a..543e86b 100644
+--- a/src/mrhttp/app.py
++++ b/src/mrhttp/app.py
+@@ -38,8 +38,8 @@ except ImportError:
+ 
+ #import mrmemcache
+ 
+-#import uvloop
+-#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
++import uvloop
++asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+ 
+ signames = {
+     int(v): v.name for k, v in signal.__dict__.items()
+diff --git a/src/mrhttp/internals/app.c b/src/mrhttp/internals/app.c
+index 446ae69..cb56bdd 100644
+--- a/src/mrhttp/internals/app.c
++++ b/src/mrhttp/internals/app.c
+@@ -1,5 +1,4 @@
+ 
+-
+ #include <Python.h>
+ #include <stdbool.h>
+ #include <math.h>
+@@ -8,7 +7,6 @@
+ #include "common.h"
+ #include "module.h"
+ #include "time.h"
+-#include "unpack.h"
+ 
+ PyObject *MrhttpApp_new(PyTypeObject* type, PyObject *args, PyObject *kwargs) {
+   MrhttpApp* self = NULL;
+@@ -28,7 +26,7 @@ int MrhttpApp_init(MrhttpApp* self, PyObject *args, PyObject *kwargs) {
+ 
+ PyObject *MrhttpApp_cinit(MrhttpApp* self) {
+   srand(time(0)); // TODO seed utils.randint
+-  initmrpacker();
++  //initmrpacker();
+   self->requests  = PyObject_GetAttrString((PyObject*)self, "requests");
+   int l = PyList_Size(self->requests);
+ 
+diff --git a/src/mrhttp/internals/common.h b/src/mrhttp/internals/common.h
+index bc97dfb..a238bfb 100644
+--- a/src/mrhttp/internals/common.h
++++ b/src/mrhttp/internals/common.h
+@@ -5,8 +5,8 @@
+ #define DBG_PARSER if(0)
+ #define DBG_RESP if(0)
+ 
+-#define DBG_MEMCAC if(1) 
+-#define DBG_MRQ if(1) 
++#define DBG_MEMCAC if(0) 
++#define DBG_MRQ if(0) 
+ 
+ #define likely(x)       __builtin_expect(!!(x), 1)
+ #define unlikely(x)     __builtin_expect(!!(x), 0)
+diff --git a/src/mrhttp/internals/memcachedclient.c b/src/mrhttp/internals/memcachedclient.c
+index 8fac69b..3406b87 100644
+--- a/src/mrhttp/internals/memcachedclient.c
++++ b/src/mrhttp/internals/memcachedclient.c
+@@ -112,16 +112,6 @@ int MemcachedClient_get(MemcachedClient* self, char *key, void *fn, void *connec
+   int rc = MemcachedServer_get( self->servers[server], key, fn, connection );
+   return rc;
+ }
+-int MemcachedClient_get2(MemcachedClient* self, char *key, int ksz, void *fn, void *connection ) {
+-
+-  int hash = (hexchar[(uint8_t)key[ksz-3]]<<8) | (hexchar[(uint8_t)key[ksz-2]]<<4) | hexchar[(uint8_t)key[ksz-1]];
+-  int server = connmap[hash];
+-  DBG_MEMCAC printf("  memcached get server %d\n",server); 
+-  if ( server == -1 ) return -1;
+-
+-  int rc = MemcachedServer_get2( self->servers[server], key, ksz, fn, connection );
+-  return rc;
+-}
+ 
+ // Args Session key bytes, user bytes
+ PyObject *MemcachedClient_set(MemcachedClient* self, PyObject *args) {
+@@ -153,11 +143,9 @@ void MemcachedClient_connection_lost( MemcachedClient* self, MemcachedProtocol*
+   MemcachedServer_connection_lost( self->servers[server], conn );
+ 
+   PyObject* func = PyObject_GetAttrString((PyObject*)self, "lost_connection");
+-  PyObject* snum = PyLong_FromLong(server);
+-  PyObject* tmp = PyObject_CallFunctionObjArgs(func, snum, NULL);
++  PyObject* tmp = PyObject_CallFunctionObjArgs(func, PyLong_FromLong(server), NULL);
+   Py_XDECREF(func);
+   Py_XDECREF(tmp);
+-  Py_DECREF(snum);
+ 
+   // If we have no more connections to this server remove it 
+   if ( self->servers[server]->num_conns == 0 ) {
+@@ -216,13 +204,7 @@ int MemcachedServer_get( MemcachedServer *self, char *k, void *fn, void *connect
+ }
+ 
+ 
+-int MemcachedServer_get2( MemcachedServer *self, char *k, int ksz, void *fn, void *connection ) {
+-  if ( self->num_conns == 0 ) return -1;
+-  int c = self->next_conn++;
+-  if ( self->next_conn == self->num_conns ) self->next_conn = 0;
+-  MemcachedProtocol_asyncGet2( self->conns[c], k, ksz, fn, connection );
+-  return 0;
+-}
++
+ 
+ 
+ 
+diff --git a/src/mrhttp/internals/memcachedclient.h b/src/mrhttp/internals/memcachedclient.h
+index 314eeb9..214de1a 100644
+--- a/src/mrhttp/internals/memcachedclient.h
++++ b/src/mrhttp/internals/memcachedclient.h
+@@ -29,13 +29,11 @@ void MemcachedClient_setupConnMap( MemcachedClient* self ) ;
+ void MemcachedClient_connection_lost( MemcachedClient* self, MemcachedProtocol* conn, int server_num );
+ PyObject *MemcachedClient_addConnection(MemcachedClient* self, MemcachedProtocol *conn, int server);
+ 
+-int MemcachedClient_get (MemcachedClient* self, char *key, void *fn, void *connection );
+-int MemcachedClient_get2(MemcachedClient* self, char *key, int ksz, void *fn, void *connection );
++int MemcachedClient_get(MemcachedClient* self, char *key, void *fn, void *connection );
+ PyObject *MemcachedClient_set(MemcachedClient* self, PyObject *args);
+ 
+ int MemcachedServer_init( MemcachedServer *self, int server_num );
+ int MemcachedServer_get( MemcachedServer *self, char *k, void *fn, void *connection);
+-int MemcachedServer_get2( MemcachedServer *self, char *k, int ksz, void *fn, void *connection );
+ int MemcachedServer_set( MemcachedServer *self, char *k, int ksz, char* d, int dsz );
+ int MemcachedServer_addConnection( MemcachedServer *self, MemcachedProtocol *conn) ;
+ void MemcachedServer_connection_lost( MemcachedServer* self, MemcachedProtocol* conn );
+diff --git a/src/mrhttp/internals/memprotocol.c b/src/mrhttp/internals/memprotocol.c
+index 4885af5..b5b9d29 100644
+--- a/src/mrhttp/internals/memprotocol.c
++++ b/src/mrhttp/internals/memprotocol.c
+@@ -23,7 +23,6 @@ PyObject * MemcachedProtocol_new(PyTypeObject *type, PyObject *args, PyObject *k
+   self->client = NULL;
+ 
+   memcpy(self->get_cmd, "get mrsessionZZZZ9dd361cc443e976b05714581a7fb\r\n",strlen("get mrsession43709dd361cc443e976b05714581a7fb\r\n"));
+-  memcpy(self->get_cmd2, "get mrsessionZZZZ9dd361cc443e976b05714581a7fb\r\n",strlen("get mrsession43709dd361cc443e976b05714581a7fb\r\n"));
+ 
+   self->set_cmd = malloc( 2048 );
+   self->set_cmd_sz = 2048;
+@@ -49,7 +48,7 @@ int MemcachedProtocol_init(MemcachedProtocol* self, PyObject *args, PyObject *kw
+   self->queue_sz = 1024;
+   self->queue_start = 0;
+   self->queue_end = 0;
+-  memcpy(self->set_cmd, "set mrsessionZZZZ9dd361cc443e976b05714581a7fb 0 0 ",strlen("set mrsessionZZZZ9dd361cc443e976b05714581a7fb 0 0 "));
++  memcpy(self->set_cmd, "set mrsessionZZZZ9dd361cc443e976b05714581a7fb 0 0 ",strlen("set mrsessionZZZZ9dd361cc443e976b05714581a7fb 0 25920000 "));
+ 
+   if(!PyArg_ParseTuple(args, "Oi", &self->client, &self->server_num)) return -1;
+   Py_INCREF(self->client);
+@@ -171,24 +170,7 @@ int MemcachedProtocol_asyncGet( MemcachedProtocol* self, char *key, void *fn, vo
+   self->queue[self->queue_end].cb = (tMemcachedCallback*)fn;
+   self->queue[self->queue_end].connection = connection;
+   self->queue_end = (self->queue_end+1)%self->queue_sz;
+-  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 0; }
+-  Py_DECREF(bytes);
+-  return 1;
+-}
+-
+-int MemcachedProtocol_asyncGet2( MemcachedProtocol* self, char *key, int keylen, void *fn, void *connection ) {
+-  DBG_MEMCAC printf("MemcachedProtocol - asyncGet2\n");
+-  printf("key %.*s\n", keylen, key);
+-  char *kp = self->get_cmd2+13;
+-  memcpy(kp, key, keylen);
+-  memcpy( kp+keylen, "\r\n", 2 );
+-  PyObject *bytes = PyBytes_FromString(self->get_cmd2);
+-  PyObject_Print(bytes,stdout,0);printf("\n"); 
+-  self->queue[self->queue_end].cb = (tMemcachedCallback*)fn;
+-  self->queue[self->queue_end].connection = connection;
+-  self->queue_end = (self->queue_end+1)%self->queue_sz;
+-  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 0; }
+-  Py_DECREF(bytes);
++  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 0;
+   return 1;
+ }
+ 
+@@ -230,9 +212,7 @@ int MemcachedProtocol_asyncSet( MemcachedProtocol* self, char *key, char *val, i
+   PyObject *bytes = PyBytes_FromStringAndSize(self->set_cmd,p-self->set_cmd);
+   //DBG_MEMCAC PyObject_Print(bytes, stdout,0); 
+   //DBG_MEMCAC printf("\n");
+-  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 1; }
+-  Py_DECREF(bytes);
+-
++  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 1;
+   return 0;  
+ }
+ 
+diff --git a/src/mrhttp/internals/memprotocol.h b/src/mrhttp/internals/memprotocol.h
+index c5c85c9..458f72c 100644
+--- a/src/mrhttp/internals/memprotocol.h
++++ b/src/mrhttp/internals/memprotocol.h
+@@ -25,9 +25,8 @@ typedef struct {
+   int queue_start;
+   int queue_end;
+ 
+-  char get_cmd[128];
++  char get_cmd[64];
+   char *set_cmd;
+-  char get_cmd2[256];
+   int set_cmd_sz;
+ 
+ } MemcachedProtocol;
+diff --git a/src/mrhttp/internals/module.h b/src/mrhttp/internals/module.h
+index cb0090c..c45366a 100644
+--- a/src/mrhttp/internals/module.h
++++ b/src/mrhttp/internals/module.h
+@@ -90,7 +90,7 @@ static PyGetSetDef Request_getset[] = {
+   {"method", (getter)Request_get_method, NULL, "", NULL},
+   {"transport", (getter)Request_get_transport, NULL, "", NULL},
+   {"headers", (getter)Request_get_headers, NULL, "", NULL},
+-  {"ip", (getter)Request_get_ip, NULL, "", NULL},
++  //MMM{"ip", (getter)Request_get_ip, NULL, "", NULL},
+   {"cookies", (getter)Request_get_cookies, NULL, "", NULL},
+   {"body", (getter)Request_get_body, NULL, "", NULL},
+   {"query_string", (getter)Request_get_query_string, NULL, "", NULL},
+diff --git a/src/mrhttp/internals/mrhttpparser.c b/src/mrhttp/internals/mrhttpparser.c
+index cc443bb..37252aa 100644
+--- a/src/mrhttp/internals/mrhttpparser.c
++++ b/src/mrhttp/internals/mrhttpparser.c
+@@ -338,9 +338,9 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
+               headers[*num_headers].name_len = 12;
+               buf += 14;
+               //goto hvalue;
+-              if ( buf[0] == 'a' && buf[13] == 'r' ) { //"application/mrpacker"
+-                mrr->flags = 2;
+-              } 
++              //if ( buf[0] == 'a' && buf[13] == 'r' ) { //"application/mrpacker"
++                //mrr->flags = 2;
++              //} 
+               buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret); 
+               goto skipvalue;
+             }
+@@ -393,12 +393,9 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
+               headers[*num_headers].name = buf;
+               headers[*num_headers].name_len = 8;
+               buf += 10;
+-              //goto hvalue;
+               mrr->ip = buf;
+               buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret); 
+               mrr->ip_len = headers[*num_headers].value_len;
+-              //print_buffer( buf, 16 );
+-              //print_buffer( mrr->cookie, 16 );
+               goto skipvalue;
+             }
+             if ( buf[1] == '-' && buf[15] == ':' ) { // X-Forwarded-For:       
+diff --git a/src/mrhttp/internals/mrqprotocol.c b/src/mrhttp/internals/mrqprotocol.c
+index d6175d6..bcb61ad 100644
+--- a/src/mrhttp/internals/mrqprotocol.c
++++ b/src/mrhttp/internals/mrqprotocol.c
+@@ -50,7 +50,7 @@ int MrqProtocol_init(MrqProtocol* self, PyObject *args, PyObject *kw)
+   Py_INCREF(self->client);
+   Py_INCREF(self->q);
+ 
+-  if(!(self->pfunc = PyObject_GetAttrString(self->q, "put_nowait"))) return NULL;
++  if(!(self->pfunc = PyObject_GetAttrString(self->q, "put_nowait"))) return -1;
+ 
+   self->b = malloc(1024);
+   self->bsz = 1024;
+@@ -153,7 +153,7 @@ PyObject* MrqProtocol_data_received(MrqProtocol* self, PyObject* data)
+     printf("WARNING py bytes as string failed\n");
+     return NULL; //TODO set error
+   }
+-  DBG_MRQ printf(" psz %d\n",psz);
++  DBG_MRQ printf(" psz %ld\n",psz);
+   int data_left = psz;
+   if ( self->rbufp ) {
+     DBG_MRQ printf(" rbufp! --------------------------------------------------------\n");
+diff --git a/src/mrhttp/internals/parser.c b/src/mrhttp/internals/parser.c
+index b032999..07e2c65 100644
+--- a/src/mrhttp/internals/parser.c
++++ b/src/mrhttp/internals/parser.c
+@@ -7,9 +7,12 @@
+ #include "parser.h"
+ #include "common.h"
+ #include "module.h"
+-#include "unpack.h"
++//#include "unpack.h"
+ //#include "cpu_features.h"
+ 
++    //unsigned long long cycles = rdtsc();
++    //unsigned long long ecyc = rdtsc();
++    //printf(" took %lld\n", ecyc - cycles);
+ static __inline__ unsigned long long rdtsc(void)
+ {
+   unsigned long lo, hi;
+@@ -186,19 +189,12 @@ body:
+   // Need more data
+   if ( self->body_length > ( self->end - self->start ) ) return -2;
+ 
+-  if ( request->hreq.ip_len ) {
+-    PyObject *ip  = PyUnicode_FromStringAndSize(request->hreq.ip, request->hreq.ip_len);
+-    if ( ip ) { PyObject_SetAttrString((PyObject*)request, "_ip", ip); Py_DECREF(ip); }
+-  }
+-
+-  if ( request->hreq.flags == 2 ) {
+-    //unsigned long long cycles = rdtsc();
+-    PyObject *obj = unpackc( self->start, self->body_length ); 
+-    //unsigned long long ecyc = rdtsc();
+-    //printf(" took %lld\n", ecyc - cycles);
+-    PyObject_SetAttrString((PyObject*)request, "mrpack", obj);
+-    Py_XDECREF(obj);
+-  }
++  // 260 vs json's 285k requests per second ... Not sure why it was slower
++  //if ( request->hreq.flags == 2 ) {
++    //PyObject *obj = unpackc( self->start, self->body_length ); 
++    //PyObject_SetAttrString((PyObject*)request, "mrpack", obj);
++    //Py_XDECREF(obj);
++  //}
+ 
+   if(!Protocol_on_body(self->protocol, self->start, self->body_length)) return -1;
+ 
+diff --git a/src/mrhttp/internals/protocol.c b/src/mrhttp/internals/protocol.c
+index 6117e2b..3028682 100644
+--- a/src/mrhttp/internals/protocol.c
++++ b/src/mrhttp/internals/protocol.c
+@@ -1,5 +1,4 @@
+ 
+-
+ #include "protocol.h"
+ #include "common.h"
+ #include "module.h"
+@@ -279,7 +278,7 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *req
+ 
+         if ( cnt < 20 ) {
+           long l = 0;
+-          while (_isdigit(*p) && (--cnt != 0)) l = (l * 10) + (*p++ - '0');
++          while (_isdigit(*p) && (cnt-- != 0)) l = (l * 10) + (*p++ - '0');
+           if ( !cnt ) {
+             args[i] = PyLong_FromLong(l);
+           } else {
+@@ -405,7 +404,7 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
+ 
+     Protocol_handle_request( self, req, req->route );
+   } else {
+-    printf("DELME closed?\n"); // TODO Need to do anything if they dropped connection before the memcached reply?
++    //printf("DELME closed?\n"); // TODO Need to do anything if they dropped connection before the memcached reply?
+   }
+   Py_DECREF(self);
+ }
+@@ -443,8 +442,8 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
+       mcd->protocol = self;
+       Py_INCREF(self); // Incref so we don't get GC'd before the response comes back
+       mcd->request  = self->request;
+-      //int rc = MemcachedClient_get( self->memclient, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+-      int rc = MemcachedClient_get2( self->memclient, self->request->session_id, self->request->session_id_sz, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
++      int rc = MemcachedClient_get( self->memclient, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
++      //int rc = MemcachedClient_get2( self->memclient, self->request->session_id, self->request->session_id_sz, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+ 
+       // If the get failed (no servers) then we're done
+       if ( rc != 0 ) {
+diff --git a/src/mrhttp/internals/request.c b/src/mrhttp/internals/request.c
+index 5bac362..00522e1 100644
+--- a/src/mrhttp/internals/request.c
++++ b/src/mrhttp/internals/request.c
+@@ -102,7 +102,7 @@ void Request_reset(Request *self) {
+   Py_XDECREF(self->py_path); self->py_path = NULL;
+   Py_XDECREF(self->py_method); self->py_method = NULL;
+   Py_XDECREF(self->py_cookies); self->py_cookies = NULL; // TODO Benchmark just clearing it here, but need a flag to reload cookies each request
+-  Py_XDECREF(self->hreq.ip); self->hreq.ip = NULL;
++  //Py_XDECREF(self->hreq.ip); self->hreq.ip = NULL;
+   self->num_headers = 0;
+   Response_reset(self->response);
+ }
+@@ -376,8 +376,14 @@ PyObject* Request_get_headers(Request* self, void* closure) {
+   return self->py_headers;
+ }
+ PyObject* Request_get_ip(Request* self, void* closure) {
+-  if(!self->py_ip) self->py_ip = PyUnicode_FromStringAndSize(self->hreq.ip, self->hreq.ip_len);
+-  Py_XINCREF(self->py_ip);
++  if(!self->py_ip) {
++    //if ( self->hreq.ip_len ) {
++      //self->py_ip = PyUnicode_FromStringAndSize(self->hreq.ip, self->hreq.ip_len);
++    //} else {
++      self->py_ip = Py_None;
++    //}
++    Py_XINCREF(self->py_ip);
++  }
+   return self->py_ip;
+ }
+ 
+@@ -385,10 +391,9 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
+   char *end = buf + buflen;
+   char *last = buf;
+   PyObject* cookies = PyDict_New();
+-  //return cookies;
+   PyObject* key = NULL; PyObject* value = NULL;
+ 
+-  printf("parse cookies: %.*s\n",buflen, buf);
++  DBG printf("parse cookies: %.*s\n",buflen, buf);
+ 
+   static char ALIGNED(16) ranges1[] = "==" ";;";
+   int found;
+@@ -436,6 +441,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
+     }
+   } while( found );
+ 
++  // If the trailing ; is left off we need to finish up
+   if (state) {
+     if (grab_session) {
+       grab_session = 0;
+@@ -448,39 +454,6 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
+     Py_XDECREF(value);
+   }
+ 
+-/*
+-  // May have 15 extra bytes
+-  for (;buf <= end;) {
+-    
+-    if ( buf == end || *buf == ';' ) {
+-      if ( state == 0 ) key  = PyUnicode_FromString("");
+-      if (grab_session) {
+-        grab_session = 0;
+-        r->session_id = last;
+-        r->session_id_sz = buf-last;
+-      }
+-      value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+-      state = 0;
+-      PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
+-      Py_XDECREF(key);
+-      Py_XDECREF(value);
+-      buf+=1;
+-      while ( *buf == 32 ) buf++;
+-      last = buf;
+-    }
+-    else if ( *buf == '=' ) {
+-      if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
+-        DBG printf("Grab session\n");
+-        grab_session = 1;
+-      }
+-      key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+-      if (!key) printf("!key\n");
+-      state = 1;
+-      last = buf+1;
+-    }
+-    buf++;
+-  }
+-*/
+   return cookies;
+ }
+ 
+@@ -558,6 +531,8 @@ static inline PyObject* parse_query_args( char *buf, size_t buflen ) {
+       //}
+     }
+   } while( found );
++
++  // TODO findchar was updated to handle < 16 bytes so remove
+   // May have 15 extra bytes
+   for (;buf <= end;) {
+     
+@@ -595,8 +570,8 @@ PyObject* Request_get_path(Request* self, void* closure)
+   if(!self->py_path) {
+     if ( self->path_len == 0 ) self->py_path = Py_None;
+     else self->py_path = PyUnicode_FromStringAndSize(self->path, self->path_len);
++    Py_XINCREF(self->py_path);
+   }
+-  Py_XINCREF(self->py_path);
+   return self->py_path;
+ }
+ PyObject* Request_get_method(Request* self, void* closure)
+@@ -606,8 +581,8 @@ PyObject* Request_get_method(Request* self, void* closure)
+     else self->py_method = PyUnicode_FromStringAndSize(self->method, self->method_len);
+     //TODO Decode latin? self->py_method = PyUnicode_DecodeLatin1( REQUEST_METHOD(self), self->method_len, NULL);
+ 
++    Py_XINCREF(self->py_method);
+   }
+-  Py_XINCREF(self->py_method);
+   return self->py_method;
+ }
+ PyObject* Request_get_query_string(Request* self, void* closure)
+@@ -615,16 +590,21 @@ PyObject* Request_get_query_string(Request* self, void* closure)
+   if(!self->py_query_string) {
+     if ( self->qs_len == 0 ) self->py_query_string = Py_None;
+     else self->py_query_string = PyUnicode_FromStringAndSize(self->path + self->path_len + 1, self->qs_len - 1);
++    Py_XINCREF(self->py_query_string);
+   }
+-  Py_XINCREF(self->py_query_string);
+   return self->py_query_string;
+ }
+ 
+ PyObject* Request_get_query_args(Request* self, void* closure)
+ {
+   if(!self->py_args) {
+-    self->py_args = parse_query_args(self->path + self->path_len + 1, self->qs_len - 1);
++    if ( self->qs_len ) {
++      self->py_args = parse_query_args(self->path + self->path_len + 1, self->qs_len - 1);
++      Py_XINCREF(self->py_args);
++    } else {
++      self->py_args = PyDict_New();
++      return self->py_args;
++    }
+   }
+-  Py_XINCREF(self->py_args);
+   return self->py_args;
+ }
+diff --git a/src/mrhttp/internals/response.c b/src/mrhttp/internals/response.c
+index 966c590..fc7933e 100644
+--- a/src/mrhttp/internals/response.c
++++ b/src/mrhttp/internals/response.c
+@@ -39,8 +39,8 @@ void response_setupResponseBuffer(void) {
+ }
+ 
+ void Response_dealloc(Response* self) {
+-  //free(self->rbuf);
+-  //free(self->errbuf);
++  free(self->rbuf);
++  free(self->errbuf);
+   Py_XDECREF(self->cookies);
+   Py_XDECREF(self->headers);
+   Py_TYPE(self)->tp_free((PyObject*)self);
+@@ -51,7 +51,6 @@ void Response_reset(Response *self) {
+   self->cookies = NULL;
+ }
+ 
+-
+ char *getResponseBuffer(int sz) {
+   if ( sz > rbuf_sz ) {
+     while ( sz > rbuf_sz ) rbuf_sz *= 2;
+diff --git a/src/mrhttp/internals/unpack.h b/src/mrhttp/internals/unpack.h
+deleted file mode 100644
+index ccbd67f..0000000
+--- a/src/mrhttp/internals/unpack.h
++++ /dev/null
+@@ -1,10 +0,0 @@
+-#pragma once
+-
+-#include <stdint.h>
+-#include <stddef.h>
+-#include <assert.h>
+-#include "Python.h"
+-
+-PyObject* unpackc( unsigned char *p, int len );
+-void initmrpacker(void);
+-
+diff --git a/src/mrhttp/request.py b/src/mrhttp/request.py
+index 910d487..36c88e3 100755
+--- a/src/mrhttp/request.py
++++ b/src/mrhttp/request.py
+@@ -2,7 +2,7 @@ import urllib.parse
+ import cgi
+ import encodings.idna
+ import collections
+-import mrhttp, time
++import mrhttp
+ try:
+   import mrjson as json
+ except:
+@@ -20,11 +20,31 @@ class Request(mrhttp.CRequest):
+   servers_down = False
+   memo = {}
+   _json = None
+-  mrpack = None
+   def __init__(self):
+     super().__init__(self)
+     pass
+ 
++  # decorator
++  def memoize(func):
++    def wrapper(self):
++      try:
++        return self.memo[func.__name__]
++      except KeyError:
++        pass
++      except Exception as e:
++        print("wrapper exception", e)
++
++      try:
++        result = func(self)
++        self.memo[func.__name__] = result
++      except Exception as e:
++        print("wrapfunc exception", e)
++
++
++      return result
++    return wrapper
++
++  #TODO we reuse requests so we need to clear memo to use it
+   def parsed_content_type(self):
+     content_type = self.headers.get('Content-Type')
+     if not content_type: return None, {}
+@@ -45,7 +65,7 @@ class Request(mrhttp.CRequest):
+       return dict(urllib.parse.parse_qsl(self.body.decode("utf-8"))), None
+ 
+     elif self.mime_type == 'multipart/form-data':
+-      boundary = self.parsed_content_type()[1]['boundary'].encode('utf-8')
++      boundary = self.get_form()[1]['boundary'].encode('utf-8')
+       return parse_multipart_form(self.body, boundary)
+ 
+     return None, None
+@@ -60,9 +80,8 @@ class Request(mrhttp.CRequest):
+       try:
+         if self.mime_type == "application/json":
+           self._json = json.loads(self.body.decode("utf-8"))
+-      except Exception as e:
++      except:
+         pass
+-        #print("Error parsing json", str(e))
+     return self._json
+ 
+   @property
+@@ -81,8 +100,129 @@ class Request(mrhttp.CRequest):
+       #return '<HttpRequest {0.method} {0.path} {0.version}, {1} headers>' \
+           #.format(self, len(self.headers))
+ 
++z="""
++@memoize
++def text(request):
++    if request.body is None:
++        return None
++
++    return request.body.decode(request.encoding or 'utf-8')
++
++
++@memoize
++def json(request):
++    if request.body is None:
++        return None
++
++    return json_loads(request.text)
++
++
++@memoize
++def query(request):
++    qs = request.query_string
++    if not qs:
++        return {}
++    return dict(urllib.parse.parse_qsl(qs))
++
++
++def remote_addr(request):
++    return request.transport.get_extra_info('peername')[0]
++
++
++@memoize
++def parsed_content_type(request):
++    content_type = request.headers.get('Content-Type')
++    if not content_type:
++        return None, {}
++
++    return cgi.parse_header(content_type)
++
++
++def mime_type(request):
++    return parsed_content_type(request)[0]
++
++
++def encoding(request):
++    return parsed_content_type(request)[1].get('charset')
++
++
++@memoize
++def parsed_form_and_files(request):
++    if request.mime_type == 'application/x-www-form-urlencoded':
++        return dict(urllib.parse.parse_qsl(request.text.decode("utf-8"))), None
++    elif request.mime_type == 'multipart/form-data':
++        boundary = parsed_content_type(request)[1]['boundary'].encode('utf-8')
++        return parse_multipart_form(request.body, boundary)
++
++    return None, None
++
++
++def form(request):
++    return parsed_form_and_files(request)[0]
++
++
++def files(request):
++    return parsed_form_and_files(request)[1]
++
++
++@memoize
++def hostname_and_port(request):
++    host = request.headers.get('Host')
++    if not host:
++        return None, None
++
++    hostname, *rest = host.split(':', 1)
++    port = rest[0] if rest else None
++
++    return encodings.idna.ToUnicode(hostname), int(port)
++
++
++def port(request):
++    return hostname_and_port(request)[1]
++
++
++def hostname(request):
++    return hostname_and_port(request)[0]
++
++
++def parse_cookie(cookie):
++    ""Parse a ``Cookie`` HTTP header into a dict of name/value pairs.
++    This function attempts to mimic browser cookie parsing behavior;
++    it specifically does not follow any of the cookie-related RFCs
++    (because browsers don't either).
++    The algorithm used is identical to that used by Django version 1.9.10.
++    ""
++    cookiedict = {}
++    for chunk in cookie.split(str(';')):
++        if str('=') in chunk:
++            key, val = chunk.split(str('='), 1)
++        else:
++            # Assume an empty name per
++            # https://bugzilla.mozilla.org/show_bug.cgi?id=169091
++            key, val = str(''), chunk
++        key, val = key.strip(), val.strip()
++        if key or val:
++            # unquote using Python's algorithm.
++            cookiedict[key] = unquote_cookie(val)
++    return cookiedict
++
++
++@memoize
++def cookies(request):
++    if 'Cookie' not in request.headers:
++        return {}
++
++    try:
++        cookies = parse_cookie(request.headers['Cookie'])
++    except Exception:
++        return {}
++
++    return {k: urllib.parse.unquote(v) for k, v in cookies.items()}
++
++
+ File = collections.namedtuple('File', ['type', 'body', 'name'])
+ 
++
+ def parse_multipart_form(body, boundary):
+     files = {}
+     fields = {}
+@@ -123,4 +263,4 @@ def parse_multipart_form(body, boundary):
+             fields[field_name] = value
+ 
+     return fields, files
+-
++"""
+diff --git a/src/mrhttp/utils/bkup/unpack.c b/src/mrhttp/utils/bkup/unpack.c
+deleted file mode 100644
+index bbb5375..0000000
+--- a/src/mrhttp/utils/bkup/unpack.c
++++ /dev/null
+@@ -1,178 +0,0 @@
+-#include "unpack.h"
+-#include "py_defines.h"
+-#include <time.h>
+-#include <stdlib.h>
+-#include <stdio.h>
+-
+-typedef struct _decoder
+-{
+-  unsigned char *start, *end, *s;
+-  int depth;
+-} Decoder;
+-
+-
+-static char    *sbuf = NULL;
+-static uint32_t sbuf_len;
+-
+-static void print_buffer( unsigned char* b, int len ) {
+-  for ( int z = 0; z < len; z++ ) {
+-    printf( "%02x ",(int)b[z]);
+-  }
+-  printf("\n");
+-}
+-
+-PyObject *decode( Decoder *d ) { //unsigned char *s, unsigned char *end) {
+-  if ( *(d->s) == 0x60 ) { d->s += 1; Py_INCREF(Py_None); return Py_None; }
+-  else if ( (*(d->s) & 0xE0) == 0x80 ) {  // String
+-    int l = *(d->s) & 0x1F; 
+-    if ( l > sbuf_len ) { 
+-      while ( l > sbuf_len ) { sbuf_len <<= 1; } 
+-      sbuf = (char*)realloc(sbuf, sbuf_len);
+-    }
+-    d->s += 1;
+-    memcpy( sbuf, d->s, l );
+-    d->s += l;
+-    return PyUnicode_FromStringAndSize( sbuf, l );
+-  }
+-  else if ( *(d->s) == 0x61 ) { d->s += 1; Py_INCREF(Py_True); return Py_True; }
+-  else if ( *(d->s) == 0x62 ) { d->s += 1; Py_INCREF(Py_False); return Py_False; }
+-  else if ( *(d->s) == 0x63 ) { 
+-    d->s++;
+-    union { double d; uint64_t i; } mem;
+-    uint64_t *p = (uint64_t*)d->s;
+-    mem.i = *p;
+-    d->s += 8;
+-    return PyFloat_FromDouble(mem.d);
+-  }
+-  else if ( *(d->s) == 0x64 ) { 
+-    d->s++;
+-    long long *p = (long long*)d->s;
+-    d->s += 8;
+-    return PyLong_FromLong(*p);
+-  }
+-  else if ( *(d->s) == 0x65 ) { 
+-    d->s++;
+-    uint64_t *p = (uint64_t*)d->s;
+-    d->s += 8;
+-    return PyLong_FromUnsignedLong(*p);
+-  }
+-  else if ( *(d->s) == 0x68 ) { 
+-    d->s++;
+-    uint32_t *p = (uint32_t*)d->s;
+-    d->s += 4;
+-    return PyLong_FromUnsignedLong(*p);
+-  }
+-  else if ( *(d->s) == 0x67 ) { 
+-    d->s++;
+-    int32_t *p = (int32_t*)d->s;
+-    d->s += 4;
+-    return PyLong_FromLong(*p);
+-  }
+-  else if ( *(d->s) == 0x66 ) { 
+-    d->s++;
+-    uint32_t *p = (uint32_t*)d->s;
+-    uint32_t l = *p;
+-    d->s+=4;
+-    if ( l > sbuf_len ) { 
+-      while ( l > sbuf_len ) { sbuf_len <<= 1; } 
+-      sbuf = (char*)realloc(sbuf, sbuf_len);
+-    }
+-    memcpy( sbuf, d->s, l );
+-    d->s += l;
+-    return PyUnicode_FromStringAndSize( sbuf, l );
+-  }
+-  else if ( (*(d->s) & 0xE0) == 0xC0 ) {  // tiny int
+-    int i = *(d->s) & 0x1F; 
+-    d->s += 1;
+-    return PyLong_FromLong(i);
+-  }
+-  else if ( (*(d->s) & 0xE0) == 0x40 ) {  // List
+-    int l = *(d->s) & 0x1F; 
+-    d->s += 1;
+-    d->depth += 1;
+-    PyObject *ret = PyList_New(l);
+-    //printf("new list of len %d", l);
+-    for (Py_ssize_t i = 0; i < l; i++) {
+-      if (Py_EnterRecursiveCall(" while unpacking list object")) return 0;
+-      PyList_SetItem( ret, i, decode( d ) );
+-      //PyObject_Print( ret, stdout, 0 );
+-      Py_LeaveRecursiveCall();
+-    }
+-    d->depth -= 1;
+-    return ret;
+-  }
+-  else if ( (*(d->s) & 0xE0) == 0x20 ) {  // dict
+-    int l = *(d->s) & 0x1F; 
+-    d->s += 1;
+-    d->depth += 1;
+-    PyObject *ret = PyDict_New();
+-    for (Py_ssize_t i = 0; i < l; i++) {
+-      PyObject* k = decode(d);
+-      PyObject* v = decode(d);
+-      PyDict_SetItem( ret, k, v );
+-    }
+-    d->depth -= 1;
+-    return ret;
+-  }
+-  else {
+-    PyErr_Format(PyExc_ValueError, "Parser error");
+-    return NULL;
+-  }
+-}
+-
+-
+-PyObject* unpackc( unsigned char *p, int len ) {
+-  Decoder d = { p,p+len,p,0 };
+-  PyObject *ret = decode( &d );
+-  return ret;
+-}
+-void initmrpacker(void) {
+-  if ( sbuf == NULL ) {
+-    sbuf_len = 256;
+-    sbuf = (char*)malloc(sbuf_len);
+-  }
+-}
+-
+-PyObject* unpack(PyObject* self, PyObject *args, PyObject *kwargs)
+-{
+-  static char *kwlist[] = {"obj", NULL};
+-  PyObject *arg;
+-
+-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &arg)) return NULL;
+-
+-  if (! PyBytes_Check(arg))
+-  {
+-    PyErr_Format(PyExc_TypeError, "Expected bytes");
+-    return NULL;
+-  }
+-
+-  //sbuf_len = 256;
+-  //sbuf = (char*)malloc(sbuf_len);
+-
+-  unsigned char* p;
+-  Py_ssize_t l;
+-
+-  if(PyBytes_AsStringAndSize(arg, &p, &l) == -1) {
+-    PyErr_Format(PyExc_TypeError, "Failed to convert byte object to c string. Out of memory?");
+-    return NULL;
+-  }
+-
+-  //print_buffer( p, l );
+-
+-  Decoder d = { p,p+l,p,0 };
+-
+-  return decode( &d );
+-
+-/*
+-  char *endptr;
+-  //ret = jsonParse(PyString_AS_STRING(sarg), &endptr, PyString_GET_SIZE(sarg));
+-
+-  if (sarg != arg)
+-  {
+-    Py_DECREF(sarg);
+-  }
+-
+-  return ret;
+-*/
+-}
+-
+diff --git a/src/mrhttp/utils/bkup/unpack.h b/src/mrhttp/utils/bkup/unpack.h
+deleted file mode 100644
+index ccbd67f..0000000
+--- a/src/mrhttp/utils/bkup/unpack.h
++++ /dev/null
+@@ -1,10 +0,0 @@
+-#pragma once
+-
+-#include <stdint.h>
+-#include <stddef.h>
+-#include <assert.h>
+-#include "Python.h"
+-
+-PyObject* unpackc( unsigned char *p, int len );
+-void initmrpacker(void);
+-
+diff --git a/src/mrhttp/utils/py_defines.h b/src/mrhttp/utils/py_defines.h
+deleted file mode 100644
+index 2b38b41..0000000
+--- a/src/mrhttp/utils/py_defines.h
++++ /dev/null
+@@ -1,53 +0,0 @@
+-/*
+-Developed by ESN, an Electronic Arts Inc. studio. 
+-Copyright (c) 2014, Electronic Arts Inc.
+-All rights reserved.
+-
+-Redistribution and use in source and binary forms, with or without
+-modification, are permitted provided that the following conditions are met:
+-* Redistributions of source code must retain the above copyright
+-notice, this list of conditions and the following disclaimer.
+-* Redistributions in binary form must reproduce the above copyright
+-notice, this list of conditions and the following disclaimer in the
+-documentation and/or other materials provided with the distribution.
+-* Neither the name of ESN, Electronic Arts Inc. nor the
+-names of its contributors may be used to endorse or promote products
+-derived from this software without specific prior written permission.
+-
+-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+-DISCLAIMED. IN NO EVENT SHALL ELECTRONIC ARTS INC. BE LIABLE 
+-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-
+-
+-Portions of code from MODP_ASCII - Ascii transformations (upper/lower, etc)
+-http://code.google.com/p/stringencoders/
+-Copyright (c) 2007  Nick Galbreath -- nickg [at] modp [dot] com. All rights reserved.
+-
+-Numeric decoder derived from from TCL library
+-http://www.opensource.apple.com/source/tcl/tcl-14/tcl/license.terms
+- * Copyright (c) 1988-1993 The Regents of the University of California.
+- * Copyright (c) 1994 Sun Microsystems, Inc.
+-*/
+-
+-#include <Python.h>
+-
+-#if PY_MAJOR_VERSION >= 3
+-
+-#define PyInt_Check             PyLong_Check
+-#define PyInt_AS_LONG           PyLong_AsLong
+-#define PyInt_FromLong          PyLong_FromLong
+-
+-#define PyString_Check          PyBytes_Check
+-#define PyString_GET_SIZE       PyBytes_GET_SIZE
+-#define PyString_AS_STRING      PyBytes_AS_STRING
+-
+-#define PyString_FromString     PyUnicode_FromString
+-
+-#endif
+diff --git a/src/mrhttp/utils/unpack.c b/src/mrhttp/utils/unpack.c
+deleted file mode 100644
+index a48ed8a..0000000
+--- a/src/mrhttp/utils/unpack.c
++++ /dev/null
+@@ -1,266 +0,0 @@
+-
+-
+-#include "unpack.h"
+-#include "py_defines.h"
+-#include <time.h>
+-#include <stdlib.h>
+-#include <stdio.h>
+-
+-#define DBG if(0) 
+-
+-#define MAX_DEPTH 64
+-
+-static char errmsg[256];
+-static PyObject* SetErrorInt(const char *message, int pos)
+-{
+-  char pstr[32];
+-  sprintf( pstr, "%d", pos );
+-  strcpy( errmsg, message );
+-  strcat( errmsg, pstr );
+-  PyErr_Format (PyExc_ValueError, "%s", errmsg);
+-  return NULL;
+-}
+-
+-
+-PyObject *decode( unsigned char *s, unsigned char *end) {
+-  PyObject *parents[MAX_DEPTH];
+-  PyObject *keys[MAX_DEPTH];
+-  int curlen[MAX_DEPTH];
+-  int maxlen[MAX_DEPTH];
+-  int types[MAX_DEPTH];
+-  
+-  int depth = -1;
+-  PyObject *o;
+-
+-
+-  while( s < end ) {
+-    DBG printf(" %02x \n", *s);
+-  if ( *s == 0x60 ) { s += 1; Py_INCREF(Py_None); o = Py_None; }
+-  else if ( (*(s) & 0xE0) == 0x80 ) {  // String
+-    int l = *(s) & 0x1F; 
+-    s += 1;
+-    // This is deprecated.  We can't do this trick unless we have separate code points
+-    //   for 1 / 2 / 4 byte unicode strings
+-    o = PyUnicode_FromStringAndSize( s, l );
+-    //o = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, s, l);
+-
+-    //memcpy( sbuf, s, l );
+-    s += l;
+-    //return o;
+-/*
+-    //memcpy( sbuf, s, l );
+-    //printf("l is %d\n",l);
+-    //PyObject *result = PyUnicode_FromUnicode(NULL, l);
+-    PyObject *result = PyUnicode_New(l,127);
+-    if (! result) { printf("!res\n"); return NULL; }
+-    //Py_UNICODE *r = PyUnicode_AS_UNICODE(result);
+-    char *r = PyUnicode_1BYTE_DATA(result);
+-    memcpy(r, s, l);
+-    s += l;
+-    return result;
+-    //return PyUnicode_FromStringAndSize( sbuf, l );
+-    //PyUnicode_READY(result);
+-    //printf("str: >%.*s<\n", l, s );
+-    //printf("str: >%.*s<\n", l, r );
+-    //PyObject_Print(result, stdout, 0); printf("\n");
+-*/
+-  }
+-  else if ( *(s) == 0x66 ) { 
+-    s++;
+-    uint32_t *p = (uint32_t*)s;
+-    uint32_t l = *p;
+-    s+=4;
+-    //o = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, s, l);
+-    o = PyUnicode_FromStringAndSize( s, l );
+-    s += l;
+-    //return o;
+-/*
+-    if ( l > sbuf_len ) { 
+-      while ( l > sbuf_len ) { sbuf_len <<= 1; } 
+-      sbuf = (char*)realloc(sbuf, sbuf_len);
+-    }
+-    memcpy( sbuf, s, l );
+-    s += l;
+-    return PyUnicode_FromStringAndSize( sbuf, l );
+-    PyObject *result = PyUnicode_New(l,127);
+-    if (! result) { printf("!res\n"); return NULL; }
+-    char *r = PyUnicode_1BYTE_DATA(result);
+-    memcpy(r, s, l);
+-    s += l;
+-    return result;
+-*/
+-  }
+-  else if ( *(s) == 0x61 ) { s += 1; Py_INCREF(Py_True);  o = Py_True; }
+-  else if ( *(s) == 0x62 ) { s += 1; Py_INCREF(Py_False); o = Py_False; }
+-  else if ( *(s) == 0x63 ) { 
+-    s++;
+-    union { double d; uint64_t i; } mem;
+-    uint64_t *p = (uint64_t*)s;
+-    mem.i = *p;
+-    s += 8;
+-    o = PyFloat_FromDouble(mem.d);
+-  }
+-  else if ( *(s) == 0x64 ) { 
+-    s++;
+-    long long *p = (long long*)s;
+-    s += 8;
+-    o = PyLong_FromLong(*p);
+-  }
+-  else if ( *(s) == 0x65 ) { 
+-    s++;
+-    uint64_t *p = (uint64_t*)s;
+-    s += 8;
+-    o = PyLong_FromUnsignedLong(*p);
+-  }
+-  else if ( *(s) == 0x68 ) { 
+-    s++;
+-    uint32_t *p = (uint32_t*)s;
+-    s += 4;
+-    o = PyLong_FromUnsignedLong(*p);
+-  }
+-  else if ( *(s) == 0x67 ) { 
+-    s++;
+-    int32_t *p = (int32_t*)s;
+-    s += 4;
+-    o = PyLong_FromLong(*p);
+-  }
+-  else if ( (*(s) & 0xE0) == 0xC0 ) {  // tiny int
+-    int i = *(s) & 0x1F; 
+-    s += 1;
+-    o = PyLong_FromLong(i);
+-  }
+-  else if ( (*(s) & 0xE0) == 0x40 ) {  // List
+-    int l = *(s) & 0x1F; 
+-    s += 1;
+-    if ( l == 0 ) o = PyList_New(0);
+-    else {
+-      depth += 1;
+-      if (depth == MAX_DEPTH) return SetErrorInt("Too many nested objects, the max depth is ", MAX_DEPTH);
+-      DBG printf("depth %d is list\n",depth);
+-      parents[depth] = PyList_New(l);
+-      curlen[depth] = 0;
+-      maxlen[depth] = l;
+-      types[depth] = 1;
+-      continue;
+-    }
+-  }
+-  else if ( *(s) == 0x6A ) {  // List
+-    s++;
+-    uint32_t *p = (uint32_t*)s;
+-    uint32_t l = *p;
+-    s+=4;
+-    depth += 1;
+-    if (depth == MAX_DEPTH) return SetErrorInt("Too many nested objects, the max depth is ", MAX_DEPTH);
+-    DBG printf("depth %d is list\n",depth);
+-    parents[depth] = PyList_New(l);
+-    curlen[depth] = 0;
+-    maxlen[depth] = l;
+-    types[depth] = 1;
+-    continue;
+-  }
+-  else if ( (*(s) & 0xE0) == 0x20 ) {  // dict
+-    int l = *(s) & 0x1F; 
+-    s += 1;
+-    if ( l > 0 ) {
+-      depth += 1;
+-      if (depth == MAX_DEPTH) return SetErrorInt("Too many nested objects, the max depth is ", MAX_DEPTH);
+-      DBG printf("depth %d is dict\n",depth);
+-      parents[depth] = PyDict_New();
+-      curlen[depth] = 0;
+-      maxlen[depth] = l;
+-      types[depth] = 2;
+-      keys[depth] = NULL;
+-      continue;
+-    } else {
+-      o = PyDict_New();
+-    }
+-  }
+-  else if ( *(s) == 0x69 ) {  // Dict
+-    s++;
+-    uint32_t *p = (uint32_t*)s;
+-    uint32_t l = *p;
+-    s+=4;
+-    if ( l > 0 ) {
+-      depth += 1;
+-      if (depth == MAX_DEPTH) return SetErrorInt("Too many nested objects, the max depth is ", MAX_DEPTH);
+-      DBG printf("depth %d is dict\n",depth);
+-      parents[depth] = PyDict_New();
+-      curlen[depth] = 0;
+-      maxlen[depth] = l;
+-      types[depth] = 2;
+-      keys[depth] = NULL;
+-      continue;
+-    } else {
+-      o = PyDict_New();
+-    }
+-  } else {
+-    PyErr_Format(PyExc_ValueError, "Parser error");
+-    return NULL;
+-  }
+-  //PyObject_Print(o, stdout, 0); printf("\n");
+-
+-end:
+-  if ( depth == -1 ) return o;
+-  if ( types[depth] == 1 ) {
+-    PyList_SetItem( parents[depth],curlen[depth],o );
+-    //Py_DECREF(o);
+-    curlen[depth] += 1;
+-    if ( curlen[depth] == maxlen[depth] ) {
+-      o = parents[depth];
+-      depth -= 1;
+-      goto end;
+-    }
+-  } else {
+-    if ( keys[depth] == NULL ) {
+-      keys[depth] = o;
+-    } else {
+-      //printf("depth %d\n",depth);
+-      //printf("Key: "); PyObject_Print( keys[depth], stdout, 0 ); printf("\n");
+-      //printf("Obj: "); PyObject_Print( o, stdout, 0 ); printf("\n");
+-      PyDict_SetItem( parents[depth], keys[depth], o );
+-      Py_DECREF(keys[depth]); Py_DECREF(o);
+-      keys[depth] = NULL;
+-      curlen[depth] += 1;
+-      if ( curlen[depth] == maxlen[depth] ) {
+-        o = parents[depth];
+-        depth -= 1;
+-        goto end;
+-      }
+-    }
+-  } 
+-  } 
+-  return NULL;
+-}
+-
+-PyObject* unpackc( unsigned char *p, int len ) {
+-  return decode( p, p+len );
+-}
+-void initmrpacker(void) {
+-}
+-
+-
+-PyObject* unpack(PyObject* self, PyObject *args, PyObject *kwargs)
+-{
+-  static char *kwlist[] = {"obj", NULL};
+-  PyObject *arg;
+-
+-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &arg)) return NULL;
+-
+-  if (! PyBytes_Check(arg))
+-  {
+-    PyErr_Format(PyExc_TypeError, "Expected bytes");
+-    return NULL;
+-  }
+-
+-  unsigned char* p;
+-  Py_ssize_t l;
+-
+-  if(PyBytes_AsStringAndSize(arg, &p, &l) == -1) {
+-    PyErr_Format(PyExc_TypeError, "Failed to convert byte object to c string. Out of memory?");
+-    return NULL;
+-  }
+-
+-  return decode( p, p+l );
+-
+-}
+-
+diff --git a/src/mrhttp/utils/unpack.c.old b/src/mrhttp/utils/unpack.c.old
+deleted file mode 100644
+index be9ab9a..0000000
+--- a/src/mrhttp/utils/unpack.c.old
++++ /dev/null
+@@ -1,199 +0,0 @@
+-#include "unpack.h"
+-#include "py_defines.h"
+-#include <time.h>
+-#include <stdlib.h>
+-#include <stdio.h>
+-
+-typedef struct _decoder
+-{
+-  unsigned char *start, *end, *s;
+-  int depth;
+-} Decoder;
+-
+-
+-static char    *sbuf;
+-static uint32_t sbuf_len;
+-
+-//static void print_buffer( unsigned char* b, int len ) {
+-  //for ( int z = 0; z < len; z++ ) {
+-    //printf( "%02x ",(int)b[z]);
+-  //}
+-  //printf("\n");
+-//}
+-
+-
+-PyObject *decode( Decoder *d ) { //unsigned char *s, unsigned char *end) {
+-  //printf( "fb: %lx\n", (int)*(d->s));
+-  if ( *(d->s) == 0x60 ) { d->s += 1; Py_INCREF(Py_None); return Py_None; }
+-  else if ( (*(d->s) & 0xE0) == 0x80 ) {  // String
+-    int l = *(d->s) & 0x1F;
+-    d->s += 1;
+-    PyObject *ret = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, d->s, l);
+-    //memcpy( sbuf, s, l );
+-    d->s += l;
+-    return ret;
+-/*
+-    int l = *(d->s) & 0x1F; 
+-    d->s += 1;
+-    memcpy( sbuf, d->s, l );
+-    d->s += l;
+-    return PyUnicode_FromStringAndSize( sbuf, l );
+-*/
+-  }
+-  else if ( *(d->s) == 0x66 ) { 
+-    d->s++;
+-    uint32_t *p = (uint32_t*)d->s;
+-    uint32_t l = *p;
+-    d->s+=4;
+-    if ( l > sbuf_len ) { 
+-      while ( l > sbuf_len ) { sbuf_len <<= 1; } 
+-      sbuf = (char*)realloc(sbuf, sbuf_len);
+-    }
+-    memcpy( sbuf, d->s, l );
+-    d->s += l;
+-    return PyUnicode_FromStringAndSize( sbuf, l );
+-  }
+-  else if ( *(d->s) == 0x61 ) { d->s += 1; Py_INCREF(Py_True); return Py_True; }
+-  else if ( *(d->s) == 0x62 ) { d->s += 1; Py_INCREF(Py_False); return Py_False; }
+-  else if ( *(d->s) == 0x63 ) { 
+-    d->s++;
+-    union { double d; uint64_t i; } mem;
+-    uint64_t *p = (uint64_t*)d->s;
+-    mem.i = *p;
+-    d->s += 8;
+-    return PyFloat_FromDouble(mem.d);
+-  }
+-  else if ( *(d->s) == 0x64 ) { 
+-    d->s++;
+-    long long *p = (long long*)d->s;
+-    d->s += 8;
+-    return PyLong_FromLong(*p);
+-  }
+-  else if ( *(d->s) == 0x65 ) { 
+-    d->s++;
+-    uint64_t *p = (uint64_t*)d->s;
+-    d->s += 8;
+-    return PyLong_FromUnsignedLong(*p);
+-  }
+-  else if ( *(d->s) == 0x68 ) { 
+-    d->s++;
+-    uint32_t *p = (uint32_t*)d->s;
+-    d->s += 4;
+-    return PyLong_FromUnsignedLong(*p);
+-  }
+-  else if ( *(d->s) == 0x67 ) { 
+-    d->s++;
+-    int32_t *p = (int32_t*)d->s;
+-    d->s += 4;
+-    return PyLong_FromLong(*p);
+-  }
+-  else if ( (*(d->s) & 0xE0) == 0xC0 ) {  // tiny int
+-    int i = *(d->s) & 0x1F; 
+-    d->s += 1;
+-    return PyLong_FromLong(i);
+-  }
+-  else if ( (*(d->s) & 0xE0) == 0x40 ) {  // List
+-    int l = *(d->s) & 0x1F; 
+-    d->s += 1;
+-    d->depth += 1;
+-    PyObject *ret = PyList_New(l);
+-    //printf("new list of len %d", l);
+-    for (Py_ssize_t i = 0; i < l; i++) {
+-      if (Py_EnterRecursiveCall(" while unpacking list object")) return 0;
+-      PyList_SetItem( ret, i, decode( d ) );
+-      Py_LeaveRecursiveCall();
+-    }
+-    d->depth -= 1;
+-    return ret;
+-  }
+-  else if ( *(d->s) == 0x6A ) {  // List
+-    d->s++;
+-    uint32_t *p = (uint32_t*)d->s;
+-    uint32_t l = *p;
+-    d->s+=4;
+-    d->depth += 1;
+-    PyObject *ret = PyList_New(l);
+-    for (Py_ssize_t i = 0; i < l; i++) {
+-      if (Py_EnterRecursiveCall(" while unpacking list object")) return 0;
+-      PyList_SetItem( ret, i, decode( d ) );
+-      Py_LeaveRecursiveCall();
+-    }
+-    d->depth -= 1;
+-    return ret;
+-  }
+-  else if ( (*(d->s) & 0xE0) == 0x20 ) {  // dict
+-    int l = *(d->s) & 0x1F; 
+-    d->s += 1;
+-    d->depth += 1;
+-    PyObject *ret = PyDict_New();
+-    for (Py_ssize_t i = 0; i < l; i++) {
+-      PyObject* k = decode(d);
+-      PyObject* v = decode(d);
+-      PyDict_SetItem( ret, k, v );
+-    }
+-    d->depth -= 1;
+-    return ret;
+-  }
+-  else if ( *(d->s) == 0x69 ) {  // Dict
+-    d->s++;
+-    uint32_t *p = (uint32_t*)d->s;
+-    uint32_t l = *p;
+-    d->s+=4;
+-    d->depth += 1;
+-    PyObject *ret = PyDict_New();
+-    for (Py_ssize_t i = 0; i < l; i++) {
+-      PyObject* k = decode(d);
+-      PyObject* v = decode(d);
+-      PyDict_SetItem( ret, k, v );
+-    }
+-    d->depth -= 1;
+-    return ret;
+-  } else {
+-    PyErr_Format(PyExc_ValueError, "Parser error");
+-    return NULL;
+-  }
+-}
+-
+-PyObject* unpack(PyObject* self, PyObject *args, PyObject *kwargs)
+-{
+-  static char *kwlist[] = {"obj", NULL};
+-  PyObject *arg;
+-
+-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &arg)) return NULL;
+-
+-  if (! PyBytes_Check(arg))
+-  {
+-    PyErr_Format(PyExc_TypeError, "Expected bytes");
+-    return NULL;
+-  }
+-
+-  sbuf_len = 256;
+-  sbuf = (char*)malloc(sbuf_len);
+-
+-  unsigned char* p;
+-  Py_ssize_t l;
+-
+-  if(PyBytes_AsStringAndSize(arg, &p, &l) == -1) {
+-    PyErr_Format(PyExc_TypeError, "Failed to convert byte object to c string. Out of memory?");
+-    return NULL;
+-  }
+-
+-  //print_buffer( p, l );
+-
+-  Decoder d = { p,p+l,p,0 };
+-
+-  return decode( &d );
+-
+-/*
+-  char *endptr;
+-  //ret = jsonParse(PyString_AS_STRING(sarg), &endptr, PyString_GET_SIZE(sarg));
+-
+-  if (sarg != arg)
+-  {
+-    Py_DECREF(sarg);
+-  }
+-
+-  return ret;
+-*/
+-}
+-
+diff --git a/src/mrhttp/utils/unpack.h b/src/mrhttp/utils/unpack.h
+deleted file mode 100644
+index 664bc36..0000000
+--- a/src/mrhttp/utils/unpack.h
++++ /dev/null
+@@ -1,11 +0,0 @@
+-#pragma once
+-
+-#include <stdint.h>
+-#include <stddef.h>
+-#include <assert.h>
+-
+-#include "Python.h"
+-
+-PyObject* unpackc( unsigned char *p, int len );
+-void initmrpacker(void);
+-
+diff --git a/src/mrhttp/utils/z b/src/mrhttp/utils/z
+deleted file mode 100644
+index 6611d46..0000000
+--- a/src/mrhttp/utils/z
++++ /dev/null
+@@ -1,33 +0,0 @@
+-12a13,20
+-> static __inline__ unsigned long long rdtsc(void)
+-> { 
+->   unsigned long lo, hi;
+->   __asm__ volatile( "rdtsc" : "=a" (lo), "=d" (hi) );
+->   return( lo | ( hi << 32 ) );
+-> }
+-> 
+-> 
+-37d44
+-<     DBG printf(" %02x \n", *s);
+-162a170
+->     //printf("new dict of len %d\n", l);
+-182a191
+->     //printf("new dict of len %d\n", l);
+-205a215,216
+->     //PyList_Append( parents[depth],o );
+->     Py_DECREF(o);
+-219a231
+->       Py_DECREF(keys[depth]); Py_DECREF(o);
+-233,239d244
+-< PyObject* unpackc( unsigned char *p, int len ) {
+-<   return decode( p, p+len );
+-< }
+-< void initmrpacker(void) {
+-< }
+-< 
+-< 
+-260a266,269
+->   //unsigned long long cycles = rdtsc();
+->   //PyObject *ret = decode( p, p+l );
+->   //printf(" took %lld\n", rdtsc() - cycles);
+->   //return ret;
+diff --git a/tests/.pipeline.lua.swp b/tests/.pipeline.lua.swp
+deleted file mode 100644
+index 0668516..0000000
+Binary files a/tests/.pipeline.lua.swp and /dev/null differ
+diff --git a/tests/s1.py b/tests/s1.py
+index d379542..8ed2bae 100644
+--- a/tests/s1.py
++++ b/tests/s1.py
+@@ -13,6 +13,13 @@ def index(r):
+ @app.route('/print/{}')
+ def pr(r,foo):
+   return foo
++@app.route('/args/{}/{}/{}/{}/{}/{}/')
++def multipleargs(r,a,b,c,d,e,f):
++  return a+b+c+d+e+f
++@app.route('/args/{num}/')
++def numarg(r,n):
++  return str(n)
++
+ 
+ @app.route('/printPostBody')
+ def printPostBody(r):
+diff --git a/tests/s_resp.py b/tests/s_resp.py
+index def37a4..5fe7a49 100644
+--- a/tests/s_resp.py
++++ b/tests/s_resp.py
+@@ -40,9 +40,10 @@ def cook2(r):
+ 
+   return 'cookie'
+ 
+-@app.route('/long',type='text')
+-def longresp(r):
+-  return "fart"*128*1000
++# python requests can't handle this?? Hangs waiting for response curl is fine
++#@app.route('/long',type='text')
++#def longresp(r):
++  #return "fart"*128*1000
+ 
+ app.run(cores=1)
+ 
+diff --git a/tests/test_requests.py b/tests/test_requests.py
+index a5669ab..440ecd5 100644
+--- a/tests/test_requests.py
++++ b/tests/test_requests.py
+@@ -37,6 +37,14 @@ def test_one():
+   r = requests.get('http://localhost:8080/print/%E4%B8%8D%E5%8F%AF%E5%86%8D%E7%94%9F%E8%B5%84%E6%BA%90/?test')
+   eq(r.text, "不可再生资源")
+ 
++  # Multiple args
++  r = requests.get('http://localhost:8080/args/a/b/c/d/e/f/')
++  eq(r.text, "abcdef")
++  r = requests.get('http://localhost:8080/args/5/')
++  eq(r.text, "5")
++  r = requests.get('http://localhost:8080/args/9999999999/')
++  eq(r.text, "9999999999")
++
+   # Query string ?foo=bar
+   r = requests.get('http://localhost:8080/query_string')
+   eq(r.text, "{}")
+diff --git a/tests/test_response.py b/tests/test_response.py
+index 016840e..673e54e 100644
+--- a/tests/test_response.py
++++ b/tests/test_response.py
+@@ -20,9 +20,9 @@ def test_one():
+   eq(r.status_code, 200)
+   eq(r.headers["Content-Type"],"text/plain")
+ 
+-  r = requests.get('http://localhost:8080/long')
+-  eq(r.status_code, 200)
+-  eq(r.headers["Content-Type"],"text/plain")
++  #r = requests.get('http://localhost:8080/long')
++  #eq(r.status_code, 200)
++  #eq(r.headers["Content-Type"],"text/plain")
+ 
+   r = requests.get('http://localhost:8080/')
+   eq(r.status_code, 200)
+@@ -43,6 +43,7 @@ def test_one():
+ 
+ 
+ def teardown():
++  print("teardown")
+   global server
+   stop_server(server)
+   #server.terminate()
+diff --git a/todo b/todo
+index 0a39c50..2658aab 100644
+--- a/todo
++++ b/todo
+@@ -1,96 +1,27 @@
+ 
++Add an r.json test
+ 
+-memcached = clean it up
++cleanup mrq and memcac pro/client
+ If MemcachedClient_set servers are down we return NULL and don't setup an exception
++Add tests for memc and mrq failover. 
++If we don't post JSON this breaks.  Check for empty body.  Maybe check JSON or endpoint checks and drops?
++  curl -i --raw http://localhost:8080/q/0/0/ -H "Cookie: mrsession=43709dd361cc443e976b057145832e6e;" 
+ 
+-dotests disconnect 
+-Request_reset - we doing in all necessary places
+-
+-Make conn/req timeouts as arguments  (20 / 5 right now)
+-
+-Try mrpacker again - make sure we have the code up to date
+-  Back out the parser changes? 
+-  Why is mrunpacking directly in C slower?
+-  
+-Add tests for memc and mrq failover. ?
+-
+-async start so can embed
+-
+-
+-
+-
+-
+-
+-test for setUserSession with added cookies
+-/r/python - Why would you write your web server in anything but python
+-
+-If we lose the mrq servers we have to tell client 
+-
+-
+-!!
+- File "uvloop/handles/basetransport.pyx", line 92, in uvloop.loop.UVBaseTransport._maybe_pause_protocol
+-AttributeError: 'internals.MrqProtocol' object has no attribute 'pause_writing'
+-protocol.resume_writing() failed
+-protocol: <internals.MrqProtocol object at 0x7f1530f86cf0>
+-transport: <TCPTransport closed=False reading=True 0x2b62fc8>
+-Traceback (most recent call last):
+-  File "uvloop/handles/basetransport.pyx", line 108, in uvloop.loop.UVBaseTransport._maybe_resume_protocol
+-AttributeError: 'internals.MrqProtocol' object has no attribute 'resume_writing'
+-Explained?
+-For the asyncio streams-based implementation, StreamReader automatically uses the {pause,resume}_reading methods to transmit backpressure upstream, and StreamWriter provides a friendly wrapper around {pause,resume}_writing to help us accept backpressure from downstream: the drain method – we just have to remember to use it. So in order to fix our proxy to transmit backpressure, all we need to do is to add one line of code to copy_all. Specifically, this line:
+-  await drain()
+-await dest_writer.drain()
+-
+-Flow Control
+-In the initial echo server example we had await writer.drain() as this paused the coroutine from writing more data to the socket till the client had caught up, it drained the socket. This is useful as until the client catches up the data will be stored in memory, hence a malicious client can make many requests for a lot of data, refuse to receive the data, and allow the server to exhaust its memory.
+-
+-To combat this the coroutine sending data should await a drain function, that can be added to the protocol,
+-
+-import asyncio
+-class FlowControlServer(asyncio.Protocol):
+-    def __init__(self):
+-        self._can_write = asyncio.Event()
+-        self._can_write.set()
+-    def pause_writing(self) -> None:
+-        # Will be called whenever the transport crosses the 
+-        # high-water mark.
+-        self._can_write.clear()
+-    def resume_writing(self) -> None:
+-        # Will be called whenever the transport drops back below the
+-        # low-water mark.
+-        self._can_write.set()
+-    async def drain(self) -> None:
+-        await self._can_write.wait()
+-
+-WriteTransport.set_write_buffer_limits(high=None, low=None)
+-Set the high and low watermarks for write flow control.
+-
+-These two values (measured in number of bytes) control when the protocol’s protocol.pause_writing() and protocol.resume_writing() methods are called. If specified, the low watermark must be less than or equal to the high watermark. Neither high nor low can be negative.
+-
+-pause_writing() is called when the buffer size becomes greater than or equal to the high value. If writing has been paused, resume_writing() is called when the buffer size becomes less than or equal to the low value.
+-
+-The defaults are implementation-specific. If only the high watermark is given, the low watermark defaults to an implementation-specific value less than or equal to the high watermark. Setting high to zero forces low to zero as well, and causes pause_writing() to be called whenever the buffer becomes non-empty. Setting low to zero causes resume_writing() to be called only once the buffer is empty. Use of zero for either limit is generally sub-optimal as it reduces opportunities for doing I/O and computation concurrently.
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
++test for replace header with r.headers and check 4_reponse.py works
++  setContentType or catch it return -1 and rerun add_headers
+ 
+ python dotests.py then ctrl-c during benchmark "RuntimeError: Event loop stopped before Future completed."
+ 
+ 
+ 
+ 
+-Wiki doc?
++Wiki doc:
+ http://www.django-rest-framework.org/api-guide/requests/
+ 
+ 
+ 
++upload a file
++  https://stackoverflow.com/questions/12667797/using-curl-to-upload-post-data-with-files
+ 
+ vhosts -- how to do this? I don't like sanic's, maybe do cherrypy's redir
+   sanic:
+@@ -106,13 +37,18 @@ vhosts -- how to do this? I don't like sanic's, maybe do cherrypy's redir
+ 
+ 
+ 
+-rate limit in C? Nginx and our cdn can do this for us?
+-
++rate limit in C
++Make conn/req timeouts as arguments  (20 / 5 right now)
+ 
++todo add test >128k byte response body to test realloc of response buffer
+ 
++?? ip = cherrypy.request.remote.ip
++Allow setting custom error pages 
+ 
+ 
+ 
++Why is 404 so slow?
++  raised. We could try to cache it. Create a bytes obj and test just writing that. Or not use the raise method app.404 or something
+ 
+ This is slow so do it in C to speed up forms
+   urllib.parse.parse_qsl('foo=bar&baz=foor&dogsdont=likecats')
+@@ -120,9 +56,7 @@ This is slow so do it in C to speed up forms
+    curl -d "param1=value1&param2=value2" -X POST http://localhost:8080/form --verbose -H "Content-Type: application/x-www-form-urlencoded; charset=UTF-8"
+ 
+ 
+-
+-
+-
++examples/5_router.py -- methods?
+ 
+ logging 
+ 
+@@ -138,7 +72,8 @@ Flask:
+ https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world
+ 
+ 
+-
++Create an async memcached client - needed for clustering
++  embed it in app
+ 
+ 
+ Look at a mysql C client?  We can do better than aiomysql.  Either libmysqlclient or our own

@@ -72,6 +72,7 @@ def run_wrk(loop, endpoint=None, lua=None, options=None):
   if retcode != 0:
     print('\r\n'.join(lines))
 
+
   return rps
 
 
@@ -104,29 +105,50 @@ try:
   opts = ('-H','Cookie: mrsession=43709dd361cc443e976b05714581a7fb; foo=fdsfdasdfasdfdsfasdfsdfsdfasdfas; short=fazc;')
   #print ("Hello pipelined", run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
   print ("Hello          ", run_wrk(loop, 'http://localhost:8080/'),             "Requests/second" )
-  print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies', options=opts), "Requests/second" )
-  print ("many args      ", run_wrk(loop, 'http://localhost:8080/sixargs/one/two/three/four/five/six'), "Requests/second" )
-  print ("404 natural    ", run_wrk(loop, 'http://localhost:8080/dfads404/'), "Requests/second" )
 
-  # TODO Look into speeding this up
-  print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
+  if 1:
+    #print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies', options=opts), "Requests/second" )
+    #print ("many args      ", run_wrk(loop, 'http://localhost:8080/sixargs/one/two/three/four/five/six'), "Requests/second" )
+    #print ("404 natural    ", run_wrk(loop, 'http://localhost:8080/dfads404/'), "Requests/second" )
+  
+    # TODO Look into speeding this up
+    #print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
+  
+    #print ("Templates      ", run_wrk(loop, 'http://localhost:8080/template'),            "Requests/second" )
+  
+    print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
+    print ("Sessions (py)  ", run_wrk(loop, 'http://localhost:8080/pys',   options=opts), "Requests/second" )
+    #print ("Session login  ", run_wrk(loop, 'http://localhost:8080/login'),               "Requests/second" )
+  
+    #print ("json post      ", run_wrk(loop,'http://localhost:8080/json',lua='tests/lua/json.lua'), "Requests/second" )
+    #print ("mrpacker       ", run_wrk(loop,'http://localhost:8080/mrpacker',lua='tests/lua/mrpacker.lua'), "Requests/second" )
+    #print ("mrpacker py    ", run_wrk(loop,'http://localhost:8080/mrpackerpy',lua='tests/lua/mrpacker.lua'), "Requests/second" )
+    #print ("msgpack py     ", run_wrk(loop,'http://localhost:8080/msgpack',lua='tests/lua/msgpack.lua'), "Requests/second" )
 
-  print ("Templates      ", run_wrk(loop, 'http://localhost:8080/template'),            "Requests/second" )
+  
+    #opts = ('-H','X-Real-IP: 1.2.3.4')
+    #print ("get ip         ", run_wrk(loop,'http://localhost:8080/getip',options=opts), "Requests/second" )
+    #print ("many num args  ", run_wrk(loop, 'http://localhost:8080/sixargs/155/2001/29999/25/29999543/93243242394'), "Requests/second" )
+    #print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
 
-  print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
-  print ("Sessions (py)  ", run_wrk(loop, 'http://localhost:8080/pys',   options=opts), "Requests/second" )
-  #print ("Session login  ", run_wrk(loop, 'http://localhost:8080/login'),               "Requests/second" )
-
-  print ("json post      ", run_wrk(loop,'http://localhost:8080/json',lua='tests/lua/json.lua'), "Requests/second" )
-  #print ("mrpacker       ", run_wrk(loop,'http://localhost:8080/mrpacker',lua='tests/lua/mrpacker.lua'), "Requests/second" )
-  #print ("mrpacker py    ", run_wrk(loop,'http://localhost:8080/mrpackerpy',lua='tests/lua/mrpacker.lua'), "Requests/second" )
-  #print ("msgpack py     ", run_wrk(loop,'http://localhost:8080/msgpack',lua='tests/lua/msgpack.lua'), "Requests/second" )
-
-
-  #opts = ('-H','X-Real-IP: 1.2.3.4')
-  #print ("get ip         ", run_wrk(loop,'http://localhost:8080/getip',options=opts), "Requests/second" )
-  #print ("many num args  ", run_wrk(loop, 'http://localhost:8080/sixargs/155/2001/29999/25/29999543/93243242394'), "Requests/second" )
-  #print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
+  if 0:
+    lines = []
+    x = 0
+    while 1:
+      x += 1
+      print(x)
+      #if x > 19842: break
+      if x > 21605: break
+      line = loop.run_until_complete(server.stdout.readline())
+      if line:
+        line = line.decode('utf-8')
+        lines.append(line)
+      else:
+        break
+    print ( len(lines) )
+    o = open( "wrkout", "wb" )
+    o.write( (''.join(lines)).encode("utf-8") )
+    o.close()
 
 except KeyboardInterrupt:
   pass

@@ -90,7 +90,7 @@ static PyGetSetDef Request_getset[] = {
   {"method", (getter)Request_get_method, NULL, "", NULL},
   {"transport", (getter)Request_get_transport, NULL, "", NULL},
   {"headers", (getter)Request_get_headers, NULL, "", NULL},
-  {"ip", (getter)Request_get_ip, NULL, "", NULL},
+  //MMM{"ip", (getter)Request_get_ip, NULL, "", NULL},
   {"cookies", (getter)Request_get_cookies, NULL, "", NULL},
   {"body", (getter)Request_get_body, NULL, "", NULL},
   {"query_string", (getter)Request_get_query_string, NULL, "", NULL},

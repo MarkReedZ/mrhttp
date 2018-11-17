@@ -50,7 +50,7 @@ int MrqProtocol_init(MrqProtocol* self, PyObject *args, PyObject *kw)
   Py_INCREF(self->client);
   Py_INCREF(self->q);
 
-  if(!(self->pfunc = PyObject_GetAttrString(self->q, "put_nowait"))) return NULL;
+  if(!(self->pfunc = PyObject_GetAttrString(self->q, "put_nowait"))) return -1;
 
   self->b = malloc(1024);
   self->bsz = 1024;
@@ -153,7 +153,7 @@ PyObject* MrqProtocol_data_received(MrqProtocol* self, PyObject* data)
     printf("WARNING py bytes as string failed\n");
     return NULL; //TODO set error
   }
-  DBG_MRQ printf(" psz %d\n",psz);
+  DBG_MRQ printf(" psz %ld\n",psz);
   int data_left = psz;
   if ( self->rbufp ) {
     DBG_MRQ printf(" rbufp! --------------------------------------------------------\n");

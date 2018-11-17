@@ -102,7 +102,7 @@ void Request_reset(Request *self) {
   Py_XDECREF(self->py_path); self->py_path = NULL;
   Py_XDECREF(self->py_method); self->py_method = NULL;
   Py_XDECREF(self->py_cookies); self->py_cookies = NULL; // TODO Benchmark just clearing it here, but need a flag to reload cookies each request
-  Py_XDECREF(self->hreq.ip); self->hreq.ip = NULL;
+  //Py_XDECREF(self->hreq.ip); self->hreq.ip = NULL;
   self->num_headers = 0;
   Response_reset(self->response);
 }
@@ -376,8 +376,14 @@ PyObject* Request_get_headers(Request* self, void* closure) {
   return self->py_headers;
 }
 PyObject* Request_get_ip(Request* self, void* closure) {
-  if(!self->py_ip) self->py_ip = PyUnicode_FromStringAndSize(self->hreq.ip, self->hreq.ip_len);
-  Py_XINCREF(self->py_ip);
+  if(!self->py_ip) {
+    //if ( self->hreq.ip_len ) {
+      //self->py_ip = PyUnicode_FromStringAndSize(self->hreq.ip, self->hreq.ip_len);
+    //} else {
+      self->py_ip = Py_None;
+    //}
+    Py_XINCREF(self->py_ip);
+  }
   return self->py_ip;
 }
 
@@ -385,10 +391,9 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
   char *end = buf + buflen;
   char *last = buf;
   PyObject* cookies = PyDict_New();
-  //return cookies;
   PyObject* key = NULL; PyObject* value = NULL;
 
-  printf("parse cookies: %.*s\n",buflen, buf);
+  DBG printf("parse cookies: %.*s\n",buflen, buf);
 
   static char ALIGNED(16) ranges1[] = "==" ";;";
   int found;
@@ -436,6 +441,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
     }
   } while( found );
 
+  // If the trailing ; is left off we need to finish up
   if (state) {
     if (grab_session) {
       grab_session = 0;
@@ -448,39 +454,6 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
     Py_XDECREF(value);
   }
 
-/*
-  // May have 15 extra bytes
-  for (;buf <= end;) {
-    
-    if ( buf == end || *buf == ';' ) {
-      if ( state == 0 ) key  = PyUnicode_FromString("");
-      if (grab_session) {
-        grab_session = 0;
-        r->session_id = last;
-        r->session_id_sz = buf-last;
-      }
-      value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
-      state = 0;
-      PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
-      Py_XDECREF(key);
-      Py_XDECREF(value);
-      buf+=1;
-      while ( *buf == 32 ) buf++;
-      last = buf;
-    }
-    else if ( *buf == '=' ) {
-      if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
-        DBG printf("Grab session\n");
-        grab_session = 1;
-      }
-      key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
-      if (!key) printf("!key\n");
-      state = 1;
-      last = buf+1;
-    }
-    buf++;
-  }
-*/
   return cookies;
 }
 
@@ -558,6 +531,8 @@ static inline PyObject* parse_query_args( char *buf, size_t buflen ) {
       //}
     }
   } while( found );
+
+  // TODO findchar was updated to handle < 16 bytes so remove
   // May have 15 extra bytes
   for (;buf <= end;) {
     
@@ -595,8 +570,8 @@ PyObject* Request_get_path(Request* self, void* closure)
   if(!self->py_path) {
     if ( self->path_len == 0 ) self->py_path = Py_None;
     else self->py_path = PyUnicode_FromStringAndSize(self->path, self->path_len);
+    Py_XINCREF(self->py_path);
   }
-  Py_XINCREF(self->py_path);
   return self->py_path;
 }
 PyObject* Request_get_method(Request* self, void* closure)
@@ -606,8 +581,8 @@ PyObject* Request_get_method(Request* self, void* closure)
     else self->py_method = PyUnicode_FromStringAndSize(self->method, self->method_len);
     //TODO Decode latin? self->py_method = PyUnicode_DecodeLatin1( REQUEST_METHOD(self), self->method_len, NULL);
 
+    Py_XINCREF(self->py_method);
   }
-  Py_XINCREF(self->py_method);
   return self->py_method;
 }
 PyObject* Request_get_query_string(Request* self, void* closure)
@@ -615,16 +590,21 @@ PyObject* Request_get_query_string(Request* self, void* closure)
   if(!self->py_query_string) {
     if ( self->qs_len == 0 ) self->py_query_string = Py_None;
     else self->py_query_string = PyUnicode_FromStringAndSize(self->path + self->path_len + 1, self->qs_len - 1);
+    Py_XINCREF(self->py_query_string);
   }
-  Py_XINCREF(self->py_query_string);
   return self->py_query_string;
 }
 
 PyObject* Request_get_query_args(Request* self, void* closure)
 {
   if(!self->py_args) {
-    self->py_args = parse_query_args(self->path + self->path_len + 1, self->qs_len - 1);
+    if ( self->qs_len ) {
+      self->py_args = parse_query_args(self->path + self->path_len + 1, self->qs_len - 1);
+      Py_XINCREF(self->py_args);
+    } else {
+      self->py_args = PyDict_New();
+      return self->py_args;
+    }
   }
-  Py_XINCREF(self->py_args);
   return self->py_args;
 }

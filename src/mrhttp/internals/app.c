@@ -1,5 +1,4 @@
 
-
 #include <Python.h>
 #include <stdbool.h>
 #include <math.h>
@@ -8,7 +7,6 @@
 #include "common.h"
 #include "module.h"
 #include "time.h"
-#include "unpack.h"
 
 PyObject *MrhttpApp_new(PyTypeObject* type, PyObject *args, PyObject *kwargs) {
   MrhttpApp* self = NULL;
@@ -28,7 +26,7 @@ int MrhttpApp_init(MrhttpApp* self, PyObject *args, PyObject *kwargs) {
 
 PyObject *MrhttpApp_cinit(MrhttpApp* self) {
   srand(time(0)); // TODO seed utils.randint
-  initmrpacker();
+  //initmrpacker();
   self->requests  = PyObject_GetAttrString((PyObject*)self, "requests");
   int l = PyList_Size(self->requests);
 

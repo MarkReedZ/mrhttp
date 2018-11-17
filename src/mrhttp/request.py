@@ -2,7 +2,7 @@ import urllib.parse
 import cgi
 import encodings.idna
 import collections
-import mrhttp, time
+import mrhttp
 try:
   import mrjson as json
 except:
@@ -20,11 +20,31 @@ class Request(mrhttp.CRequest):
   servers_down = False
   memo = {}
   _json = None
-  mrpack = None
   def __init__(self):
     super().__init__(self)
     pass
 
+  # decorator
+  def memoize(func):
+    def wrapper(self):
+      try:
+        return self.memo[func.__name__]
+      except KeyError:
+        pass
+      except Exception as e:
+        print("wrapper exception", e)
+
+      try:
+        result = func(self)
+        self.memo[func.__name__] = result
+      except Exception as e:
+        print("wrapfunc exception", e)
+
+
+      return result
+    return wrapper
+
+  #TODO we reuse requests so we need to clear memo to use it
   def parsed_content_type(self):
     content_type = self.headers.get('Content-Type')
     if not content_type: return None, {}
@@ -45,7 +65,7 @@ class Request(mrhttp.CRequest):
       return dict(urllib.parse.parse_qsl(self.body.decode("utf-8"))), None
 
     elif self.mime_type == 'multipart/form-data':
-      boundary = self.parsed_content_type()[1]['boundary'].encode('utf-8')
+      boundary = self.get_form()[1]['boundary'].encode('utf-8')
       return parse_multipart_form(self.body, boundary)
 
     return None, None
@@ -60,9 +80,8 @@ class Request(mrhttp.CRequest):
       try:
         if self.mime_type == "application/json":
           self._json = json.loads(self.body.decode("utf-8"))
-      except Exception as e:
+      except:
         pass
-        #print("Error parsing json", str(e))
     return self._json
 
   @property
@@ -81,7 +100,128 @@ class Request(mrhttp.CRequest):
       #return '<HttpRequest {0.method} {0.path} {0.version}, {1} headers>' \
           #.format(self, len(self.headers))
 
+z="""
+@memoize
+def text(request):
+    if request.body is None:
+        return None
+
+    return request.body.decode(request.encoding or 'utf-8')
+
+
+@memoize
+def json(request):
+    if request.body is None:
+        return None
+
+    return json_loads(request.text)
+
+
+@memoize
+def query(request):
+    qs = request.query_string
+    if not qs:
+        return {}
+    return dict(urllib.parse.parse_qsl(qs))
+
+
+def remote_addr(request):
+    return request.transport.get_extra_info('peername')[0]
+
+
+@memoize
+def parsed_content_type(request):
+    content_type = request.headers.get('Content-Type')
+    if not content_type:
+        return None, {}
+
+    return cgi.parse_header(content_type)
+
+
+def mime_type(request):
+    return parsed_content_type(request)[0]
+
+
+def encoding(request):
+    return parsed_content_type(request)[1].get('charset')
+
+
+@memoize
+def parsed_form_and_files(request):
+    if request.mime_type == 'application/x-www-form-urlencoded':
+        return dict(urllib.parse.parse_qsl(request.text.decode("utf-8"))), None
+    elif request.mime_type == 'multipart/form-data':
+        boundary = parsed_content_type(request)[1]['boundary'].encode('utf-8')
+        return parse_multipart_form(request.body, boundary)
+
+    return None, None
+
+
+def form(request):
+    return parsed_form_and_files(request)[0]
+
+
+def files(request):
+    return parsed_form_and_files(request)[1]
+
+
+@memoize
+def hostname_and_port(request):
+    host = request.headers.get('Host')
+    if not host:
+        return None, None
+
+    hostname, *rest = host.split(':', 1)
+    port = rest[0] if rest else None
+
+    return encodings.idna.ToUnicode(hostname), int(port)
+
+
+def port(request):
+    return hostname_and_port(request)[1]
+
+
+def hostname(request):
+    return hostname_and_port(request)[0]
+
+
+def parse_cookie(cookie):
+    ""Parse a ``Cookie`` HTTP header into a dict of name/value pairs.
+    This function attempts to mimic browser cookie parsing behavior;
+    it specifically does not follow any of the cookie-related RFCs
+    (because browsers don't either).
+    The algorithm used is identical to that used by Django version 1.9.10.
+    ""
+    cookiedict = {}
+    for chunk in cookie.split(str(';')):
+        if str('=') in chunk:
+            key, val = chunk.split(str('='), 1)
+        else:
+            # Assume an empty name per
+            # https://bugzilla.mozilla.org/show_bug.cgi?id=169091
+            key, val = str(''), chunk
+        key, val = key.strip(), val.strip()
+        if key or val:
+            # unquote using Python's algorithm.
+            cookiedict[key] = unquote_cookie(val)
+    return cookiedict
+
+
+@memoize
+def cookies(request):
+    if 'Cookie' not in request.headers:
+        return {}
+
+    try:
+        cookies = parse_cookie(request.headers['Cookie'])
+    except Exception:
+        return {}
+
+    return {k: urllib.parse.unquote(v) for k, v in cookies.items()}
+
+
 File = collections.namedtuple('File', ['type', 'body', 'name'])
+
 
 def parse_multipart_form(body, boundary):
     files = {}
@@ -123,4 +263,4 @@ def parse_multipart_form(body, boundary):
             fields[field_name] = value
 
     return fields, files
-
+"""

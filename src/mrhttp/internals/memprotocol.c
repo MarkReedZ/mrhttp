@@ -23,7 +23,6 @@ PyObject * MemcachedProtocol_new(PyTypeObject *type, PyObject *args, PyObject *k
   self->client = NULL;
 
   memcpy(self->get_cmd, "get mrsessionZZZZ9dd361cc443e976b05714581a7fb\r\n",strlen("get mrsession43709dd361cc443e976b05714581a7fb\r\n"));
-  memcpy(self->get_cmd2, "get mrsessionZZZZ9dd361cc443e976b05714581a7fb\r\n",strlen("get mrsession43709dd361cc443e976b05714581a7fb\r\n"));
 
   self->set_cmd = malloc( 2048 );
   self->set_cmd_sz = 2048;
@@ -171,24 +170,7 @@ int MemcachedProtocol_asyncGet( MemcachedProtocol* self, char *key, void *fn, vo
   self->queue[self->queue_end].cb = (tMemcachedCallback*)fn;
   self->queue[self->queue_end].connection = connection;
   self->queue_end = (self->queue_end+1)%self->queue_sz;
-  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 0; }
-  Py_DECREF(bytes);
-  return 1;
-}
-
-int MemcachedProtocol_asyncGet2( MemcachedProtocol* self, char *key, int keylen, void *fn, void *connection ) {
-  DBG_MEMCAC printf("MemcachedProtocol - asyncGet2\n");
-  printf("key %.*s\n", keylen, key);
-  char *kp = self->get_cmd2+13;
-  memcpy(kp, key, keylen);
-  memcpy( kp+keylen, "\r\n", 2 );
-  PyObject *bytes = PyBytes_FromString(self->get_cmd2);
-  PyObject_Print(bytes,stdout,0);printf("\n"); 
-  self->queue[self->queue_end].cb = (tMemcachedCallback*)fn;
-  self->queue[self->queue_end].connection = connection;
-  self->queue_end = (self->queue_end+1)%self->queue_sz;
-  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 0; }
-  Py_DECREF(bytes);
+  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 0;
   return 1;
 }
 
@@ -230,9 +212,7 @@ int MemcachedProtocol_asyncSet( MemcachedProtocol* self, char *key, char *val, i
   PyObject *bytes = PyBytes_FromStringAndSize(self->set_cmd,p-self->set_cmd);
   //DBG_MEMCAC PyObject_Print(bytes, stdout,0); 
   //DBG_MEMCAC printf("\n");
-  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 1; }
-  Py_DECREF(bytes);
-
+  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 1;
   return 0;  
 }
 

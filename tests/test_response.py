@@ -20,9 +20,9 @@ def test_one():
   eq(r.status_code, 200)
   eq(r.headers["Content-Type"],"text/plain")
 
-  r = requests.get('http://localhost:8080/long')
-  eq(r.status_code, 200)
-  eq(r.headers["Content-Type"],"text/plain")
+  #r = requests.get('http://localhost:8080/long')
+  #eq(r.status_code, 200)
+  #eq(r.headers["Content-Type"],"text/plain")
 
   r = requests.get('http://localhost:8080/')
   eq(r.status_code, 200)
@@ -43,6 +43,7 @@ def test_one():
 
 
 def teardown():
+  print("teardown")
   global server
   stop_server(server)
   #server.terminate()

@@ -29,13 +29,11 @@ void MemcachedClient_setupConnMap( MemcachedClient* self ) ;
 void MemcachedClient_connection_lost( MemcachedClient* self, MemcachedProtocol* conn, int server_num );
 PyObject *MemcachedClient_addConnection(MemcachedClient* self, MemcachedProtocol *conn, int server);
 
-int MemcachedClient_get (MemcachedClient* self, char *key, void *fn, void *connection );
-int MemcachedClient_get2(MemcachedClient* self, char *key, int ksz, void *fn, void *connection );
+int MemcachedClient_get(MemcachedClient* self, char *key, void *fn, void *connection );
 PyObject *MemcachedClient_set(MemcachedClient* self, PyObject *args);
 
 int MemcachedServer_init( MemcachedServer *self, int server_num );
 int MemcachedServer_get( MemcachedServer *self, char *k, void *fn, void *connection);
-int MemcachedServer_get2( MemcachedServer *self, char *k, int ksz, void *fn, void *connection );
 int MemcachedServer_set( MemcachedServer *self, char *k, int ksz, char* d, int dsz );
 int MemcachedServer_addConnection( MemcachedServer *self, MemcachedProtocol *conn) ;
 void MemcachedServer_connection_lost( MemcachedServer* self, MemcachedProtocol* conn );

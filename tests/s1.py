@@ -13,6 +13,13 @@ def index(r):
 @app.route('/print/{}')
 def pr(r,foo):
   return foo
+@app.route('/args/{}/{}/{}/{}/{}/{}/')
+def multipleargs(r,a,b,c,d,e,f):
+  return a+b+c+d+e+f
+@app.route('/args/{num}/')
+def numarg(r,n):
+  return str(n)
+
 
 @app.route('/printPostBody')
 def printPostBody(r):

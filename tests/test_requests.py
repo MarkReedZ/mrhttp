@@ -37,6 +37,14 @@ def test_one():
   r = requests.get('http://localhost:8080/print/%E4%B8%8D%E5%8F%AF%E5%86%8D%E7%94%9F%E8%B5%84%E6%BA%90/?test')
   eq(r.text, "不可再生资源")
 
+  # Multiple args
+  r = requests.get('http://localhost:8080/args/a/b/c/d/e/f/')
+  eq(r.text, "abcdef")
+  r = requests.get('http://localhost:8080/args/5/')
+  eq(r.text, "5")
+  r = requests.get('http://localhost:8080/args/9999999999/')
+  eq(r.text, "9999999999")
+
   # Query string ?foo=bar
   r = requests.get('http://localhost:8080/query_string')
   eq(r.text, "{}")

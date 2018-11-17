@@ -38,8 +38,8 @@ except ImportError:
 
 #import mrmemcache
 
-#import uvloop
-#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+import uvloop
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 signames = {
     int(v): v.name for k, v in signal.__dict__.items()

@@ -39,8 +39,8 @@ void response_setupResponseBuffer(void) {
 }
 
 void Response_dealloc(Response* self) {
-  //free(self->rbuf);
-  //free(self->errbuf);
+  free(self->rbuf);
+  free(self->errbuf);
   Py_XDECREF(self->cookies);
   Py_XDECREF(self->headers);
   Py_TYPE(self)->tp_free((PyObject*)self);
@@ -50,7 +50,6 @@ void Response_reset(Response *self) {
   self->headers = NULL;
   self->cookies = NULL;
 }
-
 
 char *getResponseBuffer(int sz) {
   if ( sz > rbuf_sz ) {
