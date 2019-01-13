@@ -10,17 +10,6 @@
 //#include "unpack.h"
 //#include "cpu_features.h"
 
-    //unsigned long long cycles = rdtsc();
-    //unsigned long long ecyc = rdtsc();
-    //printf(" took %lld\n", ecyc - cycles);
-static __inline__ unsigned long long rdtsc(void)
-{
-  unsigned long lo, hi;
-  __asm__ volatile( "rdtsc" : "=a" (lo), "=d" (hi) );
-  return( lo | ( hi << 32 ) );
-}
-
-
 //#include "protocol.h"
 #include "faststrcmp.h"
 //int fast_compare(const unsigned char *s1, const unsigned char *s2, size_t len)

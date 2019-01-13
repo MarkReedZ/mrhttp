@@ -10,8 +10,7 @@ Hello              633,097 Requests/second
 Form parsing       214,668 Requests/second
 Parse JSON         510,606 Requests/second
 Templates          257,753 Requests/second
-Sessions           589,414 Requests/second
-Sessions           193,110 Requests/second
+Sessions           217,759 Requests/second
 Sessions (py)       83,119 Requests/second
 Session login      121,745 Requests/second
 MrWorkServer       338,891 Requests/second

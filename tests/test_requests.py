@@ -66,6 +66,17 @@ def test_one():
   r = requests.post('http://localhost:8080/printCookies', cookies=cookie)
   eq(r.text, "{'baz': '3', 'foo': 'bar'}")
 
+  cookie = {'foo': 'b=ar'}
+  r = requests.post('http://localhost:8080/printCookies', cookies=cookie)
+  eq(r.text, "{'foo': 'b=ar'}")
+
+  #cookie = {'foo': 'b ar', 'zoo':'animals'}
+  #r = requests.post('http://localhost:8080/printCookies', cookies=cookie)
+  #eq(r.text, "{'zoo': 'animals'}")
+  #cookie = {'foo': 'b\\ar', 'zoo':'animals'}
+  #r = requests.post('http://localhost:8080/printCookies', cookies=cookie)
+  #eq(r.text, "{'zoo': 'animals'}")
+
   # Form handling
   r = requests.post('http://localhost:8080/form', data={"p1":"v1","param2":"value2"})
   eq(r.text, "value2")

@@ -34,7 +34,7 @@ PyObject *MrhttpApp_cinit(MrhttpApp* self) {
   self->nextRequest = 0;
   self->freeRequests = l;
 
-  self->numGets = self->numReleases = 0;
+  //self->numGets = self->numReleases = 0;
 
   // Idle timeouts (conn and request)
   PyObject* loop = NULL;
@@ -59,38 +59,56 @@ error:
 }
 
 void MrhttpApp_release_request(MrhttpApp* self, Request *r) {
-  //r->inprog = false;
+  //printf("DELME release %p\n", r);
+  if ( !(r->inprog) ) {
+    printf("DELME WTF release called, but not inprog??\n");
+    Request *z = r+10000;
+    z->inprog = false;
+  } else {
+    self->freeRequests++;
+  }
+  r->inprog = false;
   Request_reset(r);
-  self->freeRequests++;
-  self->numReleases++;
+  //self->numReleases++;
+  //if ( r->inprog ) { printf("DELME WTF inrpof after reset\n"); }
   //printf("DELME release gets %d rels %d free %d\n", self->numGets, self->numReleases, self->freeRequests); 
+/*
+  int sz = PyList_GET_SIZE( self->requests );
   int cnt = 0;
   int numinprog = 0;
-  while (cnt < self->numRequests) {
+  while (cnt < sz) {
     r = (Request*)PyList_GET_ITEM( self->requests, cnt );
     if ( r->inprog ) numinprog++;
     cnt++;
   }
+  printf("DELME rel numinprog %d free %d\n", numinprog, self->freeRequests); 
+  if ( numinprog != ( sz-self->freeRequests ) ) {
+    printf("DELME BAH numinprog %d free %d\n", numinprog, self->freeRequests); 
+  }
+  if ( numinprog > sz - 10 ) {
+    printf("DELME UGH cnt %d numinprog %d num %d free %d!\n", cnt, numinprog, self->numRequests,self->freeRequests); 
+  }
+ */ 
 }
 
 void MrhttpApp_double_requests(MrhttpApp* self) {
-  self->nextRequest = self->numRequests-1;
   PyObject *ret = PyObject_CallFunctionObjArgs(self->func_expand_requests, NULL);
     
-  if ( ret == NULL ) {
+  if ( ret == NULL ) { // TODO?
     printf("ret null\n");
     exit(1);
   }
   self->freeRequests += self->numRequests;
+  self->nextRequest = self->numRequests;
   self->numRequests *= 2;
   //printf("DELME dbl req list sz %d num %d\n", PyList_GET_SIZE(self->requests), self->numRequests);
 }
 
 PyObject *MrhttpApp_get_request(MrhttpApp* self) {
-  PyObject *ret = PyList_GET_ITEM( self->requests, self->nextRequest );
-  Request *r = (Request*)ret;
+  Request *r = (Request*)PyList_GET_ITEM( self->requests, self->nextRequest );
+  //printf("DELME get %p\n", r);
   self->freeRequests--;
-  self->numGets++;
+  //self->numGets++;
   DBG printf(" get request index %d\n", self->nextRequest ); 
 
   // If we wrap and hit an in progress request double the number of requests and 
@@ -108,7 +126,7 @@ redo:
     while (r->inprog) {
       cnt++; 
       if ( cnt > self->numRequests ) { 
-        printf("DELME ARGH %d > %d free %d!\n", cnt, self->numRequests,self->freeRequests); 
+        //printf("DELME ARGH %d > %d free %d!\n", cnt, self->numRequests,self->freeRequests); 
         break; 
       }
       self->nextRequest = (self->nextRequest+1)%self->numRequests;
@@ -121,35 +139,18 @@ redo:
   }
   r->inprog = true;
   self->nextRequest = (self->nextRequest+1)%self->numRequests;
-  return ret;
+  return (PyObject*)r;
 }
 
 PyObject *MrhttpApp_updateDate(MrhttpApp *self, PyObject *date) {
   return response_updateDate(date);
 }
 
-//DELME
-//PyObject *MrhttpApp_test_fut(MrhttpApp *self) {
-  //PyObject *cf = PyObject_GetAttrString(self->loop, "create_future");
-  //self->fut =     PyObject_CallFunctionObjArgs(cf, NULL);
-  //return self->fut;
-//}
-
 PyObject *MrhttpApp_check_idle(MrhttpApp *self) {
 
   PyObject* iterator = NULL;
   Protocol* c = NULL;
 
-  // DELME
-  //if ( self->fut != NULL ) {
-    //printf("Setting fut result!\n");
-    //PyObject *cf = PyObject_GetAttrString(self->fut, "set_result");
-    //PyObject *ret = PyObject_CallFunctionObjArgs(cf, Py_None, NULL);
-    //self->fut = NULL;
-    //Py_RETURN_NONE;
-  //}
-
-  
   if(!(iterator = PyObject_GetIter(self->connections))) goto error;
   
   unsigned long check_interval = PyLong_AsLong(self->check_interval);

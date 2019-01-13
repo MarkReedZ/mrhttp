@@ -75,6 +75,17 @@ The defaults are implementation-specific. If only the high watermark is given, t
 
 
 
+Add this its useful:
+To answer the comment, for this I was using Flask-AutoIndex to host the contents of a folder. Not as simple as your solution I suppose but gets the job done:
+
+from flask import Flask
+from flask_autoindex import AutoIndex
+
+app = Flask(__name__)
+AutoIndex(app, browse_root='packages')
+
+if __name__ == '__main__':
+    app.run('0.0.0.0', debug=True, port=5005, threaded=True)
 
 
 

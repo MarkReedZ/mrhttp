@@ -1,4 +1,5 @@
 
+
 #include <stddef.h>
 #include <sys/param.h>
 #include <strings.h>
@@ -95,14 +96,14 @@ int Request_init(Request* self, PyObject *args, PyObject* kw)
 
 // This only resets stuff that needs to be for reuse
 void Request_reset(Request *self) {
-  self->inprog = false;
+  //self->inprog = false;
   self->session_id = NULL;
   Py_XDECREF(self->py_headers); self->py_headers = NULL;
   Py_XDECREF(self->py_body); self->py_body = NULL;
   Py_XDECREF(self->py_path); self->py_path = NULL;
   Py_XDECREF(self->py_method); self->py_method = NULL;
   Py_XDECREF(self->py_cookies); self->py_cookies = NULL; // TODO Benchmark just clearing it here, but need a flag to reload cookies each request
-  //Py_XDECREF(self->hreq.ip); self->hreq.ip = NULL;
+  Py_XDECREF(self->hreq.ip); self->hreq.ip = NULL;
   self->num_headers = 0;
   Response_reset(self->response);
 }
@@ -377,11 +378,11 @@ PyObject* Request_get_headers(Request* self, void* closure) {
 }
 PyObject* Request_get_ip(Request* self, void* closure) {
   if(!self->py_ip) {
-    //if ( self->hreq.ip_len ) {
-      //self->py_ip = PyUnicode_FromStringAndSize(self->hreq.ip, self->hreq.ip_len);
-    //} else {
+    if ( self->hreq.ip_len ) {
+      self->py_ip = PyUnicode_FromStringAndSize(self->hreq.ip, self->hreq.ip_len);
+    } else {
       self->py_ip = Py_None;
-    //}
+    }
     Py_XINCREF(self->py_ip);
   }
   return self->py_ip;
@@ -395,7 +396,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
 
   DBG printf("parse cookies: %.*s\n",buflen, buf);
 
-  static char ALIGNED(16) ranges1[] = "==" ";;";
+  static char ALIGNED(16) ranges1[] = "==" ";;" "\x00 "; // Control chars up to space illegal
   int found;
   int state = 0;
   int grab_session = 0;
@@ -405,15 +406,19 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
     buf = findchar_fast(buf, end, ranges1, sizeof(ranges1) - 1, &found);
     if ( found ) {
       if ( *buf == '=' ) {
-        // Save out the mrsession id 
-        if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
-          DBG printf("Grab session\n");
-          grab_session = 1;
+        if ( state == 0 ) {
+          // Save out the mrsession id 
+          if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
+            DBG printf("Grab session\n");
+            grab_session = 1;
+          }
+          key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+          state = 1;
+          buf+=1;
+        } else {
+          // If we're in the value ignore the = so cookie name/value splits on the first =
+          while(found && *buf == '=') buf = findchar_fast(++buf, end, ranges1, sizeof(ranges1) - 1, &found);
         }
-        key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
-        state = 1;
-        buf+=1;
-        //if ( state == 1 )  TODO ERROR double =s 
       } 
       else if ( *buf == ';' ) {
         if ( state == 0 ) key  = PyUnicode_FromString("");
@@ -431,7 +436,11 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
         while ( *buf == 32 ) buf++;
       }
       else {
-        printf(" ERR found not = or ; %.*s\n", 5, buf );
+        // Bad character found so skip
+        state = 0;
+        while(found && *buf != ';') buf = findchar_fast(++buf, end, ranges1, sizeof(ranges1) - 1, &found);
+        if ( buf != end ) buf += 1;
+        while ( *buf == 32 ) buf++;
       }
       //else if(*buf == '%' && is_hex(*(buf + 1)) && is_hex(*(buf + 2))) {
         //*write = (hex_to_dec(*(buf + 1)) << 4) + hex_to_dec(*(buf + 2));
@@ -456,6 +465,39 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
 
   return cookies;
 }
+static inline void getSession( Request* r, char *buf, size_t buflen ) {
+  char *end = buf + buflen;
+  char *last = buf;
+
+  static char ALIGNED(16) ranges1[] = "==" ";;";
+  int found;
+  int state = 0;
+  do { 
+    last = buf;
+    buf = findchar_fast(buf, end, ranges1, sizeof(ranges1) - 1, &found);
+    if ( found ) {
+      if ( *buf == '=' ) {
+        if ( state == 0 ) {
+          // Save out the mrsession id 
+          if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
+            DBG printf("Grab session\n");
+            state = 1;
+          }
+          buf+=1;
+        } 
+      } 
+      else if ( *buf == ';' ) {
+        if (state == 1 ) {
+          r->session_id = last;
+          r->session_id_sz = buf-last;
+          return;
+        }
+        buf+=1;
+        while ( *buf == 32 ) buf++;
+      }
+    }
+  } while( found );
+}
 
 static inline PyObject* Request_decode_cookies(Request* self)
 {
@@ -470,7 +512,15 @@ static inline PyObject* Request_decode_cookies(Request* self)
 void Request_load_cookies(Request* self) {
   if(!self->py_headers) self->py_headers = Request_decode_headers(self);
   if(!self->py_cookies) self->py_cookies = Request_decode_cookies(self);
-  //self->py_cookies = Request_decode_cookies(self);
+}
+
+void Request_load_session(Request* self) {
+  for(struct mr_header* header = self->headers; header < self->headers + self->num_headers; header++) {
+    if ( header->name_len == 6 && header->name[0] == 'C' ) {
+      getSession( self, header->value, header->value_len );
+      return;
+    }
+  }
 }
 
 PyObject* Request_get_cookies(Request* self, void* closure) {

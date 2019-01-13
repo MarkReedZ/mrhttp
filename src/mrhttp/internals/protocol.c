@@ -318,7 +318,6 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
 
   DBG_MEMCAC printf(" memcached reply data len %d data %.*s\n",data_sz,data_sz,data);
 
-
   // TODO if mrq we pass it on so can skip this?
   if ( data_sz ) {
     PyObject *session = PyUnicode_FromStringAndSize( data, data_sz );
@@ -406,7 +405,7 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
   } else {
     //printf("DELME closed?\n"); // TODO Need to do anything if they dropped connection before the memcached reply?
   }
-  Py_DECREF(self);
+  Py_DECREF(self); 
 }
 
 Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
@@ -432,7 +431,11 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     DBG printf("Route requires a session\n"); 
 
     self->request->route = r;
-    Request_load_cookies(self->request);
+    //unsigned long long cycles = rdtsc();
+    Request_load_session(self->request);
+    //Request_load_cookies(self->request);
+    //unsigned long long ecyc = rdtsc();
+    //printf(" took %lld\n", ecyc - cycles);
 
     // If we found a session id in the cookies lets fetch it
     if ( self->request->session_id != NULL ) {
@@ -536,26 +539,6 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
     PyErr_Clear();
     //PyObject_Print( traceback, stdout, 0 ); printf("\n");
 
-/*
-#include "frameobject.h"
-    PyThreadState *tstate = PyThreadState_GET();
-    if (NULL != tstate && NULL != tstate->frame) {
-      PyFrameObject *frame = tstate->frame;
-
-      printf("Python stack trace:\n");
-      while (NULL != frame) {
-        // int line = frame->f_lineno;
-         //frame->f_lineno will not always return the correct line number
-         //you need to call PyCode_Addr2Line().
-        int line = PyCode_Addr2Line(frame->f_code, frame->f_lasti);
-        const char *filename = PyUnicode_AsUTF8AndSize(frame->f_code->co_filename,NULL);
-        const char *funcname = PyUnicode_AsUTF8AndSize(frame->f_code->co_name,NULL);
-        printf("    %s(%d): %s\n", filename, line, funcname);
-        frame = frame->f_back;
-      }
-    }
-*/
-   
     Py_XDECREF(traceback);
     Py_XDECREF(type);
     Py_XDECREF(value);
@@ -717,7 +700,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
     if(!(response = PyObject_CallFunctionObjArgs(get_result, NULL))) {
       Py_XDECREF(get_result);
 
-      if ( self->closed ) { // Probably CancelledError, but don't bother to check as we're done
+      if ( self->closed ) { // Probably CancelledError exception, but don't bother to check as we're done
         DBG printf("    connection closed so dropping exception\n");
         PyErr_Clear();
         self->num_requests_popped++; 

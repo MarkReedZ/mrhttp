@@ -108,7 +108,10 @@ def parseForm(r):
 
 @app.route('/json')
 def parseJ(r):
-  return r.json["name"]
+  if r.json:
+    return r.json["name"]
+  else:
+    return "Send json"
 
 @app.route('/mrpacker')
 def parseMrpacker(r):

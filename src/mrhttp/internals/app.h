@@ -24,7 +24,7 @@ typedef struct {
   PyObject *requests;
   //Request **requests;
   int numRequests, nextRequest,freeRequests; 
-  int numGets, numReleases;
+  //int numGets, numReleases;
 
 } MrhttpApp;
 

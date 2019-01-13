@@ -80,3 +80,4 @@ void request_decodePath(Request* self);
 
 PyObject *request_updateDate(Request *self, PyObject *date);
 void Request_load_cookies(Request* self);
+void Request_load_session(Request* self);
