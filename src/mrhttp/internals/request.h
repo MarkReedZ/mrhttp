@@ -30,6 +30,7 @@ typedef struct {
   char argTypes[16];
   int numArgs;
   bool inprog;
+  bool return404;
 
   char* session_id;
   int session_id_sz;
@@ -59,6 +60,7 @@ void Request_dealloc(Request* self);
 void Request_reset(Request *self);
 PyObject* Request_cleanup(Request* self);
 
+PyObject* Request_notfound(Request* self);
 
 void request_load(Request* self, char* method, size_t method_len, char* path, size_t path_len, int minor_version, struct mr_header* headers, size_t num_headers);
 //void Request_set_body(Request* self, char* body, size_t body_len);

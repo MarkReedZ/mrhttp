@@ -81,7 +81,7 @@ class Application(mrhttp.CApp):
   @property
   def loop(self):
     if not self._loop:
-      self._loop = asyncio.new_event_loop()
+      self._loop = asyncio.get_event_loop()
     return self._loop
 
   def expand_requests(self):
@@ -169,7 +169,7 @@ class Application(mrhttp.CApp):
 
       self._request_extensions[name] = (handler, property)
 
-  def serve(self, *, sock, host, port):
+  def serve(self, *, sock, host, port, loop, run_async=False):
       faulthandler.enable()
 
       #pr = cProfile.Profile()
@@ -179,13 +179,14 @@ class Application(mrhttp.CApp):
       #sock.setsockopt(socket.SOL_SOCKET, socket.SO_OOBINLINE, 0) #TODO uvloop .9.1 sets this
 
       #profiler_start(b"mrhttp.log")
-      loop = self.loop
-      asyncio.set_event_loop(loop)
-      server_coro = loop.create_server( lambda: self._protocol_factory(self), sock=sock)
-      server = loop.run_until_complete(server_coro)
+
+      if not loop:
+        loop = self.loop
+        asyncio.set_event_loop(loop)
+      else:
+        self._loop = loop
 
       self.requests = [Request() for x in range(128)]
-      self.bytes404 = self.err404.encode("utf-8")
       self.cinit()
       self.router.finalize_routes()
       self.router.setupRoutes()
@@ -212,7 +213,13 @@ class Application(mrhttp.CApp):
 
       loop.add_signal_handler(signal.SIGTERM, loop.stop)
 
-      # TODO Setup a reloader to reload if the python files change for ease of development?
+      server_coro = loop.create_server( lambda: self._protocol_factory(self), sock=sock)
+      if run_async: 
+        print("starting async")
+        return server_coro
+
+      # Try except here?
+      server = loop.run_until_complete(server_coro)
 
       print('Accepting connections on http://{}:{}'.format(host, port))
 
@@ -257,7 +264,7 @@ class Application(mrhttp.CApp):
   # Update the response date string every few seconds
   def updateDateString(self):
     self.updateDate( format_date_time(None) )
-    self.loop.call_later(5, self.updateDateString)
+    self.loop.call_later(10, self.updateDateString)
 
 
   def _appStart(self):
@@ -273,7 +280,6 @@ class Application(mrhttp.CApp):
       sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
       sock.bind((host, port))
       os.set_inheritable(sock.fileno(), True)
-
 
       workers = set()
 
@@ -294,7 +300,7 @@ class Application(mrhttp.CApp):
       #signal.signal(signal.SIGHUP, stop)
 
       for _ in range(num_workers or 1):
-          worker = multiprocessing.Process( target=self.serve, kwargs=dict(sock=sock, host=host, port=port))
+          worker = multiprocessing.Process( target=self.serve, kwargs=dict(sock=sock, host=host, port=port, loop=None))
           worker.daemon = True
           worker.start()
           workers.add(worker)
@@ -322,6 +328,19 @@ class Application(mrhttp.CApp):
 
     # TODO reloader?
     self._run( host=host, port=port, num_workers=cores, debug=debug)
+
+
+  def start_server(self, *, host='0.0.0.0', port=8080, loop=None):
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind((host, port))
+    os.set_inheritable(sock.fileno(), True)
+
+    if not loop:
+      loop = self.loop
+    
+    return self.serve(sock=sock, host=host, port=port, loop=loop, run_async=True)
 
 
   def setUserSessionAndCookies(self, request, userj, cookies={}, backend="memcached" ):

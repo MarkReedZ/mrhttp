@@ -148,7 +148,6 @@ void* Protocol_close(Protocol* self)
   if(!tmp) return NULL;
   Py_DECREF(tmp);
   self->closed = true;
-  printf("DELME protocol closed\n");
 
   return result;
 
@@ -403,7 +402,7 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
 
     Protocol_handle_request( self, req, req->route );
   } else {
-    //printf("DELME closed?\n"); // TODO Need to do anything if they dropped connection before the memcached reply?
+    // TODO Need to do anything if they dropped connection before the memcached reply?
   }
   Py_DECREF(self); 
 }
@@ -422,7 +421,9 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   Route *r = router_getRoute( self->router, self->request );
   if ( r == NULL ) {
     // TODO If the pipeline isn't empty...
-    if ( ((MrhttpApp*)self->app)->err404 ) protocol_write_error_response_bytes(self, ((MrhttpApp*)self->app)->err404);
+    if ( ((MrhttpApp*)self->app)->err404 ) {
+      return protocol_write_error_response_bytes(self, ((MrhttpApp*)self->app)->err404);
+    }
     return self;
   }
 
@@ -431,11 +432,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     DBG printf("Route requires a session\n"); 
 
     self->request->route = r;
-    //unsigned long long cycles = rdtsc();
     Request_load_session(self->request);
-    //Request_load_cookies(self->request);
-    //unsigned long long ecyc = rdtsc();
-    //printf(" took %lld\n", ecyc - cycles);
 
     // If we found a session id in the cookies lets fetch it
     if ( self->request->session_id != NULL ) {
@@ -499,6 +496,16 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
   }
 
   if(!(result = protocol_callPageHandler(self, r->func, request)) ) {
+
+    if ( request->return404 ) {
+      request->return404 = false;
+      PyErr_Clear();
+      if ( ((MrhttpApp*)self->app)->err404 ) {
+        return protocol_write_error_response_bytes(self, ((MrhttpApp*)self->app)->err404);
+      }
+      return self;
+    }
+
   //if(!(result = PyObject_CallFunctionObjArgs(r->func, NULL))) {
     DBG printf("Page handler call failed with an exception\n");
     PyObject *type, *value, *traceback;
@@ -546,6 +553,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
     return self;
     //PyErr_Restore(type, value, traceback);
   }
+
 
   if ( r->iscoro ) {
     DBG printf("protocol - Request is a coroutine\n");
@@ -717,7 +725,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
       Py_XDECREF(type);
       if (value) {
 
-        // Check for HTTPError
+        // Check for HTTPError ( if it has _message it is HTTPError )
         PyObject *msg = PyObject_GetAttrString(value, "_message");
         if ( msg ) {
           int code = PyLong_AsLong(PyObject_GetAttrString(value, "code"));

@@ -82,7 +82,8 @@ static PyMethodDef MemcachedClient_methods[] = {
 static PyMethodDef Request_methods[] = {
   //{"Response", (PyCFunction)Request_Response, METH_VARARGS | METH_KEYWORDS, ""},
   {"add_done_callback", (PyCFunction)Request_add_done_callback, METH_O,   ""},
-  {"cleanup", (PyCFunction)Request_cleanup, METH_NOARGS,   ""},
+  {"NotFound", (PyCFunction)Request_notfound, METH_NOARGS,   ""},
+  {"cleanup", (PyCFunction)Request_cleanup,   METH_NOARGS,   ""},
   {NULL}
 };
 static PyGetSetDef Request_getset[] = {

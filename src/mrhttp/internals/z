@@ -1,0 +1,668 @@
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400   1) 
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500   2) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400   3) #include <stddef.h>
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400   4) #include <sys/param.h>
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400   5) #include <strings.h>
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400   6) #include <string.h>
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400   7) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400   8) #include "common.h"
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400   9) #include "request.h"
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  10) #include "mrhttpparser.h"
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  11) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  12) #ifdef __AVX2__
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  13) #include <immintrin.h>
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  14) #elif defined __SSE4_2__
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  15) #ifdef _MSC_VER
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  16) #include <nmmintrin.h>
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  17) #else
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  18) #include <x86intrin.h>
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  19) #endif
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  20) #endif
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  21) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  22) #ifdef _MSC_VER
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  23) #define ALIGNED(n) _declspec(align(n))
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  24) #else
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  25) #define ALIGNED(n) __attribute__((aligned(n)))
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  26) #endif
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  27) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  28) #if __GNUC__ >= 3
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  29) #define likely(x) __builtin_expect(!!(x), 1)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  30) #define unlikely(x) __builtin_expect(!!(x), 0)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  31) #else
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  32) #define likely(x) (x)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  33) #define unlikely(x) (x)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  34) #endif
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  35) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  36) #define hex_to_dec(x) \
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  37)   ((x <= '9' ? 0 : 9) + (x & 0x0f))
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  38) #define is_hex(x) ((x >= '0' && x <= '9') || (x >= 'A' && x <= 'F'))
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  39) 
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400  40) #define CHAR4_INT(a, b, c, d)         \
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400  41)    (unsigned int)((d << 24) | (c << 16) | (b << 8) | a)
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400  42) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  43) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  44) //#include "cresponse.h"
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  45) //#include "capsule.h"
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  46) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  47) //static PyObject* partial;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  48) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  49) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  50) //static PyObject* HTTP10;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  51) //static PyObject* HTTP11;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  52) //static PyObject* request;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  53) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  54) PyObject* Request_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  55) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  56)   Request* self = NULL;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  57)   self = (Request*)type->tp_alloc(type, 0);
+d4b6c07c (MarkReedZ         2018-05-28 11:29:11 -0400  58)   self->set_user = NULL;
+d4b6c07c (MarkReedZ         2018-05-28 11:29:11 -0400  59)   self->response = NULL;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  60) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  61)   return (PyObject*)self;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  62) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  63) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  64) void Request_dealloc(Request* self) {
+e40ac3bf (Mark Reed         2018-04-30 17:19:08 -0400  65) 
+d4b6c07c (MarkReedZ         2018-05-28 11:29:11 -0400  66)   free(self->headers);
+d4b6c07c (MarkReedZ         2018-05-28 11:29:11 -0400  67) 
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400  68)   Py_XDECREF(self->set_user);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  69)   Py_XDECREF(self->py_headers);
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400  70)   Py_XDECREF(self->py_body);
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400  71)   Py_XDECREF(self->py_cookies);
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400  72)   Py_XDECREF(self->py_query_string);
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400  73)   Py_XDECREF(self->py_args);
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400  74)   Py_XDECREF(self->py_path);
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400  75)   Py_XDECREF(self->py_method);
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500  76)   Py_XDECREF(self->py_ip);
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500  77)   Py_XDECREF(self->response);
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500  78)   Py_XDECREF(self->set_user);
+e40ac3bf (Mark Reed         2018-04-30 17:19:08 -0400  79)   Py_TYPE(self)->tp_free((PyObject*)self);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  80) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  81) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  82) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  83) int Request_init(Request* self, PyObject *args, PyObject* kw)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  84) {
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500  85) 
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500  86)   //self->hreq.headers = malloc( sizeof(*(self->hreq.headers))*100 ); //TODO
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400  87)   self->headers = malloc( sizeof(*(self->headers))*100 ); //TODO
+d4b6c07c (MarkReedZ         2018-05-28 11:29:11 -0400  88)   if(!(self->response = (Response*)PyObject_GetAttrString((PyObject*)self, "response"))) return -1;
+d4b6c07c (MarkReedZ         2018-05-28 11:29:11 -0400  89)   if(!(self->set_user = PyObject_GetAttrString((PyObject*)self, "set_user"))) return -1;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400  90)   Request_reset(self);
+00000000 (Not Committed Yet 2019-01-20 19:47:15 -0500  91)   self->return404 = false;
+d4b6c07c (MarkReedZ         2018-05-28 11:29:11 -0400  92)   
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  93)   return 0;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  94) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400  95) 
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400  96) // This only resets stuff that needs to be for reuse
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400  97) void Request_reset(Request *self) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500  98)   //self->inprog = false;
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400  99)   self->session_id = NULL;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 100)   Py_XDECREF(self->py_headers); self->py_headers = NULL;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 101)   Py_XDECREF(self->py_body); self->py_body = NULL;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 102)   Py_XDECREF(self->py_path); self->py_path = NULL;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 103)   Py_XDECREF(self->py_method); self->py_method = NULL;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 104)   Py_XDECREF(self->py_cookies); self->py_cookies = NULL; // TODO Benchmark just clearing it here, but need a flag to reload cookies each request
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 105)   Py_XDECREF(self->hreq.ip); self->hreq.ip = NULL;
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 106)   self->num_headers = 0;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 107)   Response_reset(self->response);
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 108) }
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 109) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 110) void request_load(Request* self, char* method, size_t method_len, char* path, size_t path_len, int minor_version, struct mr_header* headers, size_t num_headers)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 111) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 112)   DBG printf("request load\n");
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 113)   // fill
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 114)   self->method = method;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 115)   self->method_len = method_len;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 116)   self->path = path;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 117)   self->path_decoded = false;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 118)   self->path_len = path_len;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 119)   self->qs_len = 0;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 120)   self->qs_decoded = false;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 121)   self->minor_version = minor_version;
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 122)   //self->headers = headers;
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 123)   //self->num_headers = num_headers;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 124)   //self->keep_alive = KEEP_ALIVE_UNSET;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 125) 
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 126) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 127) }
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 128) PyObject* Request_cleanup(Request* self) {
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 129)   Py_XDECREF(self->set_user); self->set_user = NULL;
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 130)   Py_RETURN_NONE;
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 131) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 132) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 133) PyObject* Request_add_done_callback(Request* self, PyObject* callback)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 134) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 135)   Py_RETURN_NONE;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 136) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 137) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 138) PyObject* Request_get_transport(Request* self, void* closure) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 139)   DBG printf("request transport ptr %p\n",self->transport);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 140)   if (self->transport) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 141)     Py_INCREF(self->transport);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 142)     return self->transport;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 143)   }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 144)   Py_RETURN_NONE;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 145) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 146) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 147) // TODO query parse
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 148) //?fart=on+me+now&fart=no%20way&blank=not
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 149) //{'fart': ['on me now', 'no way'], 'blank': ['not']}
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 150) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 151) //#ifdef __SSE4_2__
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 152) 
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 153) // Search for a range of characters and return a pointer to the location or buf_end if none are found
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 154) static char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 155) {
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 156)     *found = 0;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 157)     __m128i ranges16 = _mm_loadu_si128((const __m128i *)ranges);
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 158)     if (likely(buf_end - buf >= 16)) {
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 159) 
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 160)         size_t left = (buf_end - buf) & ~15;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 161)         do {
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 162)             __m128i b16 = _mm_loadu_si128((const __m128i *)buf);
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 163)             int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 164)             if (unlikely(r != 16)) {
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 165)                 buf += r;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 166)                 *found = 1;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 167)                 return buf;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 168)             }
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 169)             buf += 16;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 170)             left -= 16;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 171)         } while (likely(left != 0));
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 172) 
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 173)     }
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 174) 
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 175)     size_t left = buf_end - buf;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 176)     if ( left != 0 ) {
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 177)       static char sbuf[16] = {0};
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 178)       memcpy( sbuf, buf, left );
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 179)       __m128i b16 = _mm_loadu_si128((const __m128i *)sbuf);
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 180)       int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 181)       if (unlikely(r != 16) && r < left) {
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 182)         buf += r;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 183)         *found = 1;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 184)         return buf;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 185)       } else {
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 186)         buf = buf_end;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 187)       }
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 188)     }
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 189) 
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 190)     *found = 0;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 191)     return buf;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 192) }
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 193) /*
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 194) static char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 195) {   
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 196)     *found = 0;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 197)     if (likely(buf_end - buf >= 16)) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 198)         __m128i ranges16 = _mm_loadu_si128((const __m128i *)ranges);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 199)         
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 200)         size_t left = (buf_end - buf) & ~15;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 201)         do {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 202)             __m128i b16 = _mm_loadu_si128((const __m128i *)buf); 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 203)             int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 204)             if (unlikely(r != 16)) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 205)                 buf += r;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 206)                 *found = 1;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 207)                 return buf;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 208)             }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 209)             buf += 16;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 210)             left -= 16;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 211)         } while (likely(left != 0));
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 212)     }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 213)    
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 214)     *found = 0; 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 215)     return buf;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 216) }
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 217) */
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 218) // /spanish/objetos%20voladores%20no%20identificados?foo=bar
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 219) static inline size_t sse_decode(char* path, ssize_t length, size_t *qs_len) {
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 220)   //DBG printf("sse_decode >%.*s<\n", (int)length, path);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 221)   if (length == 0) return length;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 222)   char *pat = path;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 223)   static char ranges1[] = "%%" "??";
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 224)   char *end = path + length;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 225)   int found;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 226)   do {
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 227)     //DBG printf("sse_decode >%.*s<\n", (int)length, path);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 228)     pat = findchar_fast(pat, end, ranges1, sizeof(ranges1) - 1, &found);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 229)     if ( found ) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 230)       if(*pat == '%' && is_hex(*(pat + 1)) && is_hex(*(pat + 2))) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 231)         *pat = (hex_to_dec(*(pat + 1)) << 4) + hex_to_dec(*(pat + 2));
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 232)         pat+=3;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 233)         length -= 2;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 234)       } else {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 235)         *qs_len = end-pat;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 236)         length -= end-pat;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 237)         break;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 238)       }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 239)     }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 240)   } while (0);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 241) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 242)   // If we hit the query string separator we're done. Otherwise either there are <16 chars left or we hit a %.
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 243)   // Chinese(back to back encodes) is slow if we keep trying to use cmpestri so we stop. 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 244)   //  TODO benches/path_decode and review Spanish/etc. Maybe offer a choice.
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 245)   if(*pat == '?') return length;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 246) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 247)   char *write = pat;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 248)   if ( found ) write -= 2;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 249)   char *read = pat;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 250)   for (;read < end;) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 251)     if (read[0] == '?') {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 252)       length -= end-read;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 253)       *qs_len  = end-pat;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 254)       break;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 255)     }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 256)     if ( read[0] == '%' ) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 257)       if( is_hex(read[1]) && is_hex(read[2]) ) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 258)         *write = (hex_to_dec(read[1]) << 4) + hex_to_dec(read[2]);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 259)         write+=1;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 260)         read += 3;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 261)         length-=2;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 262)       } else {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 263)         if (read > write) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 264)           write[0] = read[0];
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 265)           write[1] = read[1];
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 266)         }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 267)         read += 2;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 268)         write += 2;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 269)       }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 270) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 271)     } else {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 272)       if (read > write) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 273)         write[0] = read[0];
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 274)       }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 275)       read++;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 276)       write++;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 277)     }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 278)   }
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 279)   DBG printf("sse_decode len %d path >%.*s<\n", (int)length, (int)length, path);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 280) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 281)   return length;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 282) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 283) //#endif
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 284) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 285) void request_decodePath(Request* self) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 286)   if(!self->path_decoded) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 287)     self->path_len = sse_decode( self->path, self->path_len, &(self->qs_len) );
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 288)     self->path_decoded = true;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 289)   }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 290) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 291) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 292) PyObject* Request_getattro(Request* self, PyObject* name)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 293) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 294)   PyObject* result;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 295) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 296)   if((result = PyObject_GenericGetAttr((PyObject*)self, name))) return result;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 297) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 298)   Py_RETURN_NONE;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 299) /*
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 300)   PyObject* extensions = NULL;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 301)   if(!(extensions = PyObject_GetAttrString(self->app, "_request_extensions")))
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 302)     goto error;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 303) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 304)   PyObject* entry;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 305)   if(!(entry = PyDict_GetItem(extensions, name)))
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 306)     goto error;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 307)   else
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 308)     PyErr_Clear();
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 309) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 310)   PyObject* handler;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 311)   PyObject* property;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 312)   if(!(handler = PyTuple_GetItem(entry, 0)))
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 313)     goto error;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 314) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 315)   if(!(property = PyTuple_GetItem(entry, 1)))
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 316)     goto error;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 317) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 318)   if(property == Py_True) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 319)     if(!(result = PyObject_CallFunctionObjArgs(handler, self, NULL)))
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 320)       goto error;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 321)   } else {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 322)     if(!(result = PyObject_CallFunctionObjArgs(partial, handler, self, NULL)))
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 323)       goto error;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 324)   }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 325) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 326)   error:
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 327)   Py_XDECREF(extensions);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 328) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 329)   return result;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 330) */
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 331) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 332) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 333) static inline PyObject* Request_decode_headers(Request* self)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 334) {
+d4b6c07c (MarkReedZ         2018-05-28 11:29:11 -0400 335)   DBG printf("request decode headers num heads %ld\n",self->num_headers);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 336)   PyObject* result = NULL;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 337)   PyObject* headers = PyDict_New();
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 338)   if(!headers) goto error;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 339)   result = headers;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 340) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 341)   for(struct mr_header* header = self->headers; header < self->headers + self->num_headers; header++) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 342)       PyObject* name = NULL; PyObject* value = NULL;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 343)       //title_case((char*)header->name, header->name_len);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 344)       name  = PyUnicode_FromStringAndSize(header->name,  header->name_len);        if(!name)  goto loop_error;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 345)       value = PyUnicode_DecodeLatin1(     header->value, header->value_len, NULL); if(!value) goto loop_error;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 346)       if(PyDict_SetItem(headers, name, value) == -1) goto loop_error;
+6e38004d (MarkReedZ         2018-08-26 07:53:49 -0400 347)       //DBG printf("Found header: %.*s %.*s\n",header->name_len,  header->name, header->value_len, header->value);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 348) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 349)       goto loop_finally;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 350) loop_error:
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 351)       result = NULL;
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 352)       DBG printf("loop error in decode headers\n");
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 353)       PyObject *type, *traceback;
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 354)       PyErr_Fetch(&type, &value, &traceback);
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 355)       printf("exception :\n");
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 356)       PyObject_Print( type, stdout, 0 ); printf("\n");
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 357)       PyObject_Print( value, stdout, 0 ); printf("\n");
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 358) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 359) loop_finally:
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 360)       Py_XDECREF(name);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 361)       Py_XDECREF(value);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 362)       if(!result) goto error;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 363)   }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 364) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 365)   goto finally;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 366)   error:
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 367)   Py_XDECREF(headers);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 368)   result = NULL;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 369)   finally:
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 370)   return result;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 371) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 372) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 373) PyObject* Request_get_headers(Request* self, void* closure) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 374)   if(!self->py_headers) self->py_headers = Request_decode_headers(self);
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 375)   Py_XINCREF(self->py_headers);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 376)   return self->py_headers;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 377) }
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 378) PyObject* Request_get_ip(Request* self, void* closure) {
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 379)   if(!self->py_ip) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 380)     if ( self->hreq.ip_len ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 381)       self->py_ip = PyUnicode_FromStringAndSize(self->hreq.ip, self->hreq.ip_len);
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 382)     } else {
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 383)       self->py_ip = Py_None;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 384)     }
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 385)     Py_XINCREF(self->py_ip);
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 386)   }
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 387)   return self->py_ip;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 388) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 389) 
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 390) static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 391)   char *end = buf + buflen;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 392)   char *last = buf;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 393)   PyObject* cookies = PyDict_New();
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 394)   PyObject* key = NULL; PyObject* value = NULL;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 395) 
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 396)   DBG printf("parse cookies: %.*s\n",buflen, buf);
+6e38004d (MarkReedZ         2018-08-26 07:53:49 -0400 397) 
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 398)   static char ALIGNED(16) ranges1[] = "==" ";;" "\x00 "; // Control chars up to space illegal
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 399)   int found;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 400)   int state = 0;
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 401)   int grab_session = 0;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 402) //Cookie: key=session_key; bar=2; nosemi=foo
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 403)   do { 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 404)     last = buf;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 405)     buf = findchar_fast(buf, end, ranges1, sizeof(ranges1) - 1, &found);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 406)     if ( found ) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 407)       if ( *buf == '=' ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 408)         if ( state == 0 ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 409)           // Save out the mrsession id 
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 410)           if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 411)             DBG printf("Grab session\n");
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 412)             grab_session = 1;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 413)           }
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 414)           key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 415)           state = 1;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 416)           buf+=1;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 417)         } else {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 418)           // If we're in the value ignore the = so cookie name/value splits on the first =
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 419)           while(found && *buf == '=') buf = findchar_fast(++buf, end, ranges1, sizeof(ranges1) - 1, &found);
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 420)         }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 421)       } 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 422)       else if ( *buf == ';' ) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 423)         if ( state == 0 ) key  = PyUnicode_FromString("");
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 424)         if (grab_session) {
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 425)           grab_session = 0;
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 426)           r->session_id = last;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 427)           r->session_id_sz = buf-last;
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 428)         }
+9f4be4fb (Mark Reed         2018-05-18 23:46:23 -0400 429)         value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 430)         state = 0;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 431)         PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
+e40ac3bf (Mark Reed         2018-04-30 17:19:08 -0400 432)         Py_XDECREF(key);
+e40ac3bf (Mark Reed         2018-04-30 17:19:08 -0400 433)         Py_XDECREF(value);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 434)         buf+=1;
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 435)         while ( *buf == 32 ) buf++;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 436)       }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 437)       else {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 438)         // Bad character found so skip
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 439)         state = 0;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 440)         while(found && *buf != ';') buf = findchar_fast(++buf, end, ranges1, sizeof(ranges1) - 1, &found);
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 441)         if ( buf != end ) buf += 1;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 442)         while ( *buf == 32 ) buf++;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 443)       }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 444)       //else if(*buf == '%' && is_hex(*(buf + 1)) && is_hex(*(buf + 2))) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 445)         //*write = (hex_to_dec(*(buf + 1)) << 4) + hex_to_dec(*(buf + 2));
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 446)         //write+=1;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 447)         //length -= 2;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 448)       //}
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 449)     }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 450)   } while( found );
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 451) 
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 452)   // If the trailing ; is left off we need to finish up
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 453)   if (state) {
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 454)     if (grab_session) {
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 455)       grab_session = 0;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 456)       r->session_id = last;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 457)       r->session_id_sz = buf-last;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 458)     }
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 459)     value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 460)     PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 461)     Py_XDECREF(key);
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 462)     Py_XDECREF(value);
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 463)   }
+cdaf7d8b (MarkReedZ         2018-11-16 11:58:54 -0500 464) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 465)   return cookies;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 466) }
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 467) static inline void getSession( Request* r, char *buf, size_t buflen ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 468)   char *end = buf + buflen;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 469)   char *last = buf;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 470) 
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 471)   static char ALIGNED(16) ranges1[] = "==" ";;";
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 472)   int found;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 473)   int state = 0;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 474)   do { 
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 475)     last = buf;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 476)     buf = findchar_fast(buf, end, ranges1, sizeof(ranges1) - 1, &found);
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 477)     if ( found ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 478)       if ( *buf == '=' ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 479)         if ( state == 0 ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 480)           // Save out the mrsession id 
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 481)           if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 482)             DBG printf("Grab session\n");
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 483)             state = 1;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 484)           }
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 485)           buf+=1;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 486)         } 
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 487)       } 
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 488)       else if ( *buf == ';' ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 489)         if (state == 1 ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 490)           r->session_id = last;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 491)           r->session_id_sz = buf-last;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 492)           return;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 493)         }
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 494)         buf+=1;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 495)         while ( *buf == 32 ) buf++;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 496)       }
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 497)     }
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 498)   } while( found );
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 499) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 500) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 501) static inline PyObject* Request_decode_cookies(Request* self)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 502) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 503)   for(struct mr_header* header = self->headers; header < self->headers + self->num_headers; header++) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 504)     if ( header->name_len == 6 && header->name[0] == 'C' ) {
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 505)       return parseCookies( self, header->value, header->value_len );
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 506)     }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 507)   }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 508)   return NULL;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 509) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 510) 
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 511) void Request_load_cookies(Request* self) {
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 512)   if(!self->py_headers) self->py_headers = Request_decode_headers(self);
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 513)   if(!self->py_cookies) self->py_cookies = Request_decode_cookies(self);
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 514) }
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 515) 
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 516) void Request_load_session(Request* self) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 517)   for(struct mr_header* header = self->headers; header < self->headers + self->num_headers; header++) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 518)     if ( header->name_len == 6 && header->name[0] == 'C' ) {
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 519)       getSession( self, header->value, header->value_len );
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 520)       return;
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 521)     }
+5cdde564 (MarkReedZ         2019-01-13 14:32:23 -0500 522)   }
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 523) }
+3a8373b0 (MarkReedZ         2018-05-26 23:21:02 -0400 524) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 525) PyObject* Request_get_cookies(Request* self, void* closure) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 526)   if(!self->py_headers) self->py_headers = Request_decode_headers(self);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 527)   if(!self->py_cookies) self->py_cookies = Request_decode_cookies(self);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 528)   return self->py_cookies;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 529) }
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 530) 
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 531) PyObject* Request_get_body(Request* self, void* closure)
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 532) {
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 533)   if(!self->body) Py_RETURN_NONE;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 534)   if(!self->py_body) self->py_body = PyBytes_FromStringAndSize(self->body, self->body_len);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 535)   Py_XINCREF(self->py_body);
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 536)   return self->py_body;
+f1df3e93 (Mark Reed         2018-04-29 07:54:39 -0400 537) }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 538) 
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 539) static inline PyObject* parse_query_args( char *buf, size_t buflen ) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 540)   char *end = buf + buflen;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 541)   char *last = buf;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 542)   PyObject* args = PyDict_New();
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 543) 
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 544)   if ( buflen == 0 ) return args;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 545) 
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 546)   PyObject* key = NULL; PyObject* value = NULL;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 547) 
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 548)   static char ALIGNED(16) ranges1[] = "==" "&&";
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 549)   int found;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 550)   int state = 0;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 551)   int grab_session = 0;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 552) // foo=bar&key=23
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 553)   do { 
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 554)     last = buf;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 555)     buf = findchar_fast(buf, end, ranges1, sizeof(ranges1) - 1, &found);
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 556)     if ( found ) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 557)       if ( *buf == '=' ) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 558)         key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 559)         state = 1;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 560)         buf+=1;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 561)         //if ( state == 1 )  TODO ERROR double =s 
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 562)       } 
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 563)       else if ( *buf == '&' ) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 564)         if ( state == 0 ) key  = PyUnicode_FromString("");
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 565)         value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 566)         state = 0;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 567)         PyDict_SetItem(args, key, value);  //  == -1) goto loop_error;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 568)         Py_XDECREF(key);
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 569)         Py_XDECREF(value);
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 570)         buf+=1;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 571)         while ( *buf == 32 ) buf++;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 572)       }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 573)       else {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 574)         printf(" ERR found not = or ; %.*s\n", 5, buf );
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 575)       }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 576)       //else if(*buf == '%' && is_hex(*(buf + 1)) && is_hex(*(buf + 2))) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 577)         //*write = (hex_to_dec(*(buf + 1)) << 4) + hex_to_dec(*(buf + 2));
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 578)         //write+=1;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 579)         //length -= 2;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 580)       //}
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 581)     }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 582)   } while( found );
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 583) 
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 584)   // TODO findchar was updated to handle < 16 bytes so remove
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 585)   // May have 15 extra bytes
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 586)   for (;buf <= end;) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 587)     
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 588)     if ( buf == end || *buf == '&' ) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 589)       if ( state == 0 ) key  = PyUnicode_FromString("");
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 590)       if ( buf == end && *(buf-1) == ' ' ) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 591)         value = PyUnicode_FromStringAndSize(last, buf-last-1); //TODO error
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 592)       } else {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 593)         value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 594)       }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 595)       state = 0;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 596)       PyDict_SetItem(args, key, value);  //  == -1) goto loop_error;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 597)       Py_XDECREF(key);
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 598)       Py_XDECREF(value);
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 599)       buf+=1;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 600)       while ( *buf == 32 ) buf++;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 601)       last = buf;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 602)     }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 603)     else if ( *buf == '=' ) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 604)       key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 605)       if (!key) printf("!key\n");
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 606)       state = 1;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 607)       last = buf+1;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 608)     }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 609)     buf++;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 610)   }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 611) 
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 612)   return args;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 613) }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 614) 
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 615) 
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 616) PyObject* Request_get_path(Request* self, void* closure)
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 617) {
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 618)   request_decodePath(self);
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 619)   if(!self->py_path) {
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 620)     if ( self->path_len == 0 ) self->py_path = Py_None;
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 621)     else self->py_path = PyUnicode_FromStringAndSize(self->path, self->path_len);
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 622)     Py_XINCREF(self->py_path);
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 623)   }
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 624)   return self->py_path;
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 625) }
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 626) PyObject* Request_get_method(Request* self, void* closure)
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 627) {
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 628)   if(!self->py_method) {
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 629)     if ( self->method_len == 0 ) self->py_method = Py_None;
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 630)     else self->py_method = PyUnicode_FromStringAndSize(self->method, self->method_len);
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 631)     //TODO Decode latin? self->py_method = PyUnicode_DecodeLatin1( REQUEST_METHOD(self), self->method_len, NULL);
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 632) 
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 633)     Py_XINCREF(self->py_method);
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 634)   }
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 635)   return self->py_method;
+aca4b753 (MarkReedZ         2018-06-17 14:48:38 -0400 636) }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 637) PyObject* Request_get_query_string(Request* self, void* closure)
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 638) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 639)   if(!self->py_query_string) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 640)     if ( self->qs_len == 0 ) self->py_query_string = Py_None;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 641)     else self->py_query_string = PyUnicode_FromStringAndSize(self->path + self->path_len + 1, self->qs_len - 1);
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 642)     Py_XINCREF(self->py_query_string);
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 643)   }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 644)   return self->py_query_string;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 645) }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 646) 
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 647) PyObject* Request_get_query_args(Request* self, void* closure)
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 648) {
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 649)   if(!self->py_args) {
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 650)     if ( self->qs_len ) {
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 651)       self->py_args = parse_query_args(self->path + self->path_len + 1, self->qs_len - 1);
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 652)       Py_XINCREF(self->py_args);
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 653)     } else {
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 654)       self->py_args = PyDict_New();
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 655)       return self->py_args;
+522cc85b (MarkReedZ         2018-11-17 16:28:39 -0500 656)     }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 657)   }
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 658)   return self->py_args;
+6dca65cc (MarkReedZ         2018-05-31 13:40:29 -0400 659) }
+00000000 (Not Committed Yet 2019-01-20 19:47:15 -0500 660) 
+00000000 (Not Committed Yet 2019-01-20 19:47:15 -0500 661) PyObject* Request_notfound(Request* self)
+00000000 (Not Committed Yet 2019-01-20 19:47:15 -0500 662) {
+00000000 (Not Committed Yet 2019-01-20 19:47:15 -0500 663)   self->return404 = true;
+00000000 (Not Committed Yet 2019-01-20 19:47:15 -0500 664)   PyErr_SetString(PyExc_ValueError, "System command failed");
+00000000 (Not Committed Yet 2019-01-20 19:47:15 -0500 665)   return NULL;
+00000000 (Not Committed Yet 2019-01-20 19:47:15 -0500 666)   //Py_RETURN_NONE;
+00000000 (Not Committed Yet 2019-01-20 19:47:15 -0500 667) }
+00000000 (Not Committed Yet 2019-01-20 19:47:15 -0500 668) 

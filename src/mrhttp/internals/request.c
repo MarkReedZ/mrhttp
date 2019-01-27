@@ -63,8 +63,6 @@ PyObject* Request_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 void Request_dealloc(Request* self) {
 
-  printf("DELME request dealloc\n");
-
   free(self->headers);
 
   Py_XDECREF(self->set_user);
@@ -90,6 +88,7 @@ int Request_init(Request* self, PyObject *args, PyObject* kw)
   if(!(self->response = (Response*)PyObject_GetAttrString((PyObject*)self, "response"))) return -1;
   if(!(self->set_user = PyObject_GetAttrString((PyObject*)self, "set_user"))) return -1;
   Request_reset(self);
+  self->return404 = false;
   
   return 0;
 }
@@ -145,10 +144,6 @@ PyObject* Request_get_transport(Request* self, void* closure) {
   Py_RETURN_NONE;
 }
 
-// TODO query parse
-//?fart=on+me+now&fart=no%20way&blank=not
-//{'fart': ['on me now', 'no way'], 'blank': ['not']}
-
 //#ifdef __SSE4_2__
 
 // Search for a range of characters and return a pointer to the location or buf_end if none are found
@@ -191,31 +186,7 @@ static char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges
     *found = 0;
     return buf;
 }
-/*
-static char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
-{   
-    *found = 0;
-    if (likely(buf_end - buf >= 16)) {
-        __m128i ranges16 = _mm_loadu_si128((const __m128i *)ranges);
-        
-        size_t left = (buf_end - buf) & ~15;
-        do {
-            __m128i b16 = _mm_loadu_si128((const __m128i *)buf); 
-            int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
-            if (unlikely(r != 16)) {
-                buf += r;
-                *found = 1;
-                return buf;
-            }
-            buf += 16;
-            left -= 16;
-        } while (likely(left != 0));
-    }
-   
-    *found = 0; 
-    return buf;
-}
-*/
+
 // /spanish/objetos%20voladores%20no%20identificados?foo=bar
 static inline size_t sse_decode(char* path, ssize_t length, size_t *qs_len) {
   //DBG printf("sse_decode >%.*s<\n", (int)length, path);
@@ -341,7 +312,6 @@ static inline PyObject* Request_decode_headers(Request* self)
 
   for(struct mr_header* header = self->headers; header < self->headers + self->num_headers; header++) {
       PyObject* name = NULL; PyObject* value = NULL;
-      //title_case((char*)header->name, header->name_len);
       name  = PyUnicode_FromStringAndSize(header->name,  header->name_len);        if(!name)  goto loop_error;
       value = PyUnicode_DecodeLatin1(     header->value, header->value_len, NULL); if(!value) goto loop_error;
       if(PyDict_SetItem(headers, name, value) == -1) goto loop_error;
@@ -514,6 +484,7 @@ void Request_load_cookies(Request* self) {
   if(!self->py_cookies) self->py_cookies = Request_decode_cookies(self);
 }
 
+// Instead of loading all headers and cookies just go directly for the session value
 void Request_load_session(Request* self) {
   for(struct mr_header* header = self->headers; header < self->headers + self->num_headers; header++) {
     if ( header->name_len == 6 && header->name[0] == 'C' ) {
@@ -584,30 +555,18 @@ static inline PyObject* parse_query_args( char *buf, size_t buflen ) {
 
   // TODO findchar was updated to handle < 16 bytes so remove
   // May have 15 extra bytes
-  for (;buf <= end;) {
     
-    if ( buf == end || *buf == '&' ) {
-      if ( state == 0 ) key  = PyUnicode_FromString("");
-      if ( buf == end && *(buf-1) == ' ' ) {
-        value = PyUnicode_FromStringAndSize(last, buf-last-1); //TODO error
-      } else {
-        value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
-      }
-      state = 0;
-      PyDict_SetItem(args, key, value);  //  == -1) goto loop_error;
-      Py_XDECREF(key);
-      Py_XDECREF(value);
-      buf+=1;
-      while ( *buf == 32 ) buf++;
-      last = buf;
+  if ( buf == end ) {
+    if ( state == 0 ) key  = PyUnicode_FromString("");
+    if ( buf == end && *(buf-1) == ' ' ) {
+      value = PyUnicode_FromStringAndSize(last, buf-last-1); //TODO error
+    } else {
+      value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
     }
-    else if ( *buf == '=' ) {
-      key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
-      if (!key) printf("!key\n");
-      state = 1;
-      last = buf+1;
-    }
-    buf++;
+    state = 0;
+    PyDict_SetItem(args, key, value);  //  == -1) goto loop_error;
+    Py_XDECREF(key);
+    Py_XDECREF(value);
   }
 
   return args;
@@ -658,3 +617,12 @@ PyObject* Request_get_query_args(Request* self, void* closure)
   }
   return self->py_args;
 }
+
+PyObject* Request_notfound(Request* self)
+{
+  self->return404 = true;
+  PyErr_SetString(PyExc_ValueError, "System command failed");
+  return NULL;
+  //Py_RETURN_NONE;
+}
+

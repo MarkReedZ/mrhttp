@@ -26,7 +26,6 @@ int MrhttpApp_init(MrhttpApp* self, PyObject *args, PyObject *kwargs) {
 
 PyObject *MrhttpApp_cinit(MrhttpApp* self) {
   srand(time(0)); // TODO seed utils.randint
-  //initmrpacker();
   self->requests  = PyObject_GetAttrString((PyObject*)self, "requests");
   int l = PyList_Size(self->requests);
 
@@ -59,9 +58,7 @@ error:
 }
 
 void MrhttpApp_release_request(MrhttpApp* self, Request *r) {
-  //printf("DELME release %p\n", r);
   if ( !(r->inprog) ) {
-    printf("DELME WTF release called, but not inprog??\n");
     Request *z = r+10000;
     z->inprog = false;
   } else {
@@ -70,8 +67,7 @@ void MrhttpApp_release_request(MrhttpApp* self, Request *r) {
   r->inprog = false;
   Request_reset(r);
   //self->numReleases++;
-  //if ( r->inprog ) { printf("DELME WTF inrpof after reset\n"); }
-  //printf("DELME release gets %d rels %d free %d\n", self->numGets, self->numReleases, self->freeRequests); 
+  //printf("release gets %d rels %d free %d\n", self->numGets, self->numReleases, self->freeRequests); 
 /*
   int sz = PyList_GET_SIZE( self->requests );
   int cnt = 0;
@@ -81,12 +77,12 @@ void MrhttpApp_release_request(MrhttpApp* self, Request *r) {
     if ( r->inprog ) numinprog++;
     cnt++;
   }
-  printf("DELME rel numinprog %d free %d\n", numinprog, self->freeRequests); 
+  printf("rel numinprog %d free %d\n", numinprog, self->freeRequests); 
   if ( numinprog != ( sz-self->freeRequests ) ) {
-    printf("DELME BAH numinprog %d free %d\n", numinprog, self->freeRequests); 
+    printf("BAH numinprog %d free %d\n", numinprog, self->freeRequests); 
   }
   if ( numinprog > sz - 10 ) {
-    printf("DELME UGH cnt %d numinprog %d num %d free %d!\n", cnt, numinprog, self->numRequests,self->freeRequests); 
+    printf("UGH cnt %d numinprog %d num %d free %d!\n", cnt, numinprog, self->numRequests,self->freeRequests); 
   }
  */ 
 }
@@ -101,12 +97,12 @@ void MrhttpApp_double_requests(MrhttpApp* self) {
   self->freeRequests += self->numRequests;
   self->nextRequest = self->numRequests;
   self->numRequests *= 2;
-  //printf("DELME dbl req list sz %d num %d\n", PyList_GET_SIZE(self->requests), self->numRequests);
+  //printf("dbl req list sz %d num %d\n", PyList_GET_SIZE(self->requests), self->numRequests);
 }
 
 PyObject *MrhttpApp_get_request(MrhttpApp* self) {
   Request *r = (Request*)PyList_GET_ITEM( self->requests, self->nextRequest );
-  //printf("DELME get %p\n", r);
+  //printf("get %p\n", r);
   self->freeRequests--;
   //self->numGets++;
   DBG printf(" get request index %d\n", self->nextRequest ); 
@@ -114,7 +110,7 @@ PyObject *MrhttpApp_get_request(MrhttpApp* self) {
   // If we wrap and hit an in progress request double the number of requests and 
   // start at the new ones. 
   if ( r->inprog ) {
-    //printf("DELME get req free %d num %d\n", self->freeRequests, self->numRequests); 
+    //printf("get req free %d num %d\n", self->freeRequests, self->numRequests); 
     // Double the number of requests if necessary
     if ( self->freeRequests < 10 ) {
       MrhttpApp_double_requests(self);
@@ -126,7 +122,7 @@ redo:
     while (r->inprog) {
       cnt++; 
       if ( cnt > self->numRequests ) { 
-        //printf("DELME ARGH %d > %d free %d!\n", cnt, self->numRequests,self->freeRequests); 
+        //printf("ARGH %d > %d free %d!\n", cnt, self->numRequests,self->freeRequests); 
         break; 
       }
       self->nextRequest = (self->nextRequest+1)%self->numRequests;
