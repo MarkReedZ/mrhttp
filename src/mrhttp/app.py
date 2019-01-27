@@ -215,7 +215,6 @@ class Application(mrhttp.CApp):
 
       server_coro = loop.create_server( lambda: self._protocol_factory(self), sock=sock)
       if run_async: 
-        print("starting async")
         return server_coro
 
       # Try except here?
