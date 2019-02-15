@@ -192,7 +192,7 @@ PyObject* MrqProtocol_data_received(MrqProtocol* self, PyObject* data)
 
     if ( p[0] == 2 ) { 
 
-      print_buffer(p, 5);
+      //print_buffer(p, 5);
       //int len   = *((int*)(p)+1);
       int len   = p[1] | (p[2]<<8) | (p[3]<<16) | (p[4]<<24);
       DBG_MRQ printf("cmd dl %d len %d\n",data_left,len);

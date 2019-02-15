@@ -88,6 +88,9 @@ def test_one():
   r = requests.post('http://localhost:8080/s', cookies=cookie)
   eq(r.text, "session")
 
+  # Misc
+  r = requests.get('http://localhost:8080/printIP')
+  eq(r.text, "None")
 
   #contains(r.text, "Internal Server Error")
   #print( r.status_code, r.headers, r.text )

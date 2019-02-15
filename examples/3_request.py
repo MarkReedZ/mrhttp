@@ -4,17 +4,21 @@ app = mrhttp.Application()
 
 @app.route('/')
 def hello(r):
-  print("Path: ", r.path)
-  print("Method: ", r.method)
-  print("Mime Type: ", r.mime_type)
-  print("IP: ", r.ip)
-  print("Body: ", r.body)
-  print("Json: ", r.json)
-  print("Headers: ", r.headers)
-  print("Form data: ", r.form)
-  print("Cookies: ", r.cookies)
-  print("Query string arguments (?x=y) are found in:")
-  print("r.args: ", r.args)
+  try:
+    print("Headers: ",     r.headers)
+    print("Json: ",        r.json)
+    print("Form data: ",   r.form)
+    print("Cookies: ",     r.cookies)
+    print("File Upload: ", r.file)
+    print("Query string arguments (?x=y) are found in r.args")
+    print("r.args: ",      r.args)
+    print("Path: ",        r.path)
+    print("Method: ",      r.method)
+    print("Mime Type: ",   r.mime_type)
+    print("IP: ",          r.ip)
+    print("Body: ",        r.body)
+  except Exception as e:
+    print(e)
   return 'Hello World!'
 
 @app.route('/{}/')

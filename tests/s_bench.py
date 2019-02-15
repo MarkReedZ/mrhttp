@@ -74,7 +74,7 @@ def testing(r):
 
 @app.route('/404/')
 def notFound(r):
-  return app.err404
+  return r.NotFound()
 
 @app.route('/500/')
 def error500(r):

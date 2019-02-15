@@ -8,12 +8,13 @@ Hello pipelined  4,152,858 Requests/second
 Hello              633,097 Requests/second
 404                654,053 Requests/second
 Form parsing       214,668 Requests/second
-Parse JSON         510,606 Requests/second
+Parse JSON         224,872 Requests/second
 Templates          257,753 Requests/second
 Sessions           217,759 Requests/second
 Sessions (py)       83,119 Requests/second
 Session login      121,745 Requests/second
 MrWorkServer       338,891 Requests/second
+File Upload        132,242 Requests/second
 ```
 
 Versus sanic a pure python async server
@@ -23,6 +24,7 @@ Hello World       64,366 Requests/second
 Cookies           50,867 Requests/second
 404                9,256 Requests/second
 sessions          29,053 Requests/second
+File upload       21,457 Requests/second
 ```
 
 Hello World Example

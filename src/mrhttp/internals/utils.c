@@ -1,5 +1,5 @@
 
-#include <Python.h>
+#include "utils.h"
 
 PyObject* myrandint(PyObject* self, PyObject* args)
 {
@@ -33,7 +33,7 @@ PyObject* myrandint(PyObject* self, PyObject* args)
 #endif
 
 // Search for a range of characters and return a pointer to the location or buf_end if none are found
-static char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
+char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
 {
     *found = 0;
     __m128i ranges16 = _mm_loadu_si128((const __m128i *)ranges);

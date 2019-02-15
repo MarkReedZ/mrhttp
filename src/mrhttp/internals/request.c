@@ -1,11 +1,11 @@
 
-
 #include <stddef.h>
 #include <sys/param.h>
 #include <strings.h>
 #include <string.h>
 
 #include "common.h"
+#include "utils.h"
 #include "request.h"
 #include "mrhttpparser.h"
 
@@ -74,6 +74,10 @@ void Request_dealloc(Request* self) {
   Py_XDECREF(self->py_path);
   Py_XDECREF(self->py_method);
   Py_XDECREF(self->py_ip);
+  Py_XDECREF(self->py_json);
+  Py_XDECREF(self->py_form);
+  Py_XDECREF(self->py_file);
+  Py_XDECREF(self->py_files);
   Py_XDECREF(self->response);
   Py_XDECREF(self->set_user);
   Py_TYPE(self)->tp_free((PyObject*)self);
@@ -103,6 +107,10 @@ void Request_reset(Request *self) {
   Py_XDECREF(self->py_method); self->py_method = NULL;
   Py_XDECREF(self->py_cookies); self->py_cookies = NULL; // TODO Benchmark just clearing it here, but need a flag to reload cookies each request
   Py_XDECREF(self->hreq.ip); self->hreq.ip = NULL;
+  Py_XDECREF(self->py_json); self->py_json = NULL;
+  Py_XDECREF(self->py_form); self->py_form = NULL;
+  Py_XDECREF(self->py_file); self->py_file = NULL;
+  Py_XDECREF(self->py_files);self->py_files= NULL;
   self->num_headers = 0;
   Response_reset(self->response);
 }
@@ -145,47 +153,6 @@ PyObject* Request_get_transport(Request* self, void* closure) {
 }
 
 //#ifdef __SSE4_2__
-
-// Search for a range of characters and return a pointer to the location or buf_end if none are found
-static char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
-{
-    *found = 0;
-    __m128i ranges16 = _mm_loadu_si128((const __m128i *)ranges);
-    if (likely(buf_end - buf >= 16)) {
-
-        size_t left = (buf_end - buf) & ~15;
-        do {
-            __m128i b16 = _mm_loadu_si128((const __m128i *)buf);
-            int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
-            if (unlikely(r != 16)) {
-                buf += r;
-                *found = 1;
-                return buf;
-            }
-            buf += 16;
-            left -= 16;
-        } while (likely(left != 0));
-
-    }
-
-    size_t left = buf_end - buf;
-    if ( left != 0 ) {
-      static char sbuf[16] = {0};
-      memcpy( sbuf, buf, left );
-      __m128i b16 = _mm_loadu_si128((const __m128i *)sbuf);
-      int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
-      if (unlikely(r != 16) && r < left) {
-        buf += r;
-        *found = 1;
-        return buf;
-      } else {
-        buf = buf_end;
-      }
-    }
-
-    *found = 0;
-    return buf;
-}
 
 // /spanish/objetos%20voladores%20no%20identificados?foo=bar
 static inline size_t sse_decode(char* path, ssize_t length, size_t *qs_len) {
@@ -383,6 +350,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
             grab_session = 1;
           }
           key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+          DBG printf("session key %.*s\n", buf-last, last);
           state = 1;
           buf+=1;
         } else {
@@ -396,8 +364,10 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
           grab_session = 0;
           r->session_id = last;
           r->session_id_sz = buf-last;
+          DBG printf("session %.*s\n", r->session_id_sz, r->session_id);
         }
         value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+        DBG printf(" value %.*s\n", buf-last, last);
         state = 0;
         PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
         Py_XDECREF(key);
@@ -426,6 +396,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
       grab_session = 0;
       r->session_id = last;
       r->session_id_sz = buf-last;
+      DBG printf("session2 %.*s\n", r->session_id_sz, r->session_id);
     }
     value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
     PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
@@ -462,11 +433,17 @@ static inline void getSession( Request* r, char *buf, size_t buflen ) {
           r->session_id_sz = buf-last;
           return;
         }
+        state = 0;
         buf+=1;
         while ( *buf == 32 ) buf++;
       }
     }
   } while( found );
+  if (state) {
+    r->session_id = last;
+    r->session_id_sz = buf-last;
+  }
+  printf( "WTF state %d\n", state);
 }
 
 static inline PyObject* Request_decode_cookies(Request* self)
@@ -624,5 +601,199 @@ PyObject* Request_notfound(Request* self)
   PyErr_SetString(PyExc_ValueError, "System command failed");
   return NULL;
   //Py_RETURN_NONE;
+}
+
+PyObject* Request_parse_mp_form(Request* self) {
+
+
+  Py_ssize_t ctlen;
+  char *ct = NULL;
+  for(struct mr_header* header = self->headers; header < self->headers + self->num_headers; header++) {
+    if ( header->name_len == 12 && header->name[0] == 'C' ) {
+      ct = header->value;
+      ctlen = header->value_len;
+      break;
+    }
+  }
+
+  if (ct == NULL ) {
+    PyObject *ret = PyTuple_New(2);
+    Py_INCREF(Py_None);
+    Py_INCREF(Py_None);
+    PyTuple_SetItem(ret, 0, Py_None);
+    PyTuple_SetItem(ret, 1, Py_None);
+    return ret;
+  }
+
+  //ct = PyUnicode_AsUTF8AndSize( pyct, &ctlen);
+
+  int found;
+  static char crlf[] = "\015\015";
+  static char colon[] = "::" ";;" "==" "\015\015";
+  static char semi[] = ";;" "=="; 
+    
+  //printf("ct >%.*s<\n", ctlen, ct);
+  char *p = ct;
+  char *pend = ct+ctlen;
+  char *bnd;
+  int bndlen;
+  p = findchar_fast(p, pend, semi, sizeof(semi) - 1, &found);
+  //printf("find >%.*s<\n", 5, p);
+  if ( p[2] == 'b' ) {
+    bnd = p + 11;
+    bndlen = pend-bnd;
+    //printf("bnd >%.*s<\n", bndlen, bnd);
+  }
+
+  int i = 0;
+  p = self->body;
+  pend = p + self->body_len;
+
+  int state = 0;
+
+  char *name = NULL;
+  char *filename = NULL;
+  char *content_type = NULL;
+  int namesz, filenamesz, content_typesz;
+  char *body = NULL;
+
+//Content-Disposition: form-data
+//Content-Disposition: form-data; name="fieldName"
+//Content-Disposition: form-data; name="fieldName"; filename="filename.jpg"
+
+  // We're looping line by line until end of body
+  // TODO add a findBoundary function and just search on '-' instead of line by line
+  //      then add a get headers for parsing the lines after the boundary
+  while ( p < pend ) {
+
+    // Consume boundary
+    if ( state == 0 ) {
+      if ( p[0] == '-' && p[1] == '-' && !strncmp(p+2, bnd, bndlen) ) {
+
+        if ( body ) {
+          //printf("body len %d\n", p-body-2);
+          if ( name         ) printf("name >%.*s<\n", 4, name);
+          if ( filename     ) printf("filename >%.*s<\n", 4, filename);
+          if ( content_type ) printf("content_type >%.*s<\n", 4, content_type);
+
+          PyObject *tmp; 
+          if ( filename ) {
+            PyObject *f = PyDict_New();
+            if ( content_type ) {
+              tmp = PyUnicode_FromStringAndSize( content_type, content_typesz);
+              PyDict_SetItemString( f, "type", tmp );
+              Py_DECREF(tmp);
+            } else {
+              tmp = PyUnicode_FromStringAndSize( "text/plain", 10 );
+              PyDict_SetItemString( f, "type", tmp );
+              Py_DECREF(tmp);
+            }
+            tmp = PyUnicode_FromStringAndSize( filename, filenamesz );
+            PyDict_SetItemString( f, "name", tmp );
+            Py_DECREF(tmp);
+            tmp = PyUnicode_FromStringAndSize( body, p-body-2 );
+            PyDict_SetItemString( f, "body", tmp );
+            Py_DECREF(tmp);
+
+            if ( self->py_file == NULL ) {
+              self->py_file = f;
+            }
+            if ( self->py_files == NULL ) {
+              self->py_files = PyList_New(0);
+            }
+            PyList_Append( self->py_files, f );
+
+            //DELME
+            //PyObject_Print( f, stdout, 0 ); printf("\n");
+          } else {
+
+            if ( self->py_form == NULL ) self->py_form = PyDict_New();
+
+            PyObject *val = PyUnicode_FromStringAndSize( body, p-body-2 );
+            PyObject *key = PyUnicode_FromStringAndSize( name, namesz   );
+
+            if ( key && val ) PyDict_SetItem( self->py_form, key, val );
+
+            Py_XDECREF(key);
+            Py_XDECREF(val);
+
+          }
+
+          body = name = filename = content_type = NULL;
+
+        }
+        if ( p[2+bndlen] == '-' ) break; // Last boundary
+        state = 1;
+      }
+    }
+    // Consume header fields ending in blank line
+    //Content-Disposition: form-data; name="fieldName"; filename="filename.jpg"
+    //Content-Type: text/plain; charset=utf-8
+    else if ( state == 1 ) {
+      if ( p[0] == '\r' ) {
+        //printf("end of state 1\n");
+        state = 0;
+        body = p+2;
+      }
+     else {
+        char *last = p;
+        p = findchar_fast(p, pend, colon, sizeof(colon) - 1, &found);
+        if ( found && p[0] == ':' ) {
+          p += 1;
+          if ( last[0] == 'C' ) {
+            //printf(" >%.*s<\n", p-last,last);
+            //printf(" p-last %d\n", (int)(p-last) );
+
+            if ( p-last == 20 ) { // Content-Disposition
+              while ( p[0] != '\r' ) {
+                last = p;
+                p = findchar_fast(p, pend, colon, sizeof(colon) - 1, &found);
+                //printf(" >%.*s<\n", 16,p); 
+
+
+ // >; name="file"; f<
+ // >="file"; filenam<
+ // >="test.txt"
+
+                if ( p[0] == ';' ) { p += 1; while ( p[0] == ' ' ) p++;  }
+                else if ( p[0] == '=' ) { 
+                  //printf("last >%.*s<\n", 4,last);
+                  
+                  if ( last[0] == 'n' ) {
+                    name = p+2;
+                    p = findchar_fast(p+1, pend, colon, sizeof(colon) - 1, &found);
+                    namesz = p-1-name;
+                  }
+                  else if ( last[0] == 'f' ) {
+                    filename = p+2; 
+                    p = findchar_fast(p+1, pend, colon, sizeof(colon) - 1, &found);
+                    filenamesz = p-1-filename;
+                  }
+                  else p += 1;
+                }
+              }
+            } else if ( p-last == 13 ) {  // Content-Type
+              content_type = p+1; 
+              p = findchar_fast(p, pend, colon, sizeof(colon) - 1, &found);
+              content_typesz = p-content_type;
+            }
+          }
+        }  
+      }    
+    }
+    
+    //if ( state == 2 ) {
+    //}
+
+    p = findchar_fast(p, pend, crlf, sizeof(crlf) - 1, &found);
+    p += 2;
+  }
+
+  PyObject *ret = PyTuple_New(2);
+  Py_INCREF(Py_None);
+  Py_INCREF(Py_None);
+  PyTuple_SetItem(ret, 0, Py_None);
+  PyTuple_SetItem(ret, 1, Py_None);
+  return ret;
 }
 

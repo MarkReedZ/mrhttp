@@ -48,6 +48,10 @@ typedef struct {
   PyObject* py_body;
   PyObject* py_query_string;
   PyObject* py_args;
+  PyObject* py_json;
+  PyObject* py_form;
+  PyObject* py_file;
+  PyObject* py_files;
 
   Response* response;
 } Request;
@@ -83,3 +87,6 @@ void request_decodePath(Request* self);
 PyObject *request_updateDate(Request *self, PyObject *date);
 void Request_load_cookies(Request* self);
 void Request_load_session(Request* self);
+
+PyObject* Request_parse_mp_form(Request* self);
+

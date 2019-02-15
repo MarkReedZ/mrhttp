@@ -1,6 +1,9 @@
 
 #pragma once
+
 #include "Python.h"
+#include "structmember.h"
+#include "stddef.h"
 #include "request.h"
 #include "protocol.h"
 #include "memprotocol.h"
@@ -84,14 +87,23 @@ static PyMethodDef Request_methods[] = {
   {"add_done_callback", (PyCFunction)Request_add_done_callback, METH_O,   ""},
   {"NotFound", (PyCFunction)Request_notfound, METH_NOARGS,   ""},
   {"cleanup", (PyCFunction)Request_cleanup,   METH_NOARGS,   ""},
+  {"parse_mp_form", (PyCFunction)Request_parse_mp_form,   METH_NOARGS,   ""},
   {NULL}
+};
+
+static PyMemberDef Request_members[] = {
+    {"_json", T_OBJECT, offsetof(Request, py_json), 0, NULL},
+    {"_form", T_OBJECT, offsetof(Request, py_form), 0, NULL},
+    {"_file", T_OBJECT, offsetof(Request, py_file), 0, NULL},
+    {"_files",T_OBJECT, offsetof(Request, py_files),0, NULL},
+    {NULL},
 };
 static PyGetSetDef Request_getset[] = {
   {"path", (getter)Request_get_path, NULL, "", NULL},
   {"method", (getter)Request_get_method, NULL, "", NULL},
   {"transport", (getter)Request_get_transport, NULL, "", NULL},
   {"headers", (getter)Request_get_headers, NULL, "", NULL},
-  //MMM{"ip", (getter)Request_get_ip, NULL, "", NULL},
+  {"ip", (getter)Request_get_ip, NULL, "", NULL},
   {"cookies", (getter)Request_get_cookies, NULL, "", NULL},
   {"body", (getter)Request_get_body, NULL, "", NULL},
   {"query_string", (getter)Request_get_query_string, NULL, "", NULL},
@@ -219,7 +231,7 @@ static PyTypeObject RequestType = {
   0,                         /* tp_iter */
   0,                         /* tp_iternext */
   Request_methods,           /* tp_methods */
-  0,                         /* tp_members */
+  Request_members,           /* tp_members */
   Request_getset,            /* tp_getset */
   0,                         /* tp_base */
   0,                         /* tp_dict */

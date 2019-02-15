@@ -24,13 +24,18 @@ def numarg(r,n):
 @app.route('/printPostBody')
 def printPostBody(r):
   return r.body
+
 @app.route('/printCookies')
 def printCookies(r):
   return str(r.cookies)
 
+@app.route('/printIP')
+def printIP(r):
+  return str(r.ip)
+
 @app.route('/foo')
 def foo(r):
-  return 'foodff'
+  return 'foo'
 
 @app.route('/123456789012345678901234567890/testing')
 def testing(r):
