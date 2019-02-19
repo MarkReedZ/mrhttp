@@ -9,4 +9,6 @@ def hello(request):
 app.run(cores=2)
 
 # curl -i --raw 'http://localhost:8080/'
+# /tst was added in multiplefiles.py
+# curl -i --raw 'http://localhost:8080/tst'
 

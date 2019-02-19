@@ -2,6 +2,7 @@ from mrhttp import Application
 from mrhttp import Request
 import mrhttp
 import socket
+import mrjson as json
 
 app = Application()
 app.config["memcache"] = [ ("127.0.0.1", 11211) ]
@@ -93,7 +94,7 @@ def parseJ(r):
 @app.route('/form')
 def parseForm(r):
   if r.form == None: return "No form"
-  return r.form["param2"]
+  return json.dumps(r.form)
 
 @app.route('/s',options=['session'])
 def session(r):

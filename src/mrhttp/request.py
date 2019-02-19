@@ -41,10 +41,10 @@ class Request(mrhttp.CRequest):
   def form(self): 
     if self._form == None:
       if self.mime_type == 'application/x-www-form-urlencoded':
-        self._form = dict(urllib.parse.parse_qsl(self.body.decode("utf-8")))
-        #TODO self._form = self.parse_urlencoded_form()
+        #self._form = dict(urllib.parse.parse_qsl(self.body.decode("utf-8")))
+        self.parse_urlencoded_form() # Sets _form
       elif self.mime_type == 'multipart/form-data':
-        self.parse_mp_form()
+        self.parse_mp_form() # Sets _form
     return self._form
 
   @property
@@ -77,61 +77,6 @@ class Request(mrhttp.CRequest):
     except Exception as e:
       print("request.set_user exception:", e)
       print("Error parsing json: ", j)
-
-
-  def parse_multipart_form(self, body, boundary):
-
-    #print(boundary)
-    files = {}
-    fields = {}
-    form_parts = body.split(boundary)
-
-    st = time.time()
-    for form_part in form_parts[1:-1]:
-      content_type = 'text/plain'
-      content_charset = 'utf-8'
-      file_name = None
-      field_name = None
-      line_index = 2
-      line_end_index = 0
-      while not line_end_index == -1:
-        line_end_index = form_part.find(b'\r\n', line_index)
-        form_line = form_part[line_index:line_end_index].decode('utf-8')
-        line_index = line_end_index + 2
-
-        if not form_line:
-            break
-
-        colon_index = form_line.index(':')
-        form_header_field = form_line[0:colon_index].lower()
-        form_header_value, form_parameters = cgi.parse_header( form_line[colon_index + 2:])
-
-        if form_header_field == 'content-disposition':
-            file_name = form_parameters.get('filename')
-            field_name = form_parameters.get('name')
-        elif form_header_field == 'content-type':
-            content_type = form_header_value
-            content_charset = form_parameters.get('charset', 'utf-8')
-
-      if field_name:
-        post_data = form_part[line_index:-4]
-        if file_name:
-            form_file = File(type=content_type,
-                             name=file_name,
-                             body=post_data)
-            if field_name in files:
-                files[field_name].append(form_file)
-            else:
-                files[field_name] = [form_file]
-        else:
-            value = post_data.decode(content_charset)
-            if field_name in fields:
-                fields[field_name].append(value)
-            else:
-                fields[field_name] = [value]
-
-    print("took", time.time()-st)
-    return fields, files
 
 
 

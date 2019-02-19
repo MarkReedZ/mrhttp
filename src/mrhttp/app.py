@@ -66,7 +66,7 @@ class Application(mrhttp.CApp):
     self.router = router.Router()
     self.tasks = []
     self.config = {}
-    self.listeners = { "at_start":[], "at_end":[]}
+    self.listeners = { "at_start":[], "at_end":[], "after_start":[]}
     self._mc = None
     self._mrq = None
     self.uses_session = False
@@ -94,7 +94,7 @@ class Application(mrhttp.CApp):
   # Decorator
   def on(self, event):
     """Call the decorated function on one of the following events:
-       ["at_start","at_end"]
+       ["at_start","at_end", "after_start"]
     """
     def decorator(func):
       self.listeners[event].append(func)
@@ -161,6 +161,7 @@ class Application(mrhttp.CApp):
       print('Forcefully killing {} connections'.format(len(busy)))
     for c in busy:
       c.pipeline_cancel()
+    await asyncio.sleep(0.3)
 
 
   def extend_request(self, handler, *, name=None, property=False):
@@ -211,8 +212,6 @@ class Application(mrhttp.CApp):
           exit(1)
         self._mc = MemcachedClient( srvs, self.loop) 
 
-      loop.add_signal_handler(signal.SIGTERM, loop.stop)
-
       server_coro = loop.create_server( lambda: self._protocol_factory(self), sock=sock)
       if run_async: 
         return server_coro
@@ -221,6 +220,11 @@ class Application(mrhttp.CApp):
       server = loop.run_until_complete(server_coro)
 
       print('Accepting connections on http://{}:{}'.format(host, port))
+
+      self.trigger_event("after_start")
+
+      loop.add_signal_handler(signal.SIGTERM, loop.stop)
+      #loop.add_signal_handler(signal.SIGINT,  loop.stop)
 
       try:
         loop.run_forever()
@@ -294,7 +298,13 @@ class Application(mrhttp.CApp):
         for worker in workers:
           worker.terminate()
 
-      signal.signal(signal.SIGINT, stop)
+      def appstop():
+        nonlocal terminating
+        terminating = True
+        for worker in workers:
+          worker.terminate()
+
+      self.stop = appstop
       signal.signal(signal.SIGTERM, stop)
       #signal.signal(signal.SIGHUP, stop)
 
@@ -309,7 +319,7 @@ class Application(mrhttp.CApp):
       for worker in workers:
           try:
             worker.join()
-
+            print("worker stopped")
             if worker.exitcode > 0:
               print('Worker exited with code {}'.format(worker.exitcode))
             elif worker.exitcode < 0:

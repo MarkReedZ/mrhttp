@@ -127,6 +127,9 @@ parse_headers:
     if(header_name_equal("Content-Length")) {
       char * endptr = (char *)header->value + header->value_len;
       self->body_length = strtol(header->value, &endptr, 10);
+
+      // TODO If the request is too large       
+
       // 0 means error from strtol, but it is also a valid value
       if ( self->body_length == 0 && !( header->value_len == 1 && *(header->value) == '0') ) { 
         //TODO ERROR
@@ -196,7 +199,7 @@ body:
   }
   _reset(self, true);
   
-// TODO CHUNKED body.  NGINX will never do chunked so I haven't bothered
+// TODO CHUNKED body.  NGINX will never do chunked.
   
 
 

@@ -79,7 +79,19 @@ def test_one():
 
   # Form handling
   r = requests.post('http://localhost:8080/form', data={"p1":"v1","param2":"value2"})
-  eq(r.text, "value2")
+  eq(r.text, '{"p1":"v1","param2":"value2"}')
+  r = requests.post('http://localhost:8080/form', data={"":"v","pa{}ram2":"val(ue2"})
+  eq(r.text, '{"":"v","pa{}ram2":"val(ue2"}')
+  r = requests.post('http://localhost:8080/form', data={"":"v","英文版本":"val(ue2"})
+  eq(r.text, '{"":"v","英文版本":"val(ue2"}')
+  r = requests.post('http://localhost:8080/form', data={"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"","英":"+=&ue2"})
+  eq(r.text, '{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"","英":"+=&ue2"}')
+  data = {}
+  s = "fa(rt"*10000
+  data["long"] = s
+  r = requests.post('http://localhost:8080/form',data)
+  eq(r.status_code, 200)
+  eq(r.text, '{"long":"' + s + '"}')
   r = requests.get('http://localhost:8080/form')
   eq(r.text, "No form")
 

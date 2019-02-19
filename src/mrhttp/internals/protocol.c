@@ -187,15 +187,6 @@ PyObject* Protocol_data_received(Protocol* self, PyObject* data)
 {
   self->num_data_received++;
   DBG printf("protocol data recvd %ld\n", Py_SIZE(data));
-        //# Check for the request itself getting too large and exceeding
-        //# memory limits
-        //self._total_request_size += len(data)
-        //if self._total_request_size > self.request_max_size:
-            //exception = PayloadTooLarge('Payload Too Large')
-            //self.write_error(exception)
-
-//if self._header_fragment == b'Content-Length' \ and int(value) > self.request_max_size:
-                //exception = PayloadTooLarge('Payload Too Large')
 
   // If -1 it was an error, but we should have raised it already
   if(parser_data_received(&self->parser, data, self->request) == -1) {

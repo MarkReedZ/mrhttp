@@ -88,6 +88,7 @@ static PyMethodDef Request_methods[] = {
   {"NotFound", (PyCFunction)Request_notfound, METH_NOARGS,   ""},
   {"cleanup", (PyCFunction)Request_cleanup,   METH_NOARGS,   ""},
   {"parse_mp_form", (PyCFunction)Request_parse_mp_form,   METH_NOARGS,   ""},
+  {"parse_urlencoded_form", (PyCFunction)Request_parse_urlencoded_form,   METH_NOARGS,   ""},
   {NULL}
 };
 

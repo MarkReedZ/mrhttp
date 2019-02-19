@@ -89,4 +89,5 @@ void Request_load_cookies(Request* self);
 void Request_load_session(Request* self);
 
 PyObject* Request_parse_mp_form(Request* self);
+PyObject* Request_parse_urlencoded_form(Request* self);
 

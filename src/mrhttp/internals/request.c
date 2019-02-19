@@ -162,6 +162,8 @@ static inline size_t sse_decode(char* path, ssize_t length, size_t *qs_len) {
   static char ranges1[] = "%%" "??";
   char *end = path + length;
   int found;
+
+  // We only findchar once - benchmark one or more % encodings with continuing to use findchar ( Spanish / Chinese )
   do {
     //DBG printf("sse_decode >%.*s<\n", (int)length, path);
     pat = findchar_fast(pat, end, ranges1, sizeof(ranges1) - 1, &found);
@@ -178,10 +180,7 @@ static inline size_t sse_decode(char* path, ssize_t length, size_t *qs_len) {
     }
   } while (0);
 
-  // If we hit the query string separator we're done. Otherwise either there are <16 chars left or we hit a %.
-  // Chinese(back to back encodes) is slow if we keep trying to use cmpestri so we stop. 
-  //  TODO benches/path_decode and review Spanish/etc. Maybe offer a choice.
-  if(*pat == '?') return length;
+  if( !found || *pat == '?') return length;
 
   char *write = pat;
   if ( found ) write -= 2;
@@ -498,47 +497,45 @@ static inline PyObject* parse_query_args( char *buf, size_t buflen ) {
   int found;
   int state = 0;
   int grab_session = 0;
-// foo=bar&key=23
+  size_t len;
+  // foo=bar&key=23%28
   do { 
-    last = buf;
     buf = findchar_fast(buf, end, ranges1, sizeof(ranges1) - 1, &found);
     if ( found ) {
       if ( *buf == '=' ) {
-        key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+        len = sse_decode( last, buf-last, NULL );
+        key = PyUnicode_FromStringAndSize(last, len); //TODO error
         state = 1;
         buf+=1;
-        //if ( state == 1 )  TODO ERROR double =s 
+        last = buf;
       } 
       else if ( *buf == '&' ) {
         if ( state == 0 ) key  = PyUnicode_FromString("");
-        value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+
+        len = sse_decode( last, buf-last, NULL );
+        value = PyUnicode_FromStringAndSize(last, len);
         state = 0;
         PyDict_SetItem(args, key, value);  //  == -1) goto loop_error;
         Py_XDECREF(key);
         Py_XDECREF(value);
         buf+=1;
         while ( *buf == 32 ) buf++;
+        last = buf;
       }
       else {
         printf(" ERR found not = or ; %.*s\n", 5, buf );
       }
-      //else if(*buf == '%' && is_hex(*(buf + 1)) && is_hex(*(buf + 2))) {
-        //*write = (hex_to_dec(*(buf + 1)) << 4) + hex_to_dec(*(buf + 2));
-        //write+=1;
-        //length -= 2;
-      //}
     }
   } while( found );
 
-  // TODO findchar was updated to handle < 16 bytes so remove
-  // May have 15 extra bytes
-    
   if ( buf == end ) {
     if ( state == 0 ) key  = PyUnicode_FromString("");
     if ( buf == end && *(buf-1) == ' ' ) {
-      value = PyUnicode_FromStringAndSize(last, buf-last-1); //TODO error
+      len = sse_decode( last, buf-last-1, NULL );
+      value = PyUnicode_FromStringAndSize(last, len); //TODO error
     } else {
-      value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
+      len = sse_decode( last, buf-last, NULL );
+      value = PyUnicode_FromStringAndSize(last, len); //TODO error
     }
     state = 0;
     PyDict_SetItem(args, key, value);  //  == -1) goto loop_error;
@@ -795,5 +792,10 @@ PyObject* Request_parse_mp_form(Request* self) {
   PyTuple_SetItem(ret, 0, Py_None);
   PyTuple_SetItem(ret, 1, Py_None);
   return ret;
+}
+
+PyObject* Request_parse_urlencoded_form(Request* self) {
+  self->py_form = parse_query_args(self->body, self->body_len);
+  Py_RETURN_NONE;
 }
 
