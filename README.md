@@ -48,9 +48,9 @@ app.run(cores=2)
 Installation
 ------------
 
-'''
+```
 sudo apt install python3-dev -y
 pip3 install mrhttp
-'''
+```
 
 
