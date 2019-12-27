@@ -1,7 +1,7 @@
 
 import asyncio
 import os
-import mrhttp, mrjson
+import mrhttp, mrpacker
 
 
 #TODO
@@ -29,6 +29,7 @@ class MrqClient(mrhttp.CMrqClient):
 
     super().__init__(len(servers))
     self.loop = loop
+    self.pool_size = 2
     self.servers = []
     for s in servers:
       self.servers.append( MrqServer(s[0], s[1], loop, pool_size) )
@@ -71,7 +72,9 @@ class MrqClient(mrhttp.CMrqClient):
         s.num_connections += 1
         s.reconnect_attempts = 0
         s.reconnecting = False  #TODO make sure open pool size number of conns
-        return
+        print( "MrQ: Reconnected to",s.host, "port",s.port )
+        if s.num_connections >= self.pool_size:
+          return
       except ConnectionRefusedError:
         print("Reconnect failed to", s.host, "port", s.port)
         await asyncio.sleep(10)
@@ -81,16 +84,14 @@ class MrqClient(mrhttp.CMrqClient):
 
 
   async def get(self, slot, o):
-    #print("mrqpy get", o)
-    b = mrjson.dumpb(o)
+    b = mrpacker.pack(o)
     srv = self._get(slot, b)
-    #print("After _get srv ",srv, " qsize ", self.servers[srv].q.qsize())
     return await self.servers[srv].q.get()
   
   def lost_connection(self, srv):
     s = self.servers[srv]
     s.num_connections -= 1
-    print( "    Lost connection to",s.host, "port",s.port )
+    print( "MrQ: Lost connection to",s.host, "port",s.port )
     if not s.reconnecting:
       s.reconnecting = True
       asyncio.ensure_future( self.reconnect(srv) )

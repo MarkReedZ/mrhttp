@@ -3,7 +3,18 @@
 #include <Python.h>
 #include <stdbool.h>
 
-#include "app.h"
+typedef struct Protocol Protocol;
+typedef struct Request Request;
+
+typedef struct {
+  Protocol *protocol;
+  Request  *request;
+} SessionCallbackData;
+
+typedef void (*tSessionCallback)(void*, char*, int);
+typedef int (*tSessionClientGet)(void*, char*, void*, void*);
+
+#include "memcachedclient.h"
 
 typedef struct {
   PyObject_HEAD
@@ -25,6 +36,15 @@ typedef struct {
   //Request **requests;
   int numRequests, nextRequest,freeRequests; 
   //int numGets, numReleases;
+
+  // Clients
+  PyObject *py_mc;
+  PyObject *py_mrq;
+  PyObject *py_redis;
+  PyObject *py_session_backend_type; // int 1,2,3 ( memcached, mrworkserver, redis )
+  PyObject *py_session; // points to mc, mrq, or redis
+
+  tSessionClientGet session_get;
 
 } MrhttpApp;
 

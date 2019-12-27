@@ -338,9 +338,9 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               headers[*num_headers].name_len = 12;
               buf += 14;
               //goto hvalue;
-              //if ( buf[0] == 'a' && buf[13] == 'r' ) { //"application/mrpacker"
-                //mrr->flags = 2;
-              //} 
+              if ( buf[0] == 'a' && buf[13] == 'r' ) { //"application/mrpacker"
+                mrr->flags = 2;
+              } 
               buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret); 
               goto skipvalue;
             }
@@ -355,21 +355,15 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               headers[*num_headers].name_len = 14;
               buf += 16;
               goto hvalue;
-/*
-              //print_buffer( buf, 16 ); //DELME
-              headers[*num_headers].value = buf;
-              mrr->body_length = 0;
-              //headers[*num_headers].value_len = 0;
-              while (*buf != 13) {
-                mrr->body_length = (mrr->body_length*10) + (*buf++ - '0');
-              }
-              headers[*num_headers].value_len = buf - headers[*num_headers].value;
-              buf+=2;
-              //print_buffer( buf, 4 ); //DELME
-              //headers[*num_headers].value_len = 0;
-
+            }
+            if ( buf[1] == 'F' || buf[16] == ':' ) { // CF-Connecting-IP
+              headers[*num_headers].name = buf;
+              headers[*num_headers].name_len = 16;
+              buf += 18;
+              mrr->ip = buf;
+              buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret); 
+              mrr->ip_len = headers[*num_headers].value_len;
               goto skipvalue;
-*/
             }
             break;
             //printf( "%.*s\n" , 10, buf);
@@ -389,10 +383,10 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
             }
             break;
           case 'x':
-            if ( buf[1] == '-' && buf[8] == ':' ) { // X-Real-IP
+            if ( buf[1] == '-' && buf[9] == ':' ) { // X-Real-IP
               headers[*num_headers].name = buf;
-              headers[*num_headers].name_len = 8;
-              buf += 10;
+              headers[*num_headers].name_len = 9;
+              buf += 11;
               mrr->ip = buf;
               buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret); 
               mrr->ip_len = headers[*num_headers].value_len;
@@ -402,7 +396,11 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 15;
               buf += 17;
-              goto hvalue;
+              mrr->ip = buf;
+              buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret); 
+              mrr->ip_len = headers[*num_headers].value_len;
+              goto skipvalue;
+              //goto hvalue;
             }
             if ( buf[1] == '-' && buf[16] == ':' ) { // X-Forwarded-Host:       
               headers[*num_headers].name = buf;

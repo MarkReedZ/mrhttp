@@ -104,7 +104,8 @@ PyObject *MemcachedClient_addConnection(MemcachedClient* self, MemcachedProtocol
 int MemcachedClient_get(MemcachedClient* self, char *key, void *fn, void *connection ) {
 
   int ksz = 32;
-  int hash = (hexchar[(uint8_t)key[ksz-3]]<<8) | (hexchar[(uint8_t)key[ksz-2]]<<4) | hexchar[(uint8_t)key[ksz-1]];
+  //int hash = (hexchar[(uint8_t)key[ksz-3]]<<8) | (hexchar[(uint8_t)key[ksz-2]]<<4) | hexchar[(uint8_t)key[ksz-1]];
+  int hash = ((from_64[(uint8_t)key[ksz-3]]&0x3) << 10) | ( from_64[(uint8_t)key[ksz-2]]<<5 ) | from_64[(uint8_t)key[ksz-1]] ;
   int server = connmap[hash];
   DBG_MEMCAC printf("  memcached get server %d\n",server); 
   if ( server == -1 ) return -1;
@@ -122,9 +123,18 @@ PyObject *MemcachedClient_set(MemcachedClient* self, PyObject *args) {
   Py_ssize_t ksz;
   char *k = PyUnicode_AsUTF8AndSize( pykey, &ksz ); 
   Py_ssize_t dsz;
-  char *d = PyUnicode_AsUTF8AndSize( pydata, &dsz ); 
+  char *d;
+  if ( PyUnicode_Check(pydata) ) {
+    d = PyUnicode_AsUTF8AndSize( pydata, &dsz ); 
+  } else {
+    if ( PyBytes_AsStringAndSize( pydata, &d, &dsz ) == -1 ) {
+      return NULL;
+    }
+  }
 
-  int hash = (hexchar[(uint8_t)k[ksz-3]]<<8) | (hexchar[(uint8_t)k[ksz-2]]<<4) | hexchar[(uint8_t)k[ksz-1]];
+  // TODO This assumes its a base64 encoded key - our session key.  It won't work properly as a general purpose set
+  //int hash = (hexchar[(uint8_t)k[ksz-3]]<<8) | (hexchar[(uint8_t)k[ksz-2]]<<4) | hexchar[(uint8_t)k[ksz-1]];
+  int hash = ((from_64[(uint8_t)k[ksz-3]]&0x3) << 10) | ( from_64[(uint8_t)k[ksz-2]]<<5 ) | from_64[(uint8_t)k[ksz-1]] ;
   int server = connmap[hash];
   if ( server == -1 ) return NULL;
 

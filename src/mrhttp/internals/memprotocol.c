@@ -1,10 +1,13 @@
 
+
 #include "memprotocol.h"
 #include "memcachedclient.h"
 #include "Python.h"
 #include "common.h"
 #include <errno.h>
 #include <string.h>
+
+#include "app.h"
 
 // We only support 32 character session IDs and memcache key must be mrsession[32chars]
 
@@ -118,7 +121,7 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
     // No session found
     if ( p[0] == 'E' ) {
       p += 5;
-      tMemcachedCallback cb = self->queue[self->queue_start].cb;
+      tSessionCallback cb = self->queue[self->queue_start].cb;
       cb(self->queue[self->queue_start].connection, NULL, 0);
       self->queue_start = (self->queue_start+1)%self->queue_sz;
     }
@@ -140,9 +143,9 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
         exit(1);
       }
 
-      char *buf = malloc( vlen );
+      char *buf = malloc( vlen ); // TODO Use a preallocated buffer
       memcpy(buf, p, vlen);
-      tMemcachedCallback cb = self->queue[self->queue_start].cb;
+      tSessionCallback cb = self->queue[self->queue_start].cb;
       cb(self->queue[self->queue_start].connection, buf, vlen);
       free(buf);
       self->queue_start = (self->queue_start+1)%self->queue_sz;
@@ -163,13 +166,15 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
 
 int MemcachedProtocol_asyncGet( MemcachedProtocol* self, char *key, void *fn, void *connection ) {
   DBG_MEMCAC printf("MemcachedProtocol - asyncGet\n");
-  //printf("key %.*s\n", 32, key);
   char *kp = self->get_cmd+13;
   memcpy(kp, key, 32);
   PyObject *bytes = PyBytes_FromString(self->get_cmd);
-  self->queue[self->queue_end].cb = (tMemcachedCallback*)fn;
+
+  // Queue up a callback for the response
+  self->queue[self->queue_end].cb = (tSessionCallback*)fn;
   self->queue[self->queue_end].connection = connection;
   self->queue_end = (self->queue_end+1)%self->queue_sz;
+
   if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 0;
   return 1;
 }
@@ -210,8 +215,6 @@ int MemcachedProtocol_asyncSet( MemcachedProtocol* self, char *key, char *val, i
   *p++ = '\r';
   *p++ = '\n';
   PyObject *bytes = PyBytes_FromStringAndSize(self->set_cmd,p-self->set_cmd);
-  //DBG_MEMCAC PyObject_Print(bytes, stdout,0); 
-  //DBG_MEMCAC printf("\n");
   if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 1;
   return 0;  
 }

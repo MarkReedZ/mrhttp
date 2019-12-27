@@ -1,4 +1,5 @@
 
+
 #include <stddef.h>
 #include <sys/param.h>
 #include <strings.h>
@@ -73,11 +74,13 @@ void Request_dealloc(Request* self) {
   Py_XDECREF(self->py_args);
   Py_XDECREF(self->py_path);
   Py_XDECREF(self->py_method);
-  Py_XDECREF(self->py_ip);
+  //Py_XDECREF(self->py_ip);
   Py_XDECREF(self->py_json);
+  Py_XDECREF(self->py_mrpack);
   Py_XDECREF(self->py_form);
   Py_XDECREF(self->py_file);
   Py_XDECREF(self->py_files);
+  Py_XDECREF(self->py_mrq_servers_down);
   Py_XDECREF(self->response);
   Py_XDECREF(self->set_user);
   Py_TYPE(self)->tp_free((PyObject*)self);
@@ -102,15 +105,19 @@ void Request_reset(Request *self) {
   //self->inprog = false;
   self->session_id = NULL;
   Py_XDECREF(self->py_headers); self->py_headers = NULL;
-  Py_XDECREF(self->py_body); self->py_body = NULL;
-  Py_XDECREF(self->py_path); self->py_path = NULL;
+  Py_XDECREF(self->py_body);   self->py_body = NULL;
+  Py_XDECREF(self->py_path);   self->py_path = NULL;
   Py_XDECREF(self->py_method); self->py_method = NULL;
-  Py_XDECREF(self->py_cookies); self->py_cookies = NULL; // TODO Benchmark just clearing it here, but need a flag to reload cookies each request
-  Py_XDECREF(self->hreq.ip); self->hreq.ip = NULL;
-  Py_XDECREF(self->py_json); self->py_json = NULL;
-  Py_XDECREF(self->py_form); self->py_form = NULL;
-  Py_XDECREF(self->py_file); self->py_file = NULL;
-  Py_XDECREF(self->py_files);self->py_files= NULL;
+  Py_XDECREF(self->py_cookies);self->py_cookies = NULL; 
+  Py_XDECREF(self->py_json);   self->py_json = NULL;
+  Py_XDECREF(self->py_mrpack); self->py_mrpack = NULL;
+  Py_XDECREF(self->py_form);   self->py_form = NULL;
+  Py_XDECREF(self->py_file);   self->py_file = NULL;
+  Py_XDECREF(self->py_files);  self->py_files= NULL;
+  self->py_ip   = NULL;
+  self->py_user = NULL;
+  self->hreq.ip = NULL;
+  Py_XDECREF(self->py_mrq_servers_down);  self->py_mrq_servers_down= NULL;
   self->num_headers = 0;
   Response_reset(self->response);
 }
@@ -319,8 +326,8 @@ PyObject* Request_get_ip(Request* self, void* closure) {
     } else {
       self->py_ip = Py_None;
     }
-    Py_XINCREF(self->py_ip);
   }
+  Py_INCREF(self->py_ip);
   return self->py_ip;
 }
 
@@ -330,7 +337,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
   PyObject* cookies = PyDict_New();
   PyObject* key = NULL; PyObject* value = NULL;
 
-  DBG printf("parse cookies: %.*s\n",buflen, buf);
+  DBG printf("parse cookies: %.*s\n",(int)buflen, buf);
 
   static char ALIGNED(16) ranges1[] = "==" ";;" "\x00 "; // Control chars up to space illegal
   int found;
@@ -349,7 +356,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
             grab_session = 1;
           }
           key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
-          DBG printf("session key %.*s\n", buf-last, last);
+          DBG printf("session key %.*s\n", (int)(buf-last), last);
           state = 1;
           buf+=1;
         } else {
@@ -366,7 +373,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
           DBG printf("session %.*s\n", r->session_id_sz, r->session_id);
         }
         value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
-        DBG printf(" value %.*s\n", buf-last, last);
+        DBG printf(" value %.*s\n", (int)(buf-last), last);
         state = 0;
         PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
         Py_XDECREF(key);
@@ -442,7 +449,6 @@ static inline void getSession( Request* r, char *buf, size_t buflen ) {
     r->session_id = last;
     r->session_id_sz = buf-last;
   }
-  printf( "WTF state %d\n", state);
 }
 
 static inline PyObject* Request_decode_cookies(Request* self)
@@ -630,16 +636,34 @@ PyObject* Request_parse_mp_form(Request* self) {
   static char semi[] = ";;" "=="; 
     
   //printf("ct >%.*s<\n", ctlen, ct);
+
+/*
   char *p = ct;
   char *pend = ct+ctlen;
-  char *bnd;
+  char *bnd = NULL;
   int bndlen;
   p = findchar_fast(p, pend, semi, sizeof(semi) - 1, &found);
   //printf("find >%.*s<\n", 5, p);
   if ( p[2] == 'b' ) {
     bnd = p + 11;
     bndlen = pend-bnd;
-    //printf("bnd >%.*s<\n", bndlen, bnd);
+  }
+*/
+  // Boundary is always a fixed offset "Content-Type: multipart/form-data; boundary=foo" and ct is pointing to multipart
+  //   If that changes then the above code may need to parse the entire line for the boundary instead of stopping at the first ;
+  char *p, *pend, *bnd=NULL;
+  int bndlen;
+  if ( ct[21] == 'b' ) {
+    bnd = ct+30;
+    bndlen = ctlen-30;
+  }
+  if ( bnd == NULL ) {
+    PyObject *ret = PyTuple_New(2);
+    Py_INCREF(Py_None);
+    Py_INCREF(Py_None);
+    PyTuple_SetItem(ret, 0, Py_None);
+    PyTuple_SetItem(ret, 1, Py_None);
+    return ret;
   }
 
   int i = 0;
@@ -669,9 +693,9 @@ PyObject* Request_parse_mp_form(Request* self) {
 
         if ( body ) {
           //printf("body len %d\n", p-body-2);
-          if ( name         ) printf("name >%.*s<\n", 4, name);
-          if ( filename     ) printf("filename >%.*s<\n", 4, filename);
-          if ( content_type ) printf("content_type >%.*s<\n", 4, content_type);
+          //if ( name         ) printf("name >%.*s<\n", 4, name);
+          //if ( filename     ) printf("filename >%.*s<\n", 4, filename);
+          //if ( content_type ) printf("content_type >%.*s<\n", 4, content_type);
 
           PyObject *tmp; 
           if ( filename ) {

@@ -7,6 +7,7 @@ Async Python 3.5+ web server written in C
 Hello pipelined  4,152,858 Requests/second
 Hello              633,097 Requests/second
 404                654,053 Requests/second
+Cookies            422,728 Requests/second
 Form parsing       328,780 Requests/second
 Parse JSON         224,872 Requests/second
 Templates          257,753 Requests/second

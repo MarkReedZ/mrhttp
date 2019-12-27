@@ -3,11 +3,13 @@
 #include "Python.h"
 #include <stdbool.h>
 
+typedef void (*tSessionCallback)(void*, char*, int);
+
 //typedef void (*tMrqCallback)(void*);
-//typedef struct {
-  //void *connection;
-  //tMrqCallback *cb;
-//} MrqRequest;
+typedef struct {
+  void *connection;
+  tSessionCallback *cb;
+} MrqRequest;
 
 typedef struct {
   PyObject_HEAD
@@ -29,6 +31,11 @@ typedef struct {
   char *rbuf, *rbufp;
   int rbufsz;
 
+  MrqRequest queue[1024];
+  int queue_sz;
+  int queue_start;
+  int queue_end;
+
 
 } MrqProtocol;
 
@@ -43,8 +50,11 @@ PyObject* MrqProtocol_connection_lost (MrqProtocol* self, PyObject* args);
 PyObject* MrqProtocol_data_received   (MrqProtocol* self, PyObject* data);
 PyObject* MrqProtocol_eof_received    (MrqProtocol* self);
 
-int MrqProtocol_get(MrqProtocol* self, int slot, char *d, int dsz);
-int MrqProtocol_push(MrqProtocol* self, int topic, int slot, char *d, int dsz);
+int MrqProtocol_getSession(MrqProtocol* self, char *key, void *fn, void *connection);
+int MrqProtocol_get  (MrqProtocol* self, char *d, int dsz);
+int MrqProtocol_push (MrqProtocol* self, char *d, int dsz);
+int MrqProtocol_pushj(MrqProtocol* self, char *d, int dsz);
+int MrqProtocol_set  (MrqProtocol* self, char *d, int dsz);
 //typedef struct {
   //int (*MrqProtocol_asyncGet) (MrqProtocol* self, void* fn);
 //} MrqProtocol_CAPI;

@@ -8,6 +8,8 @@
 #include "module.h"
 #include "time.h"
 
+#include "memcachedclient.h"
+
 PyObject *MrhttpApp_new(PyTypeObject* type, PyObject *args, PyObject *kwargs) {
   MrhttpApp* self = NULL;
   self = (MrhttpApp*)type->tp_alloc(type, 0);
@@ -51,6 +53,14 @@ PyObject *MrhttpApp_cinit(MrhttpApp* self) {
   response_setupResponseBuffer();
 
   MrhttpApp_setup_error_pages(self);
+
+  long t = PyLong_AsLong( self->py_session_backend_type );
+  if      ( t == 1 ) self->session_get = (tSessionClientGet)&MemcachedClient_get;
+  else if ( t == 2 ) self->session_get = (tSessionClientGet)&MrqClient_getSession;
+  else if ( t == 3 ) self->session_get = (tSessionClientGet)&MemcachedClient_get;// TODO redis
+  if      ( t == 1 ) self->py_session = self->py_mc;
+  else if ( t == 2 ) self->py_session = self->py_mrq;
+  else if ( t == 3 ) self->py_session = self->py_redis;
 
   Py_RETURN_NONE;
 error:

@@ -7,7 +7,9 @@
 
 //#include "module.h"
 
-typedef struct {
+typedef struct Request Request;
+
+struct Request {
   PyObject_HEAD
 
   struct mr_request hreq;
@@ -49,12 +51,15 @@ typedef struct {
   PyObject* py_query_string;
   PyObject* py_args;
   PyObject* py_json;
+  PyObject* py_mrpack;
   PyObject* py_form;
   PyObject* py_file;
   PyObject* py_files;
+  PyObject* py_mrq_servers_down;
+  PyObject* py_user;
 
   Response* response;
-} Request;
+}; // Request;
 
 
 PyObject* Request_new(PyTypeObject *type, PyObject *args, PyObject *kwds);

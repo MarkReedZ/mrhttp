@@ -3,11 +3,9 @@
 #include "Python.h"
 #include <stdbool.h>
 
-typedef void (*tMemcachedCallback)(void*, char*, int);
-
 typedef struct {
   void *connection;
-  tMemcachedCallback *cb;
+  void *cb;
 } MemcachedRequest;
 
 typedef struct {

@@ -9,43 +9,6 @@
 
 #define MAX_DEPTH 64
 
-#ifdef _MSC_VER
-
-#ifdef _M_IX86
-
-inline uint64_t rdtsc()
-{
-  uint64_t c;
-  __asm {
-    cpuid       // serialize processor
-    rdtsc       // read time stamp counter
-    mov dword ptr [c + 0], eax
-    mov dword ptr [c + 4], edx
-  }
-  return c;
-}
-
-#elif defined(_M_X64)
-#include <intrin.h>
-
-#pragma intrinsic(__rdtsc)
-inline uint64_t rdtsc()
-{
-  return __rdtsc();
-}
-
-#endif
-
-#else
-static __inline__ unsigned long long rdtsc(void)
-{ 
-  unsigned long lo, hi;
-  __asm__ volatile( "rdtsc" : "=a" (lo), "=d" (hi) );
-  return( lo | ( hi << 32 ) );
-}
-
-#endif
-
 static char errmsg[256];
 static PyObject* SetErrorInt(const char *message, int pos)
 {
@@ -224,6 +187,11 @@ end:
   return NULL;
 }
 
+PyObject* unpackc( char *p, int len ) {
+  PyObject *ret = decode( (char*)p, (char*)p+len );
+  return ret;
+}
+
 PyObject* unpack(PyObject* self, PyObject *args, PyObject *kwargs)
 {
   static char *kwlist[] = {"obj", NULL};
@@ -245,10 +213,6 @@ PyObject* unpack(PyObject* self, PyObject *args, PyObject *kwargs)
     return NULL;
   }
 
-  //unsigned long long cycles = rdtsc();
-  //PyObject *ret = decode( p, p+l );
-  //printf(" took %lld\n", rdtsc() - cycles);
-  //return ret;
   return decode( p, p+l );
 
 }

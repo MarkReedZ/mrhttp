@@ -3,6 +3,7 @@ import cgi, time
 import encodings.idna
 import collections
 import mrhttp
+import mrpacker
 try:
   import mrjson as json
 except:
@@ -17,8 +18,6 @@ File = collections.namedtuple('File', ['type', 'body', 'name'])
 class Request(mrhttp.CRequest):
 
   response = mrhttp.Response()
-  user = None
-  servers_down = False
   def __init__(self):
     super().__init__(self)
     pass
@@ -71,12 +70,22 @@ class Request(mrhttp.CRequest):
         self.parse_mp_form()
     return self._files
 
+  def set_usermrp(self, j):
+    try:
+      self.user = mrpacker.unpack(j)
+    except:
+      pass
   def set_user(self, j):
-    try: #TODO bad json??
-      self.user = json.loads(j)
+    try:
+      self.user = json.loadb(j)
     except Exception as e:
-      print("request.set_user exception:", e)
-      print("Error parsing json: ", j)
+      print(e)
+      pass
+    #try: #TODO bad json??
+      #self.user = json.loads(j)
+    #except Exception as e:
+      #print("request.set_user exception:", e)
+      #print("Error parsing json: ", j)
 
 
 

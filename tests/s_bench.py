@@ -14,6 +14,9 @@ engine = tenjin.Engine(path=['tests/templates'])
 app = Application()
 app.config["memcache"] = [("127.0.0.1", 11211)]
 app.config["mrq"] =      [("127.0.0.1", 7100 )]
+app.config["mrq"] =      [("127.0.0.1", 7100 ),("127.0.0.1",7001)]
+app.session_backend = "memcached"
+app.session_backend = "mrworkserver"
 
 
 @app.on('at_start')
@@ -23,7 +26,7 @@ async def dbsetup():
 async def dbclose():
   await app.mcc.close()
 
-@app.route('/pys', type="text")
+@app.route('/pys', _type="text")
 async def pys(r):
   j = await app.mcc.get(b"mrsession" + r.cookies["mrsession"].encode("utf-8"))
   return 'py session'
@@ -59,7 +62,8 @@ def printHeaders(r):
 
 @app.route('/getip')
 def getip(r):
-  return r.ip
+  return str(r.ip)
+
 @app.route('/getip2')
 def getip2(r):
   return r.getip
@@ -131,11 +135,7 @@ def parsemsgpack(r):
 @app.route('/s',options=['session'])
 def session(r):
   if r.user:
-    if "user" in r.user:
-      return r.user["user"]
-    if "un" in r.user:
-      return r.user["un"]
-    
+    return "user"
   return "session"
 
 @app.route('/mrq/{}',options=['session',"mrq","append_user"])
@@ -150,9 +150,9 @@ async def mrqget(r):
   #j = await app.mcc.get(b"mrqget")
   return "ok"
 
-@app.route('/login', type="text")
+@app.route('/login', _type="text")
 def login(r):
-  app.setUserSessionAndCookies( r, mrjson.dumps({"user":"Mark"}) )
+  app.setUserSessionAndCookies( r, 10999, {"user":"Mark"} )
   return 'Logged in!'
 
 @app.route('/template')
@@ -160,7 +160,7 @@ def t2(r):
   context = { "world":"all you python fanatics out there!" } 
   return engine.render('example.ten', context)
 
-@app.route('/long',type='text')
+@app.route('/long',_type='text')
 def longresp(r):
   return "fart"*128*1000
 

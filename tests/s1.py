@@ -7,7 +7,7 @@ import mrjson as json
 app = Application()
 app.config["memcache"] = [ ("127.0.0.1", 11211) ]
 
-@app.route('/',type='text')
+@app.route('/',_type='text')
 def index(r):
   return 'Hello World!'
 

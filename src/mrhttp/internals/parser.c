@@ -7,7 +7,7 @@
 #include "parser.h"
 #include "common.h"
 #include "module.h"
-//#include "unpack.h"
+#include "unpack.h"
 //#include "cpu_features.h"
 
 //#include "protocol.h"
@@ -31,26 +31,12 @@ int parser_init(Parser *self, void *protocol) {
   if ( !self->buf ) return 0;
   _reset(self, true);
 
-  //PyObject *pObj = NULL;
-  //pObj = PyBytes_FromString("Hello world\n");
-  //printf("parser init hello world\n");
-  //PyObject* func = NULL;
-  //PyObject* tmp;
-  //if(!(func = PyObject_GetAttrString(((Protocol*)protocol)->app, "wtf"))) return NULL;
-  //if(!(tmp = PyObject_CallFunction(func, NULL))) return NULL;
-  //if(!(func = PyObject_GetAttrString(((Protocol*)protocol)->app, "echo"))) return NULL;
-  //if(!(tmp = PyObject_CallFunctionObjArgs(func, pObj, NULL))) return NULL;
-  //if(!(tmp = PyObject_CallFunctionObjArgs(func, protocol->app, pObj))) return NULL;
-  //if(!(tmp = PyObject_CallFunctionObjArgs(func, self->app, (PyObject*)&self->request))) return NULL;
-  //Py_DECREF(pObj); 
   return 1;
 }
 
 // TODO Check we don't exceed a max request size
 int parser_data_received(Parser *self, PyObject *py_data, Request *request ) {
-//#ifdef DEBUG_PRINT
   DBG printf("parser data\n");
-//#endif
   char* data;
   Py_ssize_t datalen;
   int i;
@@ -61,11 +47,6 @@ int parser_data_received(Parser *self, PyObject *py_data, Request *request ) {
   }
   DBG printf("parser data\n%.*s\n",(int)datalen, data);
 
-  //if ( unlikely( datalen > ( self->buf_size - (self->end-self->start) )) ) {
-    //memmove(self->buf, self->start, self->end-self->start); 
-    //self->end = self->buf + (self->end-self->start);
-    //self->start = self->buf;
-  //}
   // If we need more space increase the size of the buffer
   DBG printf("parser datalen %lu buflen %ld buffer size %d\n", datalen, (self->end-self->start), self->buf_size);
   if ( unlikely( (datalen+(self->end-self->start)) > self->buf_size) ) {
@@ -181,12 +162,12 @@ body:
   // Need more data
   if ( self->body_length > ( self->end - self->start ) ) return -2;
 
-  // 260 vs json's 285k requests per second ... Not sure why it was slower
-  //if ( request->hreq.flags == 2 ) {
-    //PyObject *obj = unpackc( self->start, self->body_length ); 
-    //PyObject_SetAttrString((PyObject*)request, "mrpack", obj);
-    //Py_XDECREF(obj);
-  //}
+  if ( request->hreq.flags == 2 ) {
+    request->py_mrpack = unpackc( self->start, self->body_length ); 
+  }
+  if ( request->hreq.ip != NULL ) {
+    request->py_ip = PyUnicode_FromStringAndSize(request->hreq.ip, request->hreq.ip_len);
+  }
 
   if(!Protocol_on_body(self->protocol, self->start, self->body_length)) return -1;
 

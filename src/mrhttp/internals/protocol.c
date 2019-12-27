@@ -5,6 +5,8 @@
 #include "request.h"
 #include "response.h"
 #include "router.h"
+#include "unpack.h"
+#include "utils.h"
 
 #include "Python.h"
 #include <errno.h>
@@ -63,8 +65,6 @@ void Protocol_dealloc(Protocol* self)
   Py_XDECREF(self->writelines);
   Py_XDECREF(self->create_task);
   Py_XDECREF(self->task_done);
-  Py_XDECREF(self->memclient);
-  Py_XDECREF(self->mrqclient);
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -76,15 +76,15 @@ int Protocol_init(Protocol* self, PyObject *args, PyObject *kw)
   if(!PyArg_ParseTuple(args, "O", &self->app)) return -1;
   Py_INCREF(self->app);
 
-  self->request = (Request*)MrhttpApp_get_request( (MrhttpApp*)self->app );
-  //if(!(self->request  = (Request*) PyObject_GetAttrString(self->app, "request" ))) return -1;
-  //if(!(self->response = (Response*)PyObject_GetAttrString(self->app, "response"))) return -1;
-  if(!(self->router   = (Router*)  PyObject_GetAttrString(self->app, "router"  ))) return -1;
+  self->request = (Request*)MrhttpApp_get_request( self->app );
+  //if(!(self->request  = (Request*) PyObject_GetAttrString((PyObject*)self->app, "request" ))) return -1;
+  //if(!(self->response = (Response*)PyObject_GetAttrString((PyObject*)self->app, "response"))) return -1;
+  if(!(self->router   = (Router*)  PyObject_GetAttrString((PyObject*)self->app, "router"  ))) return -1;
 
   if ( !parser_init(&self->parser, self) ) return -1;
 
   PyObject* loop = NULL;
-  if(!(loop = PyObject_GetAttrString(self->app, "_loop"  ))) return -1;
+  if(!(loop = PyObject_GetAttrString((PyObject*)self->app, "_loop"  ))) return -1;
   
   self->queue_start = 0;
   self->queue_end = 0;
@@ -125,14 +125,14 @@ PyObject* Protocol_connection_made(Protocol* self, PyObject* transport)
   if(!(self->write      = PyObject_GetAttrString(transport, "write"))) return NULL;
   if(!(self->writelines = PyObject_GetAttrString(transport, "writelines"))) return NULL;
 
-  if(!(connections = PyObject_GetAttrString(self->app, "_connections"))) return NULL;
+  if(!(connections = PyObject_GetAttrString((PyObject*)self->app, "_connections"))) return NULL;
   if(PySet_Add(connections, (PyObject*)self) == -1) { Py_XDECREF(connections); return NULL; }
   DBG printf("connection made num %ld\n", PySet_GET_SIZE(connections));
   Py_XDECREF(connections);
 
   // TODO Only if session or mrq is enabled?
-  self->memclient = (MemcachedClient*)PyObject_GetAttrString(self->app, "_mc");
-  self->mrqclient = (MrqClient*)PyObject_GetAttrString(self->app, "_mrq");
+  //self->memclient = (MemcachedClient*)(self->app->py_mc);
+  //self->mrqclient = (MrqClient*)      (self->app->py_mrq);
 
   Py_RETURN_NONE;
 }
@@ -161,14 +161,14 @@ PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
 {
   DBG printf("conn lost\n");
   self->closed = true;
-  MrhttpApp_release_request( (MrhttpApp*)self->app, self->request );
+  MrhttpApp_release_request( self->app, self->request );
 
   PyObject* connections = NULL;
 
   //if(!Parser_feed_disconnect(&self->parser)) goto error;
 
   // Remove the connection from app.connections
-  if(!(connections = PyObject_GetAttrString(self->app, "_connections"))) return NULL;
+  if(!(connections = PyObject_GetAttrString((PyObject*)self->app, "_connections"))) return NULL;
   int rc = PySet_Discard(connections, (PyObject*)self);
   Py_XDECREF(connections);
   if ( rc == -1 ) return NULL;
@@ -302,26 +302,31 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *req
   return ret;
 }
 
-void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int data_sz ) {
-  Protocol *self = (Protocol*)mcd->protocol;
-  Request  *req  = (Request*)mcd->request;
+void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data_sz ) {
+  Protocol *self = (Protocol*)scd->protocol;
+  Request  *req  = (Request*)scd->request;
+
 
   DBG_MEMCAC printf(" memcached reply data len %d data %.*s\n",data_sz,data_sz,data);
 
-  // TODO if mrq we pass it on so can skip this?
+  // TODO Only support mrpacked user?
   if ( data_sz ) {
-    PyObject *session = PyUnicode_FromStringAndSize( data, data_sz );
-    PyObject_CallFunctionObjArgs(req->set_user, session, NULL);
-    Py_XDECREF(session); 
+    //PyObject *session = PyUnicode_FromStringAndSize( data, data_sz );
+    //if ( data[0] == '{' ) {
+      //PyObject *o = PyBytes_FromStringAndSize( data, data_sz );
+      //PyObject_CallFunctionObjArgs(req->set_user, o, NULL);
+      //Py_XDECREF(o); 
+    //} else {
+    req->py_user = unpackc( data, data_sz );
+    //}
   } 
   
-  free(mcd);
+  free(scd);
   if ( !self->closed ) {
 
     Route *r = req->route;
     if ( r->mrq ) { 
       int slot = 0;
-      int topic = 0;
 
       // Pull slot from the first arg. Must be a number though a string won't break
       if ( req->numArgs > 0 ) {
@@ -329,28 +334,64 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
         char *p = req->args[0];
         while (len--) slot = (slot * 10) + (*p++ - '0');
         slot &= 0xff;
+      } else {
+        // The slot is the user id embedded in the session key
+        unsigned char *p = (unsigned char*)req->session_id;
+        uint64_t uid = 0;
+        int x = from_64[p[0]];
+        int num = 0;
+        while( (x & 0x20) == 0 && num++ < req->session_id_sz ) {
+          uid <<= 5;
+          uid |= x;
+          p += 1; num += 1;
+          x = from_64[p[0]];
+        }
+        slot = uid;
       }
 
       // Only push to mrq if we found a session for the user's key
       if ( data_sz ) {
+
         // push [ user, json ] if append_user is set
         if ( r->append_user ) {
           // TODO Test using a static buffer
-          char *tmp = malloc( req->body_len + data_sz + 16 );
-          tmp[0] = '[';
-          char *p = tmp+1;
-          memcpy(p, req->body, req->body_len);
-          p += req->body_len;
-          *p++ = ',';
-          memcpy(p, data, data_sz);
-          p += data_sz;
-          *p++ = ']';
-          int rc = MrqClient_push( self->mrqclient, topic, slot, tmp, (int)(p-tmp) );
-          free(tmp);
+
+          //int rc = MrqClient_push( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(p-tmp) );
+
+          int rc;
+          // We accept JSON or mrpacker TODO mrpacker first is faster?
+/*
+          if ( req->py_mrpack == NULL ) {
+            char *tmp = malloc( req->body_len + data_sz + 16 );
+            tmp[0] = '[';
+            char *p = tmp+1;
+            memcpy(p, req->body, req->body_len);
+            p += req->body_len;
+            *p++ = ',';
+            memcpy(p, data, data_sz);
+            p += data_sz;
+            *p++ = ']';
+            rc = MrqClient_pushj( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(p-tmp) );
+            free(tmp);
+          } else {
+*/
+            char *tmp = malloc( req->body_len + data_sz + 16 );
+            tmp[0] = 0x42;
+            char *p = tmp+1;
+            memcpy(p, req->body, req->body_len);
+            p += req->body_len;
+            memcpy(p, data, data_sz);
+            p += data_sz;
+            rc = MrqClient_push ( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(p-tmp) );
+            free(tmp);
+          //}
+
           if ( rc == -1 ) {
-            rc = PyObject_SetAttrString((PyObject*)req, "servers_down", Py_True );
-            Py_DECREF(Py_True);
+            req->py_mrq_servers_down = Py_True; Py_INCREF(Py_True);
+            //rc = PyObject_SetAttrString((PyObject*)req, "servers_down", Py_True );
+            //Py_DECREF(Py_True);
           }
+
         }
 
   // TODO Delete the below and just keep append user? This pulls a user defined key from the json and sends that object
@@ -374,16 +415,20 @@ void Protocol_on_memcached_reply( MemcachedCallbackData *mcd, char *data, int da
               strncpy(s, req->body, req->body_len);
               s += req->body_len;
               *s++ = ']';
-              MrqClient_push( self->mrqclient, topic, slot, tmp, (int)(s-tmp) );
+              MrqClient_push( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(s-tmp) );
             }
   
           } else {
-            MrqClient_push( self->mrqclient, topic, slot, req->body, req->body_len );
+            MrqClient_push( (MrqClient*)self->app->py_mrq, slot, req->body, req->body_len );
           }
         */  
         else {
           // Send body to mrq
-          MrqClient_push( self->mrqclient, topic, slot, req->body, req->body_len );
+          if ( req->py_mrpack == NULL ) {
+            MrqClient_pushj( (MrqClient*)self->app->py_mrq, slot, req->body, req->body_len );
+          } else {
+            MrqClient_push ( (MrqClient*)self->app->py_mrq, slot, req->body, req->body_len );
+          }
         }
       }
       // TODO else tell user to login?
@@ -407,13 +452,14 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   request->body_len = body_len;
 
   request->transport = self->transport;
-  request->app = self->app; //TODO need this?
+  request->app = (PyObject*)self->app; //TODO need this?
+
 
   Route *r = router_getRoute( self->router, self->request );
   if ( r == NULL ) {
     // TODO If the pipeline isn't empty...
-    if ( ((MrhttpApp*)self->app)->err404 ) {
-      return protocol_write_error_response_bytes(self, ((MrhttpApp*)self->app)->err404);
+    if ( self->app->err404 ) {
+      return protocol_write_error_response_bytes(self, self->app->err404);
     }
     return self;
   }
@@ -428,13 +474,16 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     // If we found a session id in the cookies lets fetch it
     if ( self->request->session_id != NULL ) {
       DBG printf("found session in cookies\n");
-      // We need to call asyncGet and save this request so when our CB is called we continue processing
-      MemcachedCallbackData *mcd = malloc( sizeof(MemcachedCallbackData));
-      mcd->protocol = self;
+
+      SessionCallbackData *scd = malloc( sizeof(SessionCallbackData));
+      scd->protocol = self;
       Py_INCREF(self); // Incref so we don't get GC'd before the response comes back
-      mcd->request  = self->request;
-      int rc = MemcachedClient_get( self->memclient, self->request->session_id, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
-      //int rc = MemcachedClient_get2( self->memclient, self->request->session_id, self->request->session_id_sz, (tMemcachedCallback)&Protocol_on_memcached_reply, mcd );
+      scd->request  = self->request;
+      //int rc = (tSessionClientGet*)(self->app->session_get)( (MemcachedClient*)self->app->py_mc, self->request->session_id, (tSessionCallback)&Protocol_on_memcached_reply, scd );
+      int rc = self->app->session_get( self->app->py_session, self->request->session_id, (tSessionCallback)&Protocol_on_memcached_reply, scd );
+      //int rc = MemcachedClient_get( (MemcachedClient*)self->app->py_mc, self->request->session_id, (tSessionCallback)&Protocol_on_memcached_reply, scd );
+      // TODO allow keys of any size
+      //int rc = MemcachedClient_get2( (MemcachedClient*)self->app->py_mc, self->request->session_id, self->request->session_id_sz, (tSessionCallback)&Protocol_on_memcached_reply, scd );
 
       // If the get failed (no servers) then we're done
       if ( rc != 0 ) {
@@ -442,7 +491,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
         return self;
       }
       // Get a new request object so we don't overwrite this one while waiting for the reply
-      self->request = (Request*)MrhttpApp_get_request( (MrhttpApp*)self->app );
+      self->request = (Request*)MrhttpApp_get_request( self->app );
       return self;
     }
 
@@ -456,7 +505,6 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   if ( r->mrq ) { //TODO
     DBG printf("Route uses mrq\n"); 
     int slot = 0;
-    int topic = 0;
     // Pull slot from the first arg. Must be a number
     if ( self->request->numArgs > 0 ) {
       int len = self->request->argLens[0];
@@ -465,7 +513,11 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     }
 
     // Send body to mrq
-    MrqClient_push( self->mrqclient, topic, slot, self->request->body, self->request->body_len );
+    if ( self->request->py_mrpack == NULL ) {
+      MrqClient_pushj( (MrqClient*)self->app->py_mrq, slot, self->request->body, self->request->body_len );
+    } else {
+      MrqClient_push ( (MrqClient*)self->app->py_mrq, slot, self->request->body, self->request->body_len );
+    }
 
     // TODO set a client member to say success/fail? Have to start failing if slow consumer / connection gone.
 
@@ -483,7 +535,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
   if ( r->iscoro || !PIPELINE_EMPTY(self)) {
     //self->gather.enabled = false;
     // If we can't finish now save this request by grabbing a new free request if we haven't already done so
-    if ( self->request == request ) self->request = (Request*)MrhttpApp_get_request( (MrhttpApp*)self->app );
+    if ( self->request == request ) self->request = (Request*)MrhttpApp_get_request( self->app );
   }
 
   if(!(result = protocol_callPageHandler(self, r->func, request)) ) {
@@ -491,8 +543,8 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
     if ( request->return404 ) {
       request->return404 = false;
       PyErr_Clear();
-      if ( ((MrhttpApp*)self->app)->err404 ) {
-        return protocol_write_error_response_bytes(self, ((MrhttpApp*)self->app)->err404);
+      if ( self->app->err404 ) {
+        return protocol_write_error_response_bytes(self, self->app->err404);
       }
       return self;
     }
@@ -564,13 +616,13 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
     return self;
   }
 
-  if ( PyBytes_Check( result ) ) {
-    result = PyUnicode_FromEncodedObject( result, "utf-8", "strict" );
-    printf("WARNING: Page handler should return a string. Bytes object returned from the page handler is being converted to unicode using utf-8\n");
-  }
+  //if ( PyBytes_Check( result ) ) {
+    //result = PyUnicode_FromEncodedObject( result, "utf-8", "strict" );
+    //printf("WARNING: Page handler should return a string. Bytes object returned from the page handler is being converted to unicode using utf-8\n");
+  //}
 
   // Make sure the result is a string
-  if ( !PyUnicode_Check( result ) ) {
+  if ( !( PyUnicode_Check( result ) || PyBytes_Check( result ) ) ) {
     protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
     if ( PyCoro_CheckExact( result ) ) {
       PyErr_SetString(PyExc_ValueError, "Page handler must return a string, did you forget to await an async function?");
@@ -610,7 +662,13 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
   if (!headerLen) return NULL;
 
   // TODO Would unicode to bytes (PyUnicode_AsEncodedString) then concatenate body and header be faster? Could check those functions
-  char *r = PyUnicode_AsUTF8AndSize( resp, &rlen ); 
+  char *r;
+  if ( PyBytes_Check(resp) ) {
+    r = PyBytes_AsString(resp);
+    rlen = PyBytes_GET_SIZE(resp);
+  } else {
+    r = PyUnicode_AsUTF8AndSize( resp, &rlen ); 
+  }
   t = rlen;
   DBG_RESP printf("Response body >%.*s<\n", (int)rlen, r);
 
@@ -649,7 +707,7 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
   // If we modified the header in the response buffer return it to default TODO
   if ( req->response->mtype ) response_setHtmlHeader();
 
-  if ( req != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, req );
+  if ( req != self->request ) MrhttpApp_release_request( self->app, req );
   else                        Request_reset(req);
   return self;
 }
@@ -703,7 +761,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
         DBG printf("    connection closed so dropping exception\n");
         PyErr_Clear();
         self->num_requests_popped++; 
-        if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
+        if ( request != self->request ) MrhttpApp_release_request( self->app, request );
         return self;
       }
 
@@ -723,7 +781,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
           PyObject *reason = PyObject_GetAttrString(value, "reason");
           Py_DECREF(value);
           PyErr_Clear();
-          if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
+          if ( request != self->request ) MrhttpApp_release_request( self->app, request );
           if(!protocol_write_error_response(self, code, PyUnicode_AsUTF8(reason), PyUnicode_AsUTF8(msg))) return NULL;
           return self;
         }
@@ -733,7 +791,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
           int code = PyLong_AsLong(PyObject_GetAttrString(value, "code"));
           Py_DECREF(value);
           PyErr_Clear();
-          if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
+          if ( request != self->request ) MrhttpApp_release_request( self->app, request );
           if(!protocol_write_redirect_response(self, code, PyUnicode_AsUTF8(msg))) return NULL;
           return self;
         }
@@ -747,7 +805,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
       PyObject_Print( value, stdout, 0 ); printf("\n");
  
       self->num_requests_popped++; 
-      if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
+      if ( request != self->request ) MrhttpApp_release_request( self->app, request );
       protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
       return self;
     }
@@ -758,13 +816,14 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
   }
   self->num_requests_popped++; 
 
-  if ( PyBytes_Check( response ) ) {
-    response = PyUnicode_FromEncodedObject( response, "utf-8", "strict" );
-    printf("WARNING: Page handler should return a string. Bytes object returned from the page handler is being converted to unicode using utf-8\n");
-  }
+  //if ( PyBytes_Check( response ) ) {
+    //response = PyUnicode_FromEncodedObject( response, "utf-8", "strict" );
+    //printf("WARNING: Page handler should return a string. Bytes object returned from the page handler is being converted to unicode using utf-8\n");
+  //}
 
-  if ( !PyUnicode_Check( response ) ) {
-    if ( request != self->request ) MrhttpApp_release_request( (MrhttpApp*)self->app, request );
+  //if ( !PyUnicode_Check( response ) ) {
+  if ( !( PyUnicode_Check( response ) || PyBytes_Check( response ) ) ) {
+    if ( request != self->request ) MrhttpApp_release_request( self->app, request );
 
     protocol_write_error_response(self, 500,"Internal Server Error","The server encountered an unexpected condition which prevented it from fulfilling the request.");
     if ( PyCoro_CheckExact( response ) ) {

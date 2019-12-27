@@ -1,4 +1,53 @@
 
+set user sess - fix it!
+anti session jacking - detect someone trying different ids 
+  use httponly
+
+Change to the new session ids everywhere.  Update dotests to save a session and have a found and not found?
+
+
+
+
+    def _get_address(self):
+        sock = self.transport.get_extra_info('socket')
+
+        if sock.family == socket.AF_INET:
+            self._socket = (self.transport.get_extra_info('peername') or
+                            (None, None))
+            self._ip, self._port = self._socket
+        elif sock.family == socket.AF_INET6:
+            self._socket = (self.transport.get_extra_info('peername') or
+                            (None, None, None, None))
+            self._ip, self._port, *_ = self._socket
+        else:
+            self._ip, self._port = (None, None)
+
+    @property
+    def remote_addr(self):
+        """Attempt to return the original client ip based on X-Forwarded-For.
+
+        :return: original client ip.
+        """
+        if not hasattr(self, '_remote_addr'):
+            forwarded_for = self.headers.get('X-Forwarded-For', '').split(',')
+            remote_addrs = [
+                addr for addr in [
+                    addr.strip() for addr in forwarded_for
+                    ] if addr
+                ]
+            if len(remote_addrs) > 0:
+                self._remote_addr = remote_addrs[0]
+            else:
+                self._remote_addr = ''
+        return self._remote_addr
+
+
+
+subdomains
+redirects?
+bad.py - bad request
+Review tests
+mrpacker
 
 memcached = clean it up
 If MemcachedClient_set servers are down we return NULL and don't setup an exception
@@ -8,16 +57,11 @@ Request_reset - we doing in all necessary places
 
 Make conn/req timeouts as arguments  (20 / 5 right now)
 
-Try mrpacker again - make sure we have the code up to date
-  Back out the parser changes? 
-  Why is mrunpacking directly in C slower?
-  
 Add tests for memc and mrq failover. ?
 
-async start so can embed
 
-
-
+Add streaming upload
+https://github.com/huge-success/sanic/tree/master/examples/request_stream
 
 
 
@@ -75,26 +119,6 @@ The defaults are implementation-specific. If only the high watermark is given, t
 
 
 
-Add this its useful:
-To answer the comment, for this I was using Flask-AutoIndex to host the contents of a folder. Not as simple as your solution I suppose but gets the job done:
-
-from flask import Flask
-from flask_autoindex import AutoIndex
-
-app = Flask(__name__)
-AutoIndex(app, browse_root='packages')
-
-if __name__ == '__main__':
-    app.run('0.0.0.0', debug=True, port=5005, threaded=True)
-
-
-
-
-
-
-python dotests.py then ctrl-c during benchmark "RuntimeError: Event loop stopped before Future completed."
-
-
 
 
 Wiki doc?
@@ -117,18 +141,7 @@ vhosts -- how to do this? I don't like sanic's, maybe do cherrypy's redir
 
 
 
-rate limit in C? Nginx and our cdn can do this for us?
 
-
-
-
-
-
-
-This is slow so do it in C to speed up forms
-  urllib.parse.parse_qsl('foo=bar&baz=foor&dogsdont=likecats')
-  cgi.parse_header do in C 
-   curl -d "param1=value1&param2=value2" -X POST http://localhost:8080/form --verbose -H "Content-Type: application/x-www-form-urlencoded; charset=UTF-8"
 
 
 
@@ -155,5 +168,9 @@ https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world
 Look at a mysql C client?  We can do better than aiomysql.  Either libmysqlclient or our own
 https://dev.mysql.com/doc/dev/mysql-server/latest/PAGE_PROTOCOL.html
 https://dev.mysql.com/doc/internals/en/a-mysql-client-logs-in.html
+
+
+If I want to try mrpacker again:
+https://github.com/MarkReedZ/mrhttp/tree/cdaf7d8be3bcb0a88792875678aa2de515020566/src/mrhttp/utils
 
 

@@ -4,6 +4,7 @@
 #include "Python.h"
 #include "structmember.h"
 #include "stddef.h"
+#include "app.h"
 #include "request.h"
 #include "protocol.h"
 #include "memprotocol.h"
@@ -11,7 +12,6 @@
 #include "mrqclient.h"
 #include "memcachedclient.h"
 #include "router.h"
-#include "app.h"
 #include "utils.h"
 
 //PyMethodDef Request_methods[];
@@ -72,9 +72,18 @@ static PyMethodDef MrhttpApp_methods[] = {
   {"check_idle", (PyCFunction)MrhttpApp_check_idle,  METH_NOARGS,  ""},
   {NULL}
 };
+static PyMemberDef MrhttpApp_members[] = {
+    {"_mc", T_OBJECT, offsetof(MrhttpApp, py_mc), 0, NULL},
+    {"_mrq", T_OBJECT, offsetof(MrhttpApp, py_mrq), 0, NULL},
+    {"_redis", T_OBJECT, offsetof(MrhttpApp, py_redis), 0, NULL},
+    {"_session_client", T_OBJECT, offsetof(MrhttpApp, py_session), 0, NULL},
+    {"session_backend_type", T_OBJECT, offsetof(MrhttpApp, py_session_backend_type), 0, NULL},
+    {NULL},
+};
 static PyMethodDef MrqClient_methods[] = {
   {"cinit", (PyCFunction)MrqClient_cinit, METH_NOARGS,   ""},
   {"_get",  (PyCFunction)MrqClient_get,   METH_VARARGS,  ""},
+  {"set",   (PyCFunction)MrqClient_set,   METH_VARARGS,  ""},
   {NULL}
 };
 static PyMethodDef MemcachedClient_methods[] = {
@@ -93,10 +102,14 @@ static PyMethodDef Request_methods[] = {
 };
 
 static PyMemberDef Request_members[] = {
-    {"_json", T_OBJECT, offsetof(Request, py_json), 0, NULL},
-    {"_form", T_OBJECT, offsetof(Request, py_form), 0, NULL},
-    {"_file", T_OBJECT, offsetof(Request, py_file), 0, NULL},
-    {"_files",T_OBJECT, offsetof(Request, py_files),0, NULL},
+    {"_json",  T_OBJECT, offsetof(Request, py_json),   0, NULL},
+    {"mrpack", T_OBJECT, offsetof(Request, py_mrpack), 0, NULL},
+    {"_form",  T_OBJECT, offsetof(Request, py_form),   0, NULL},
+    {"_file",  T_OBJECT, offsetof(Request, py_file),   0, NULL},
+    {"_files", T_OBJECT, offsetof(Request, py_files),  0, NULL},
+    {"servers_down",T_OBJECT, offsetof(Request, py_mrq_servers_down),0, NULL},
+    {"user",   T_OBJECT, offsetof(Request, py_user),   0, NULL},
+    {"ip",     T_OBJECT, offsetof(Request, py_ip),     0, NULL},
     {NULL},
 };
 static PyGetSetDef Request_getset[] = {
@@ -104,7 +117,6 @@ static PyGetSetDef Request_getset[] = {
   {"method", (getter)Request_get_method, NULL, "", NULL},
   {"transport", (getter)Request_get_transport, NULL, "", NULL},
   {"headers", (getter)Request_get_headers, NULL, "", NULL},
-  {"ip", (getter)Request_get_ip, NULL, "", NULL},
   {"cookies", (getter)Request_get_cookies, NULL, "", NULL},
   {"body", (getter)Request_get_body, NULL, "", NULL},
   {"query_string", (getter)Request_get_query_string, NULL, "", NULL},
@@ -150,8 +162,8 @@ static PyTypeObject MrhttpAppType = {
   0,                         /* tp_weaklistoffset */
   0,                         /* tp_iter */
   0,                         /* tp_iternext */
-  MrhttpApp_methods,           /* tp_methods */
-  0,                         /* tp_members */
+  MrhttpApp_methods,         /* tp_methods */
+  MrhttpApp_members,         /* tp_members */
   0,            /* tp_getset */
   0,                         /* tp_base */
   0,                         /* tp_dict */

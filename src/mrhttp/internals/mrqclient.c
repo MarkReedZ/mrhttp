@@ -1,3 +1,4 @@
+
 #include <Python.h>
 #include <stdbool.h>
 
@@ -19,6 +20,10 @@ PyObject *MrqClient_new(PyTypeObject* type, PyObject *args, PyObject *kwargs) {
 }
 
 void MrqClient_dealloc(MrqClient* self) {
+  for (int i = 0; i < self->num_servers; i++ ) {
+    MrqServer_dealloc( self->servers[i] );
+    free( self->servers[i] );
+  }
   Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -109,22 +114,62 @@ PyObject *MrqClient_get(MrqClient* self, PyObject *args) {
   int slot;
   PyObject *getargs;
   if(!PyArg_ParseTuple(args, "iO", &slot, &getargs)) return NULL;
-  int srv = server_slotmap[slot];
+  int srv = server_slotmap[slot&0xFF];
   if ( srv == -1 ) return NULL;
-  MrqServer_get( self->servers[srv], slot, getargs); //TODO error check
+  MrqServer_get( self->servers[srv], getargs); //TODO error check
   return PyLong_FromLong(srv);
 }
 
+PyObject *MrqClient_set(MrqClient* self, PyObject *args) {
+  int slot;
+  PyObject *d;
+  if(!PyArg_ParseTuple(args, "iO", &slot, &d)) return NULL;
+  int srv = server_slotmap[slot&0xFF];
+  if ( srv == -1 ) return NULL;
+  MrqServer_set( self->servers[srv], d); //TODO error check
+  return PyLong_FromLong(srv);
+}
+
+
 // TODO We trust the slot is & 0xFF
-int MrqClient_push(MrqClient* self, int topic, int slot, char *d, int dsz) {
-  DBG_MRQ printf(" MrqClient_push topic %d slot %d\n", topic, slot );
+int MrqClient_push(MrqClient* self, int slot, char *d, int dsz) {
+  DBG_MRQ printf(" MrqClient_push slot %d\n", slot );
   int server = server_slotmap[slot];
   DBG_MRQ printf(" MrqClient_push server %d\n", server );
   DBG_MRQ printf(" MrqClient_push >%.*s<\n", dsz, d );
   if ( server == -1 ) return -1;
-  int rc = MrqServer_push( self->servers[server], topic, slot, d, dsz );
+  int rc = MrqServer_push( self->servers[server], d, dsz );
   return rc;
 }
+int MrqClient_pushj(MrqClient* self, int slot, char *d, int dsz) {
+  DBG_MRQ printf(" MrqClient_pushj slot %d\n", slot );
+  int server = server_slotmap[slot];
+  DBG_MRQ printf(" MrqClient_pushj server %d\n", server );
+  DBG_MRQ printf(" MrqClient_pushj >%.*s<\n", dsz, d );
+  if ( server == -1 ) return -1;
+  int rc = MrqServer_pushj( self->servers[server], d, dsz );
+  return rc;
+}
+
+int MrqClient_getSession(MrqClient* self, char *key, void *fn, void *connection ) {
+  int ksz = 32;
+  int hash = (from_64[(uint8_t)key[ksz-2]]<<5) | from_64[(uint8_t)key[ksz-1]] ;
+  int server = server_slotmap[hash&0xFF];
+  return MrqServer_getSession( self->servers[server], key, fn, connection);
+}
+/*
+int MemcachedClient_get(MemcachedClient* self, char *key, void *fn, void *connection ) {
+
+  int ksz = 32;
+  int hash = (hexchar[(uint8_t)key[ksz-3]]<<8) | (hexchar[(uint8_t)key[ksz-2]]<<4) | hexchar[(uint8_t)key[ksz-1]];
+  int server = connmap[hash];
+  DBG_MEMCAC printf("  memcached get server %d\n",server);
+  if ( server == -1 ) return -1;
+
+  int rc = MemcachedServer_get( self->servers[server], key, fn, connection );
+  return rc;
+}
+*/
 
 int MrqServer_dealloc( MrqServer *self ) {
   free(self->conns);
@@ -140,7 +185,6 @@ int MrqServer_init( MrqServer *self, MrqClient *client, int server_num ) {
   return 0;
 }
 int MrqServer_addConnection( MrqServer *self, MrqProtocol *conn) {
-  DBG_MRQ printf("  MrqServer add conn %p\n", conn);
   self->conns[ self->num_conns++ ] = conn;
   return 0;
 }
@@ -162,7 +206,14 @@ void MrqServer_connection_lost( MrqServer* self, MrqProtocol* conn ) {
 
 }
 
-int MrqServer_get(MrqServer* self, int slot, PyObject *args ) {
+int MrqServer_getSession(MrqServer* self, char *key, void *fn, void *connection ) {
+  if ( self->num_conns == 0 ) return -1;
+  int c = self->next_conn++;
+  if ( self->next_conn >= self->num_conns ) self->next_conn = 0;
+  return MrqProtocol_getSession( self->conns[c], key, fn, connection );
+}
+
+int MrqServer_get(MrqServer* self, PyObject *args ) {
   if ( self->num_conns == 0 ) return -1;
   int c = self->next_conn++;
   if ( self->next_conn >= self->num_conns ) self->next_conn = 0;
@@ -171,18 +222,40 @@ int MrqServer_get(MrqServer* self, int slot, PyObject *args ) {
   Py_ssize_t bsz;
   if(PyBytes_AsStringAndSize(args, &b, &bsz) == -1) return -1;
 
-  MrqProtocol_get( self->conns[c], slot, b, bsz );
+  MrqProtocol_get( self->conns[c], b, bsz );
+  return 0;
+}
+int MrqServer_set(MrqServer* self, PyObject *d) {
+  if ( self->num_conns == 0 ) return -1;
+  int c = self->next_conn++;
+  if ( self->next_conn >= self->num_conns ) self->next_conn = 0;
+
+  char *b;
+  Py_ssize_t bsz;
+  if(PyBytes_AsStringAndSize(d, &b, &bsz) == -1) return -1;
+
+  MrqProtocol_set( self->conns[c], b, bsz );
   return 0;
 }
 
-int MrqServer_push(MrqServer* self, int topic, int slot, char *d, int dsz) {
+int MrqServer_push(MrqServer* self, char *d, int dsz) {
   DBG_MRQ printf("  MrqServer push num conns %d\n", self->num_conns);
   if ( self->num_conns == 0 ) return -1;
   int c = self->next_conn++;
   if ( self->next_conn >= self->num_conns ) self->next_conn = 0;
 
   DBG_MRQ printf("mrq server push: %.*s\n",dsz, d);
-  MrqProtocol_push( self->conns[c], topic, slot, d, dsz );
+  MrqProtocol_push( self->conns[c], d, dsz );
+  return 0;
+}
+int MrqServer_pushj(MrqServer* self, char *d, int dsz) {
+  DBG_MRQ printf("  MrqServer pushj num conns %d\n", self->num_conns);
+  if ( self->num_conns == 0 ) return -1;
+  int c = self->next_conn++;
+  if ( self->next_conn >= self->num_conns ) self->next_conn = 0;
+
+  DBG_MRQ printf("mrq server push: %.*s\n",dsz, d);
+  MrqProtocol_pushj( self->conns[c], d, dsz );
   return 0;
 }
 

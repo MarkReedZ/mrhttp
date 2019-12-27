@@ -2,6 +2,7 @@
 #include "Python.h"
 #include <stdbool.h>
 
+#include "app.h"
 #include "router.h"
 #include "parser.h"
 #include "request.h"
@@ -19,9 +20,9 @@ typedef struct {
   PyObject* task; // Task if coroutine otherwise output
 } PipelineRequest;
 
-typedef struct {
+struct Protocol {
   PyObject_HEAD
-  PyObject* app;
+  MrhttpApp* app;
   bool closed;
 
   PyObject* transport;
@@ -50,12 +51,8 @@ typedef struct {
   Parser  parser;
   MemcachedClient *memclient;
   MrqClient *mrqclient;
-} Protocol;
+};// Protocol;
 
-typedef struct {
-  Protocol *protocol;
-  Request  *request;
-} MemcachedCallbackData;
 
 PyObject * Protocol_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 int Protocol_init(Protocol* self, PyObject *args, PyObject *kw);

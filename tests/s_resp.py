@@ -6,7 +6,7 @@ import http.cookies
 
 app = Application()
 
-@app.route('/type',type='text')
+@app.route('/type', _type='text')
 def content_type(r):
   return 'Hello World!'
 
@@ -16,7 +16,7 @@ def index(r):
   r.response.headers["Foo"] = "b"
   return 'Hello World!'
 
-@app.route('/cook1', type="text")
+@app.route('/cook1', _type="text")
 def cook1(r):
 
   cookies = http.cookies.SimpleCookie()
@@ -31,7 +31,7 @@ def cook1(r):
 
   return 'cookie'
 
-@app.route('/cook2', type="text")
+@app.route('/cook2', _type="text")
 def cook2(r):
 
   cookies = http.cookies.SimpleCookie()
@@ -41,7 +41,7 @@ def cook2(r):
   return 'cookie'
 
 # python requests can't handle this?? Hangs waiting for response curl is fine
-#@app.route('/long',type='text')
+#@app.route('/long', _type='text')
 #def longresp(r):
   #return "fart"*128*1000
 
