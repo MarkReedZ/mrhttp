@@ -14,7 +14,7 @@ msg = mrpacker.pack( [1,2,3] )
 msglen = len(msg)
 print(msg)
 
-@app.route('/')#,options=['session'])
+@app.route('/',options=['session'])
 async def index(r):
   #await app.c.push( r.user["id"], 0, msg, msglen )
   #print( r.headers )

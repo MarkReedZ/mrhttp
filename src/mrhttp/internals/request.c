@@ -370,7 +370,6 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
           grab_session = 0;
           r->session_id = last;
           r->session_id_sz = buf-last;
-          DBG printf("session %.*s\n", r->session_id_sz, r->session_id);
         }
         value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
         DBG printf(" value %.*s\n", (int)(buf-last), last);
@@ -724,8 +723,6 @@ PyObject* Request_parse_mp_form(Request* self) {
             }
             PyList_Append( self->py_files, f );
 
-            //DELME
-            //PyObject_Print( f, stdout, 0 ); printf("\n");
           } else {
 
             if ( self->py_form == NULL ) self->py_form = PyDict_New();

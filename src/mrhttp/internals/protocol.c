@@ -318,6 +318,7 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
       //Py_XDECREF(o); 
     //} else {
     req->py_user = unpackc( data, data_sz );
+    
     //}
   } 
   
@@ -359,7 +360,7 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
           //int rc = MrqClient_push( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(p-tmp) );
 
           int rc;
-          // We accept JSON or mrpacker TODO mrpacker first is faster?
+          // TODO Accept json and mrpacker?
 /*
           if ( req->py_mrpack == NULL ) {
             char *tmp = malloc( req->body_len + data_sz + 16 );

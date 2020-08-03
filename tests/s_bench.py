@@ -13,23 +13,25 @@ engine = tenjin.Engine(path=['tests/templates'])
 
 app = Application()
 app.config["memcache"] = [("127.0.0.1", 11211)]
-app.config["mrq"] =      [("127.0.0.1", 7100 )]
-app.config["mrq"] =      [("127.0.0.1", 7100 ),("127.0.0.1",7001)]
+#app.config["mrq"] =      [("127.0.0.1", 7100 )]
+#app.config["mrq"] =      [("127.0.0.1", 7100 ),("127.0.0.1",7001)]
+#app.config["mrcache"] =  [("127.0.0.1", 7000 )]
 app.session_backend = "memcached"
-app.session_backend = "mrworkserver"
+#app.session_backend = "mrworkserver"
+#app.session_backend = "mrcache"
 
 
-@app.on('at_start')
-async def dbsetup():
-  app.mcc = await mrasyncmc.create_client([("127.0.0.1",11211),("127.0.0.1",11212)], loop=app.loop,pool_size=4)
-@app.on('at_end')
-async def dbclose():
-  await app.mcc.close()
+#@app.on('at_start')
+#async def dbsetup():
+  #app.mcc = await mrasyncmc.create_client([("127.0.0.1",11211),("127.0.0.1",11212)], loop=app.loop,pool_size=4)
+#@app.on('at_end')
+#async def dbclose():
+  #await app.mcc.close()
 
-@app.route('/pys', _type="text")
-async def pys(r):
-  j = await app.mcc.get(b"mrsession" + r.cookies["mrsession"].encode("utf-8"))
-  return 'py session'
+#@app.route('/pys', _type="text")
+#async def pys(r):
+  #j = await app.mcc.get(b"mrsession" + r.cookies["mrsession"].encode("utf-8"))
+  #return 'py session'
 
 
 
@@ -138,9 +140,9 @@ def session(r):
     return "user"
   return "session"
 
-@app.route('/mrq/{}',options=['session',"mrq","append_user"])
-def mrq(r, tstid):
-  return "ok"
+#@app.route('/mrq/{}',options=['session',"mrq","append_user"])
+#def mrq(r, tstid):
+  #return "ok"
 
 @app.route('/mrqget')
 async def mrqget(r):

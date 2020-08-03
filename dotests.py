@@ -7,6 +7,7 @@ import tests
 
 # TODO
 #  Check for memcached being up and add the session key so we hit and load the json 43709dd361cc443e976b05714581a7fb
+#     memcached -l 127.0.0.1 -p 11211 -d -m 50
 
 
 if 1:
@@ -46,31 +47,34 @@ import atexit
 
 
 def run_wrk(loop, endpoint=None, lua=None, options=None):
-  endpoint = endpoint or 'http://localhost:8080/'
-  if lua:
-    wrk_fut = asyncio.create_subprocess_exec( 'wrk', '-t', '4', '-c', '32', '-d', '2', '-s', lua, endpoint, stdout=PIPE, stderr=STDOUT)
-  else:
-    if options != None:
-      wrk_fut = asyncio.create_subprocess_exec( 'wrk', '-t', '4', '-c', '32', '-d', '2', *options, endpoint, stdout=PIPE, stderr=STDOUT)
+  try: 
+    endpoint = endpoint or 'http://localhost:8080/'
+    if lua:
+      wrk_fut = asyncio.create_subprocess_exec( 'wrk', '-t', '4', '-c', '32', '-d', '2', '-s', lua, endpoint, stdout=PIPE, stderr=STDOUT)
     else:
-      wrk_fut = asyncio.create_subprocess_exec( 'wrk', '-t', '4', '-c', '32', '-d', '2', endpoint, stdout=PIPE, stderr=STDOUT)
-
-  wrk = loop.run_until_complete(wrk_fut)
-  rps = 0
-  lines = []
-  while 1:
-    line = loop.run_until_complete(wrk.stdout.readline())
-    if line:
-      line = line.decode('utf-8')
-      lines.append(line)
-      if line.startswith('Requests/sec:'):
-        rps = float(line.split()[-1])
-    else:
-      break
-
-  retcode = loop.run_until_complete(wrk.wait())
-  if retcode != 0:
-    print('\r\n'.join(lines))
+      if options != None:
+        wrk_fut = asyncio.create_subprocess_exec( 'wrk', '-t', '4', '-c', '32', '-d', '2', *options, endpoint, stdout=PIPE, stderr=STDOUT)
+      else:
+        wrk_fut = asyncio.create_subprocess_exec( 'wrk', '-t', '4', '-c', '32', '-d', '2', endpoint, stdout=PIPE, stderr=STDOUT)
+  
+    wrk = loop.run_until_complete(wrk_fut)
+    rps = 0
+    lines = []
+    while 1:
+      line = loop.run_until_complete(wrk.stdout.readline())
+      if line:
+        line = line.decode('utf-8')
+        lines.append(line)
+        if line.startswith('Requests/sec:'):
+          rps = float(line.split()[-1])
+      else:
+        break
+  
+    retcode = loop.run_until_complete(wrk.wait())
+    if retcode != 0:
+      print('\r\n'.join(lines))
+  except:
+    print("WTF")
 
 
   return rps
@@ -111,14 +115,14 @@ try:
     #print ("many args      ", run_wrk(loop, 'http://localhost:8080/sixargs/one/two/three/four/five/six'), "Requests/second" )
     #print ("404 natural    ", run_wrk(loop, 'http://localhost:8080/dfads404/'), "Requests/second" )
     #print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
-    #print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
+    print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
     #print ("Templates      ", run_wrk(loop, 'http://localhost:8080/template'),            "Requests/second" )
     #print ("mrpacker       ", run_wrk(loop,'http://localhost:8080/mrpacker',lua='tests/lua/mrpacker.lua'), "Requests/second" )
-    print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
+    #print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
     #print ("Sessions (py)  ", run_wrk(loop, 'http://localhost:8080/pys',   options=opts), "Requests/second" )
     #print ("Session login  ", run_wrk(loop, 'http://localhost:8080/login'),               "Requests/second" )
     #print ("json post      ", run_wrk(loop,'http://localhost:8080/json',lua='tests/lua/json.lua'), "Requests/second" )
-    #print ("mrpacker py    ", run_wrk(loop,'http://localhost:8080/mrpackerpy',lua='tests/lua/mrpacker.lua'), "Requests/second" )
+    print ("mrpacker py    ", run_wrk(loop,'http://localhost:8080/mrpackerpy',lua='tests/lua/mrpacker.lua'), "Requests/second" )
     #print ("msgpack py     ", run_wrk(loop,'http://localhost:8080/msgpack',lua='tests/lua/msgpack.lua'), "Requests/second" )
 
   

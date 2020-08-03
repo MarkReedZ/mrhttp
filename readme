@@ -108,5 +108,6 @@ s_bench:
 wrk -t4 -c32 -d1s http://localhost:8080/s -H "Cookie: mrsession=11111111111111111111110000000001;"
 wrk -t4 -c32 -d1s http://localhost:8080/mrq/1 -H "Cookie: mrsession=11111111111111111111110000000001;" -s tests/lua/json.lua
 wrk -t4 -c32 -d1s http://localhost:8080/mrpackerpy -H "Cookie: mrsession=11111111111111111111110000000001;" -s tests/lua/mrpacker.lua
+wrk -t4 -c32 -d1s http://localhost:8080/s -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
 
 

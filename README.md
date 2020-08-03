@@ -11,7 +11,9 @@ Cookies            422,728 Requests/second
 Form parsing       328,780 Requests/second
 Parse JSON         224,872 Requests/second
 Templates          257,753 Requests/second
-Sessions           217,759 Requests/second
+Sessions:
+  memcached        163,833 Requests/second
+  mrcache          283,359 Requests/second
 Sessions (py)       83,119 Requests/second
 Session login      121,745 Requests/second
 MrWorkServer       338,891 Requests/second

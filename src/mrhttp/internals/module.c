@@ -55,9 +55,11 @@ PyInit_internals(void)
   if (PyType_Ready(&MrhttpAppType) < 0) return NULL;
   if (PyType_Ready(&MemcachedClientType) < 0) return NULL;
   if (PyType_Ready(&MrqClientType) < 0) return NULL;
+  if (PyType_Ready(&MrcacheClientType) < 0) return NULL;
   if (PyType_Ready(&ResponseType) < 0) return NULL;
   if (PyType_Ready(&MemcachedProtocolType) < 0) return NULL;
   if (PyType_Ready(&MrqProtocolType) < 0) return NULL;
+  if (PyType_Ready(&MrcacheProtocolType) < 0) return NULL;
 
   m = PyModule_Create(&internals_module);
   if(!m) return NULL;
@@ -76,11 +78,15 @@ PyInit_internals(void)
   PyModule_AddObject(m, "MemcachedClient", (PyObject*)&MemcachedClientType);
   Py_INCREF(&MrqClientType);
   PyModule_AddObject(m, "MrqClient", (PyObject*)&MrqClientType);
+  Py_INCREF(&MrcacheClientType);
+  PyModule_AddObject(m, "MrcacheClient", (PyObject*)&MrcacheClientType);
 
   Py_INCREF(&MemcachedProtocolType);
   PyModule_AddObject(m, "MemcachedProtocol", (PyObject*)&MemcachedProtocolType);
   Py_INCREF(&MrqProtocolType);
   PyModule_AddObject(m, "MrqProtocol", (PyObject*)&MrqProtocolType);
+  Py_INCREF(&MrcacheProtocolType);
+  PyModule_AddObject(m, "MrcacheProtocol", (PyObject*)&MrcacheProtocolType);
 
   return m;
 }

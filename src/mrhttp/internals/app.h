@@ -40,9 +40,10 @@ typedef struct {
   // Clients
   PyObject *py_mc;
   PyObject *py_mrq;
+  PyObject *py_mrc;
   PyObject *py_redis;
-  PyObject *py_session_backend_type; // int 1,2,3 ( memcached, mrworkserver, redis )
-  PyObject *py_session; // points to mc, mrq, or redis
+  PyObject *py_session_backend_type; // int 1,2,3 ( memcached, mrworkserver, mrcache )
+  PyObject *py_session; // points to mc, mrq, or mrcache
 
   tSessionClientGet session_get;
 

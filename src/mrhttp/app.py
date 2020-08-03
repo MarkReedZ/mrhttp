@@ -26,6 +26,7 @@ from mrhttp import router
 
 from mrhttp import MemcachedClient
 from mrhttp import MrqClient
+from mrhttp import MrcacheClient
 try:
   import mrjson as json
 except ImportError:
@@ -67,6 +68,7 @@ class Application(mrhttp.CApp):
     self.listeners = { "at_start":[], "at_end":[], "after_start":[]}
     self._mc = None
     self._mrq = None
+    self._mrc = None
     self.session_backend = "memcached"
     self.uses_session = False
     self.uses_mrq = False
@@ -228,6 +230,8 @@ class Application(mrhttp.CApp):
       self.session_backend_type = 1
       if self.session_backend == "mrworkserver":
         self.session_backend_type = 2
+      elif self.session_backend == "mrcache":
+        self.session_backend_type = 3
 
       self.requests = [Request() for x in range(128)]
       self.cinit()
@@ -406,6 +410,8 @@ class Application(mrhttp.CApp):
       raise ValueError("setUserSession called without memcached being setup")
     if self.session_backend_type == 2 and self._mrq== None:
       raise ValueError("setUserSession called without mrworkserver being setup")
+    if self.session_backend_type == 3 and self._mrc== None:
+      raise ValueError("setUserSession called without mrcache being setup")
 
     a = random.getrandbits(64)
     b = random.getrandbits(64)
@@ -449,10 +455,12 @@ class Application(mrhttp.CApp):
         self._mc.set( skey, json.dumpb(user) )
       else:
         self._mc.set( skey, mrpacker.pack(user) )
-    elif self.session_backend_type == 2: # MrWorkServer
+    elif self.session_backend_type == 2: # MrWorkServer 
       self._mrq.set( user_id, mrpacker.pack( [skey, user]) )
-    elif self.session_backend_type == 3: # Redis
-      pass
+    elif self.session_backend_type == 3: # MrCache
+      print("user",user)
+      print("packed",mrpacker.pack(user))
+      self._mrc.set( skey, mrpacker.pack( user ) )
 
     return skey
 
@@ -476,6 +484,18 @@ class Application(mrhttp.CApp):
           exit(1)
         self._mrq = MrqClient( srvs, self.loop) 
       self._session_client = self._mrq
+    elif self.session_backend == "mrcache":
+      if not self._mrc:
+        conf = self.config.get("mrcache", None)
+        if not conf:
+          print("When using mrcache as a session backend app.config['mrcache'] must be set. Exiting")
+          exit(1)
+        srvs = self.config.get("mrcache", None)
+        if type(srvs) != list or len(srvs) == 0 or type(srvs[0]) != tuple:
+          print("When using mrcache app.config['mrcache'] must be set to a list of (host,port) tuple pairs. Exiting")
+          exit(1)
+        self._mrc = MrcacheClient( srvs, self.loop) 
+      self._session_client = self._mrc
 
 app = Application()
 
