@@ -22,10 +22,11 @@ class Request(mrhttp.CRequest):
     super().__init__(self)
     pass
 
-  #TODO we reuse requests so we need to clear memo to use it
   def parsed_content_type(self):
     content_type = self.headers.get('Content-Type')
-    if not content_type: return None, {}
+    if not content_type: 
+      content_type = self.headers.get('content-type')
+      if not content_type: return None, {}
     return cgi.parse_header(content_type)
 
   @property
