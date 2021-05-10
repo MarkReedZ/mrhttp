@@ -172,7 +172,7 @@ PyObject* MrcacheProtocol_data_received(MrcacheProtocol* self, PyObject* data)
   	}
     else {
       printf("TODO Bad memc response data len %ld\n", l);
-      PyObject_Print( data, stdout, 0 ); printf("\n");
+      PyObject_Print( data, stdout, 0 ); printf("\n"); // Print on error
       exit(1);
     }
   }

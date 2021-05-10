@@ -431,12 +431,6 @@ class Application(mrhttp.CApp):
       numbits -= 5
     userk = userk + mrhttp.to64( 0x20 | random.getrandbits(5) ) 
 
-    #TODO remove
-    #x = 0
-    #for c in userk[1:]:
-      #x <<= 5
-      #x |= mrhttp.from64(c)
-
     skey = userk + k[len(userk):]
 
     # TODO We could have user id be optional and do this if not given
@@ -458,8 +452,6 @@ class Application(mrhttp.CApp):
     elif self.session_backend_type == 2: # MrWorkServer 
       self._mrq.set( user_id, mrpacker.pack( [skey, user]) )
     elif self.session_backend_type == 3: # MrCache
-      print("user",user)
-      print("packed",mrpacker.pack(user))
       self._mrc.set( skey, mrpacker.pack( user ) )
 
     return skey

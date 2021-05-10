@@ -112,8 +112,6 @@ PyObject *MrcacheClient_set(MrcacheClient* self, PyObject *args) {
   PyObject *pykey, *pydata;
   if(!PyArg_ParseTuple(args, "OO", &pykey, &pydata)) return NULL;
 
-  PyObject_Print( pykey, stdout, 0 ); // DELME
-
   Py_ssize_t ksz;
   char *k = PyUnicode_AsUTF8AndSize( pykey, &ksz ); 
   Py_ssize_t dsz;
