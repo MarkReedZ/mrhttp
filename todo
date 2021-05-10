@@ -1,9 +1,14 @@
 
-set user sess - fix it!
-anti session jacking - detect someone trying different ids 
-  use httponly
 
-Change to the new session ids everywhere.  Update dotests to save a session and have a found and not found?
+
+set user sess - fix it!
+
+Change to the new session ids everywhere.  TODO user id in session necessary? No.  Idea was to use MrWorkServers to cache user data .
+Update dotests to setup the memcached/mrq/mrcache servers and set a session id so we find the user 
+
+
+
+
 
 
 
