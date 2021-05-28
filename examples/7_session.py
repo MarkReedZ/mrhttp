@@ -11,11 +11,11 @@ import mrhttp
 
 app = mrhttp.Application()
 app.config["memcache"] = [ ("127.0.0.1", 11211) ]
-app.config["mrq"] = [ ("127.0.0.1", 7100) ]
-app.config["mrcache"] = [ ("127.0.0.1", 7000) ]
+#app.config["mrq"] = [ ("127.0.0.1", 7100) ]
+#app.config["mrcache"] = [ ("127.0.0.1", 7000) ]
 app.session_backend = "memcached"
-app.session_backend = "mrworkserver"
-app.session_backend = "mrcache"
+#app.session_backend = "mrworkserver"
+#app.session_backend = "mrcache"
 
 @app.route('/',options=['session'])
 def session(r):
@@ -36,7 +36,7 @@ async def login(r):
   user_id = 10999
   user = {"name":"Mark"}
 
-  # This creates a session key, stores it in memcache with the user's data, and sets the session
+  # This creates a session key, stores it in the backend with the user data, and sets the session
   # cookie in the browser with the key 'mrsession'
 
   app.setUserSessionAndCookies( r, user_id, user )
