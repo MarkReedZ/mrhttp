@@ -134,7 +134,7 @@ PyObject *MrqClient_set(MrqClient* self, PyObject *args) {
 // TODO We trust the slot is & 0xFF
 int MrqClient_push(MrqClient* self, int slot, char *d, int dsz) {
   DBG_MRQ printf(" MrqClient_push slot %d\n", slot );
-  int server = server_slotmap[slot];
+  int server = server_slotmap[slot&0xFF];
   DBG_MRQ printf(" MrqClient_push server %d\n", server );
   DBG_MRQ printf(" MrqClient_push >%.*s<\n", dsz, d );
   if ( server == -1 ) return -1;
@@ -143,7 +143,7 @@ int MrqClient_push(MrqClient* self, int slot, char *d, int dsz) {
 }
 int MrqClient_pushj(MrqClient* self, int slot, char *d, int dsz) {
   DBG_MRQ printf(" MrqClient_pushj slot %d\n", slot );
-  int server = server_slotmap[slot];
+  int server = server_slotmap[slot&0xFF];
   DBG_MRQ printf(" MrqClient_pushj server %d\n", server );
   DBG_MRQ printf(" MrqClient_pushj >%.*s<\n", dsz, d );
   if ( server == -1 ) return -1;

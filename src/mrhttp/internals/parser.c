@@ -1,5 +1,6 @@
 
 
+
 #include <strings.h>
 #include <sys/param.h>
 #include <immintrin.h>
@@ -25,7 +26,6 @@ static void _reset(Parser* self, bool reset_buffer) {
 
 
 int parser_init(Parser *self, void *protocol) {
-  DBG printf("parser init\n");
   self->protocol = protocol;
   self->buf = malloc(8096); self->buf_size = 8096;
   if ( !self->buf ) return 0;

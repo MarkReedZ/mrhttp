@@ -1,3 +1,4 @@
+
 #include "mrqprotocol.h"
 #include "mrqclient.h"
 #include "Python.h"
@@ -8,7 +9,7 @@
 
 static void print_buffer( char* b, int len ) {
   for ( int z = 0; z < len; z++ ) {
-    printf( "%02x ",(int)b[z]);
+    printf( "%02x ",(unsigned char)b[z]);
   }
   printf("\n");
 }
@@ -197,9 +198,8 @@ PyObject* MrqProtocol_data_received(MrqProtocol* self, PyObject* data)
 
     if ( p[0] == 2 ) { 
 
-      //print_buffer(p, 5);
       //int len   = *((int*)(p)+1);
-      int len   = p[1] | (p[2]<<8) | (p[3]<<16) | (p[4]<<24);
+      unsigned int len   = *((unsigned int*)(p+1));
       DBG_MRQ printf("cmd dl %d len %d\n",data_left,len);
 
       if ( data_left < len ) {
@@ -221,6 +221,7 @@ PyObject* MrqProtocol_data_received(MrqProtocol* self, PyObject* data)
       data_left -= len + 5;
 
       if ( self->queue[self->queue_start].cb == NULL ) {
+        DBG_MRQ printf(" No queue so put_nowait on Q len %d data %.*s\n",len, 4, p);
         PyObject *b = PyBytes_FromStringAndSize(p,len);
         p += len;
         if(!PyObject_CallFunctionObjArgs(self->pfunc, b, NULL)) { printf("WTF\n"); Py_XDECREF(b); return NULL; }
@@ -361,7 +362,7 @@ int MrqProtocol_pushj(MrqProtocol* self, char *d, int dsz) {
   memcpy(self->bb, d, dsz);
 
   PyObject *bytes = PyBytes_FromStringAndSize(self->b, dsz + 6);
-  //PyObject_Print(bytes, stdout,0); printf("\n");
+  //PyObject_Print(bytes, stdout,0); printf("\n"); // DELME
   if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 1; }
   Py_DECREF(bytes);
 

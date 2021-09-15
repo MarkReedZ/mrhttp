@@ -1,4 +1,6 @@
 
+// PyObject_Print( req->py_user, stdout, 0 ); printf("\n");
+
 #include "protocol.h"
 #include "common.h"
 #include "module.h"
@@ -11,11 +13,17 @@
 #include "Python.h"
 #include <errno.h>
 #include <string.h>
-//#include "response.h"
 
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+// DELME
+static void print_buffer( char* b, int len ) {
+  for ( int z = 0; z < len; z++ ) {
+    printf( "%02x ",(int)b[z]);
+  }
+  printf("\n");
+}
 
 void printErr(void) {
   PyObject *type, *value, *traceback;
@@ -55,6 +63,7 @@ PyObject * Protocol_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 void Protocol_dealloc(Protocol* self)
 {
+  DBG printf("procotol dealloc\n");
   parser_dealloc(&self->parser);
   //Py_XDECREF(self->request);
   //Py_XDECREF(self->response);
@@ -127,7 +136,7 @@ PyObject* Protocol_connection_made(Protocol* self, PyObject* transport)
 
   if(!(connections = PyObject_GetAttrString((PyObject*)self->app, "_connections"))) return NULL;
   if(PySet_Add(connections, (PyObject*)self) == -1) { Py_XDECREF(connections); return NULL; }
-  DBG printf("connection made num %ld\n", PySet_GET_SIZE(connections));
+  DBG printf("connection made num %ld %p\n", PySet_GET_SIZE(connections), self);
   Py_XDECREF(connections);
 
   // TODO Only if session or mrq is enabled?
@@ -139,6 +148,7 @@ PyObject* Protocol_connection_made(Protocol* self, PyObject* transport)
 
 void* Protocol_close(Protocol* self)
 {
+  DBG printf("protocol close\n");
   void* result = self;
 
   PyObject* close = PyObject_GetAttrString(self->transport, "close");
@@ -159,7 +169,7 @@ PyObject* Protocol_eof_received(Protocol* self) {
 }
 PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
 {
-  DBG printf("conn lost\n");
+  DBG printf("conn lost %p\n",self);
   self->closed = true;
   MrhttpApp_release_request( self->app, self->request );
 
@@ -309,16 +319,18 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
 
   DBG_MEMCAC printf(" memcached reply data len %d data %.*s\n",data_sz,data_sz,data);
 
-  // TODO Only support mrpacked user?
+  bool json = false;
+  // If append_user then the stored session's format must match the incoming.  json or mrpacker
+
+  // TODO Support json?  
   if ( data_sz ) {
-    //PyObject *session = PyUnicode_FromStringAndSize( data, data_sz );
     //if ( data[0] == '{' ) {
+      //json = true;
       //PyObject *o = PyBytes_FromStringAndSize( data, data_sz );
       //PyObject_CallFunctionObjArgs(req->set_user, o, NULL);
       //Py_XDECREF(o); 
     //} else {
     req->py_user = unpackc( data, data_sz );
-    
     //}
   } 
   
@@ -361,8 +373,8 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
 
           int rc;
           // TODO Accept json and mrpacker?
-/*
-          if ( req->py_mrpack == NULL ) {
+
+          if ( json ) {
             char *tmp = malloc( req->body_len + data_sz + 16 );
             tmp[0] = '[';
             char *p = tmp+1;
@@ -375,7 +387,7 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
             rc = MrqClient_pushj( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(p-tmp) );
             free(tmp);
           } else {
-*/
+
             char *tmp = malloc( req->body_len + data_sz + 16 );
             tmp[0] = 0x42;
             char *p = tmp+1;
@@ -385,7 +397,7 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
             p += data_sz;
             rc = MrqClient_push ( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(p-tmp) );
             free(tmp);
-          //}
+          }
 
           if ( rc == -1 ) {
             req->py_mrq_servers_down = Py_True; Py_INCREF(Py_True);
@@ -417,6 +429,7 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
               s += req->body_len;
               *s++ = ']';
               MrqClient_push( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(s-tmp) );
+              free(tmp);
             }
   
           } else {
@@ -531,8 +544,6 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
   PyObject* result = NULL;
   DBG printf("protocol handle request\n");
 
-  request->response->mtype = r->mtype;
-
   if ( r->iscoro || !PIPELINE_EMPTY(self)) {
     //self->gather.enabled = false;
     // If we can't finish now save this request by grabbing a new free request if we haven't already done so
@@ -632,6 +643,8 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
     }
     return NULL;
   }
+
+  request->response->mtype = r->mtype;
 
   if(!protocol_write_response(self, request, result)) goto error;
 

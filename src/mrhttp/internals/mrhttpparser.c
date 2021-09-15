@@ -105,7 +105,7 @@ static void print_buffer( char* b, int len ) {
         const char *tok_start = buf;                                                                                               \
         static const char ALIGNED(16) ranges2[] = "\000\042\177\177";                                                              \
         int found2;                                                                                                                \
-        buf = findchar_fast(buf, buf_end, ranges2, sizeof(ranges2) - 1, &found2);                                                  \
+        buf = findchar(buf, buf_end, ranges2, sizeof(ranges2) - 1, &found2);                                                  \
         if (!found2) {                                                                                                             \
             CHECK_EOF();                                                                                                           \
         } else if ( unlikely(*buf != ' ' )) {                                                                                       \
@@ -138,7 +138,7 @@ static const char *token_char_map = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\
                                     "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
                                     "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
-static const char *findchar_fast(const char *buf, const char *buf_end, const char *ranges, size_t ranges_size, int *found)
+static const char *findchar(const char *buf, const char *buf_end, const char *ranges, size_t ranges_size, int *found)
 {
     *found = 0;
 #if __SSE4_2__
@@ -180,7 +180,7 @@ static const char *get_token_to_eol(const char *buf, const char *buf_end, const 
         /* allow chars w. MSB set */
         ;
     int found;
-    buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
+    buf = findchar(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
     if (found)
         goto FOUND_CTL;
 #else
@@ -328,6 +328,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               goto hvalue;
             }
             if ( buf[11] == ':' ) { // Content-MD5: 
+              printf("DELME no buf 11\n");
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 11;
               buf += 13;
@@ -534,7 +535,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
                                                       "[]"     /* 0x5b-0x5d */
                                                       "{\377"; /* 0x7b-0xff */
             int found;
-            buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
+            buf = findchar(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
             if (!found) {
                 CHECK_EOF();
             }

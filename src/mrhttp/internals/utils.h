@@ -15,5 +15,5 @@ PyObject *from64   (PyObject *self, PyObject *str);
 PyObject *timesince(PyObject *self, PyObject *ts);
 PyObject *hot      (PyObject *self, PyObject *args);
 
-char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found);
+char *findchar(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found);
 

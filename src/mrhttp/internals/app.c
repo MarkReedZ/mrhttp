@@ -217,6 +217,7 @@ void MrhttpApp_setup_error_pages(MrhttpApp* self) {
   memcpy(p, body, l);
 
   self->err404 = PyBytes_FromStringAndSize( resp, (p-resp) + l );
+  free(resp);
  
 }
 

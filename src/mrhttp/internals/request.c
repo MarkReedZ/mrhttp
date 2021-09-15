@@ -1,5 +1,6 @@
 
 
+
 #include <stddef.h>
 #include <sys/param.h>
 #include <strings.h>
@@ -51,6 +52,9 @@
 //static PyObject* HTTP10;
 //static PyObject* HTTP11;
 //static PyObject* request;
+
+
+
 
 PyObject* Request_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -173,7 +177,7 @@ static inline size_t sse_decode(char* path, ssize_t length, size_t *qs_len) {
   // We only findchar once - benchmark one or more % encodings with continuing to use findchar ( Spanish / Chinese )
   do {
     //DBG printf("sse_decode >%.*s<\n", (int)length, path);
-    pat = findchar_fast(pat, end, ranges1, sizeof(ranges1) - 1, &found);
+    pat = findchar(pat, end, ranges1, sizeof(ranges1) - 1, &found);
     if ( found ) {
       if(*pat == '%' && is_hex(*(pat + 1)) && is_hex(*(pat + 2))) {
         *pat = (hex_to_dec(*(pat + 1)) << 4) + hex_to_dec(*(pat + 2));
@@ -346,7 +350,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
 //Cookie: key=session_key; bar=2; nosemi=foo
   do { 
     last = buf;
-    buf = findchar_fast(buf, end, ranges1, sizeof(ranges1) - 1, &found);
+    buf = findchar(buf, end, ranges1, sizeof(ranges1) - 1, &found);
     if ( found ) {
       if ( *buf == '=' ) {
         if ( state == 0 ) {
@@ -361,7 +365,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
           buf+=1;
         } else {
           // If we're in the value ignore the = so cookie name/value splits on the first =
-          while(found && *buf == '=') buf = findchar_fast(++buf, end, ranges1, sizeof(ranges1) - 1, &found);
+          while(found && *buf == '=') buf = findchar(++buf, end, ranges1, sizeof(ranges1) - 1, &found);
         }
       } 
       else if ( *buf == ';' ) {
@@ -383,7 +387,7 @@ static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
       else {
         // Bad character found so skip
         state = 0;
-        while(found && *buf != ';') buf = findchar_fast(++buf, end, ranges1, sizeof(ranges1) - 1, &found);
+        while(found && *buf != ';') buf = findchar(++buf, end, ranges1, sizeof(ranges1) - 1, &found);
         if ( buf != end ) buf += 1;
         while ( *buf == 32 ) buf++;
       }
@@ -420,7 +424,7 @@ static inline void getSession( Request* r, char *buf, size_t buflen ) {
   int state = 0;
   do { 
     last = buf;
-    buf = findchar_fast(buf, end, ranges1, sizeof(ranges1) - 1, &found);
+    buf = findchar(buf, end, ranges1, sizeof(ranges1) - 1, &found);
     if ( found ) {
       if ( *buf == '=' ) {
         if ( state == 0 ) {
@@ -505,7 +509,7 @@ static inline PyObject* parse_query_args( char *buf, size_t buflen ) {
   size_t len;
   // foo=bar&key=23%28
   do { 
-    buf = findchar_fast(buf, end, ranges1, sizeof(ranges1) - 1, &found);
+    buf = findchar(buf, end, ranges1, sizeof(ranges1) - 1, &found);
     if ( found ) {
       if ( *buf == '=' ) {
         len = sse_decode( last, buf-last, NULL );
@@ -641,7 +645,7 @@ PyObject* Request_parse_mp_form(Request* self) {
   char *pend = ct+ctlen;
   char *bnd = NULL;
   int bndlen;
-  p = findchar_fast(p, pend, semi, sizeof(semi) - 1, &found);
+  p = findchar(p, pend, semi, sizeof(semi) - 1, &found);
   //printf("find >%.*s<\n", 5, p);
   if ( p[2] == 'b' ) {
     bnd = p + 11;
@@ -755,7 +759,7 @@ PyObject* Request_parse_mp_form(Request* self) {
       }
      else {
         char *last = p;
-        p = findchar_fast(p, pend, colon, sizeof(colon) - 1, &found);
+        p = findchar(p, pend, colon, sizeof(colon) - 1, &found);
         if ( found && p[0] == ':' ) {
           p += 1;
           if ( last[0] == 'C' ) {
@@ -765,7 +769,7 @@ PyObject* Request_parse_mp_form(Request* self) {
             if ( p-last == 20 ) { // Content-Disposition
               while ( p[0] != '\r' ) {
                 last = p;
-                p = findchar_fast(p, pend, colon, sizeof(colon) - 1, &found);
+                p = findchar(p, pend, colon, sizeof(colon) - 1, &found);
                 //printf(" >%.*s<\n", 16,p); 
 
 
@@ -779,12 +783,12 @@ PyObject* Request_parse_mp_form(Request* self) {
                   
                   if ( last[0] == 'n' ) {
                     name = p+2;
-                    p = findchar_fast(p+1, pend, colon, sizeof(colon) - 1, &found);
+                    p = findchar(p+1, pend, colon, sizeof(colon) - 1, &found);
                     namesz = p-1-name;
                   }
                   else if ( last[0] == 'f' ) {
                     filename = p+2; 
-                    p = findchar_fast(p+1, pend, colon, sizeof(colon) - 1, &found);
+                    p = findchar(p+1, pend, colon, sizeof(colon) - 1, &found);
                     filenamesz = p-1-filename;
                   }
                   else p += 1;
@@ -792,7 +796,7 @@ PyObject* Request_parse_mp_form(Request* self) {
               }
             } else if ( p-last == 13 ) {  // Content-Type
               content_type = p+1; 
-              p = findchar_fast(p, pend, colon, sizeof(colon) - 1, &found);
+              p = findchar(p, pend, colon, sizeof(colon) - 1, &found);
               content_typesz = p-content_type;
             }
           }
@@ -803,7 +807,7 @@ PyObject* Request_parse_mp_form(Request* self) {
     //if ( state == 2 ) {
     //}
 
-    p = findchar_fast(p, pend, crlf, sizeof(crlf) - 1, &found);
+    p = findchar(p, pend, crlf, sizeof(crlf) - 1, &found);
     p += 2;
   }
 

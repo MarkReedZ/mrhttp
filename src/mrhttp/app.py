@@ -37,8 +37,8 @@ except ImportError:
 
 #import mrmemcache
 
-import uvloop
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+#import uvloop
+#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 signames = {
     int(v): v.name for k, v in signal.__dict__.items()
@@ -278,6 +278,7 @@ class Application(mrhttp.CApp):
       finally:
         loop.run_until_complete(loop.shutdown_asyncgens())
         loop.run_until_complete(self.drain())
+        self._connections.clear()
         server.close()
         loop = asyncio.get_event_loop()
         loop.run_until_complete(server.wait_closed())

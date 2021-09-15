@@ -1,4 +1,5 @@
 
+
 #include "utils.h"
 
 PyObject* myrandint(PyObject* self, PyObject* args)
@@ -32,8 +33,25 @@ PyObject* myrandint(PyObject* self, PyObject* args)
 #define unlikely(x) (x)
 #endif
 
+// Valgrind doesn't support mm_cmpestri so replace findchar
+char *valgrind_zfindchar(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
+{
+    //printf("DELME ranges sz %d\n", ranges_size);
+  *found = 0;
+  char *p = buf;
+  while ( p < buf_end ) {
+    for ( int i = 0; i < ranges_size; i += 2 ) {
+      if ( p >= ranges[i] && p <= ranges[i+1] ) {
+        *found = 1;
+        return p;
+    	}
+    }
+    p++;
+  }
+  return p;    
+}
 // Search for a range of characters and return a pointer to the location or buf_end if none are found
-char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
+char *findchar(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
 {
     *found = 0;
     __m128i ranges16 = _mm_loadu_si128((const __m128i *)ranges);
@@ -75,6 +93,7 @@ char *findchar_fast(char *buf, char *buf_end, char *ranges, size_t ranges_size, 
 
 static char escbuf[16*1024];
 
+
 PyObject *escape_html(PyObject *self, PyObject *s) {
 
   Py_ssize_t l;
@@ -91,7 +110,7 @@ PyObject *escape_html(PyObject *self, PyObject *s) {
   static char ranges1[] = "<<" ">>" "\x22\x22" "&&";
 
   while ( p < end ) {
-    p = findchar_fast(p, end, ranges1, sizeof(ranges1) - 1, &found);
+    p = findchar(p, end, ranges1, sizeof(ranges1) - 1, &found);
     if ( found ) { 
       if ( p[0] == '<' ) {
         memcpy( o, last, p-last ); o += p-last;
