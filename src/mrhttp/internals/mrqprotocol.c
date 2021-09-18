@@ -202,7 +202,7 @@ PyObject* MrqProtocol_data_received(MrqProtocol* self, PyObject* data)
       unsigned int len   = *((unsigned int*)(p+1));
       DBG_MRQ printf("cmd dl %d len %d\n",data_left,len);
 
-      if ( data_left < len ) {
+      if ( data_left < (int)len ) {
         DBG_MRQ printf("Received partial data dl %d need %d\n",data_left,len);
         if ( self->rbufp == NULL ) self->rbufp = self->rbuf;
 
@@ -362,7 +362,6 @@ int MrqProtocol_pushj(MrqProtocol* self, char *d, int dsz) {
   memcpy(self->bb, d, dsz);
 
   PyObject *bytes = PyBytes_FromStringAndSize(self->b, dsz + 6);
-  //PyObject_Print(bytes, stdout,0); printf("\n"); // DELME
   if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 1; }
   Py_DECREF(bytes);
 

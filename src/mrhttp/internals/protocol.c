@@ -1,4 +1,5 @@
 
+
 // PyObject_Print( req->py_user, stdout, 0 ); printf("\n");
 
 #include "protocol.h"
@@ -36,7 +37,7 @@ void printErr(void) {
 PyObject * Protocol_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
   Protocol* self = NULL;
-  DBG printf("protocol new\n");
+  printf("protocol new\n");
 
   self = (Protocol*)type->tp_alloc(type, 0);
   if(!self) goto finally;
@@ -330,7 +331,14 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
       //PyObject_CallFunctionObjArgs(req->set_user, o, NULL);
       //Py_XDECREF(o); 
     //} else {
+    // TODO error clear py err or just not raise
     req->py_user = unpackc( data, data_sz );
+    //if ( req->py_user == NULL ) {
+      //printf("DELME unpackc returned null on memcached reply\n");
+      //printf("DELME data sz %d\n",data_sz);
+      //print_buffer(data, 16);
+      //exit(1);
+    //}
     //}
   } 
   

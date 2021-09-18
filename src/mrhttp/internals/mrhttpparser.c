@@ -328,7 +328,6 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               goto hvalue;
             }
             if ( buf[11] == ':' ) { // Content-MD5: 
-              printf("DELME no buf 11\n");
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 11;
               buf += 13;

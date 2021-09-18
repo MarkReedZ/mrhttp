@@ -25,7 +25,7 @@ Assoc_t *assoc_create(void) {
   }
   t->hashpower = 16;
   t->buckets = malloc(sizeof(*t->buckets) * hashsize(t->hashpower));
-  for (int i = 0; i < hashsize(t->hashpower); i++) t->buckets[i] = NULL;
+  for (ub4 i = 0; i < hashsize(t->hashpower); i++) t->buckets[i] = NULL;
   return t;
 }
 
