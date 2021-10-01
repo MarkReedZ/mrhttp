@@ -457,7 +457,7 @@ static inline void getSession( Request* r, char *buf, size_t buflen ) {
 static inline PyObject* Request_decode_cookies(Request* self)
 {
   for(struct mr_header* header = self->headers; header < self->headers + self->num_headers; header++) {
-    if ( header->name_len == 6 && header->name[0] == 'C' ) {
+    if ( header->name_len == 6 && header->name[1] == 'o' && header->name[3] == 'k' ) {
       return parseCookies( self, header->value, header->value_len );
     }
   }
@@ -472,7 +472,7 @@ void Request_load_cookies(Request* self) {
 // Instead of loading all headers and cookies just go directly for the session value
 void Request_load_session(Request* self) {
   for(struct mr_header* header = self->headers; header < self->headers + self->num_headers; header++) {
-    if ( header->name_len == 6 && header->name[0] == 'C' ) {
+    if ( header->name_len == 6 && header->name[1] == 'o' && header->name[3] == 'k' ) {
       getSession( self, header->value, header->value_len );
       return;
     }
@@ -678,7 +678,7 @@ PyObject* Request_parse_mp_form(Request* self) {
   char *name = NULL;
   char *filename = NULL;
   char *content_type = NULL;
-  int namesz, filenamesz, content_typesz;
+  int namesz=0, filenamesz=0, content_typesz=0;
   char *body = NULL;
 
 //Content-Disposition: form-data
@@ -762,7 +762,7 @@ PyObject* Request_parse_mp_form(Request* self) {
         p = findchar(p, pend, colon, sizeof(colon) - 1, &found);
         if ( found && p[0] == ':' ) {
           p += 1;
-          if ( last[0] == 'C' ) {
+          if ( last[0] == 'C' || last[0] =='c' ) { // TODO need the little c?
             //printf(" >%.*s<\n", p-last,last);
             //printf(" p-last %d\n", (int)(p-last) );
 

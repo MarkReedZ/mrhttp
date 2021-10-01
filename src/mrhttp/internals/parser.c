@@ -15,6 +15,15 @@
 #include "faststrcmp.h"
 //int fast_compare(const unsigned char *s1, const unsigned char *s2, size_t len)
 
+// DELME
+static void print_buffer( char* b, int len ) {
+  for ( int z = 0; z < len; z++ ) {
+    printf( "%02x ",(int)b[z]);
+  }
+  printf("\n");
+}
+
+
 static void _reset(Parser* self, bool reset_buffer) {
   self->parsed_headers = 0;
   self->body_length = 0;
@@ -72,7 +81,7 @@ parse_headers:
 
   request->num_headers = 100; // Max allowed headers
   DBG_PARSER printf("before parser requests\n");
-
+  request->hreq.flags = 0; // TODO clear the mr_request struct
   rc = mr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, request->headers, &(request->num_headers), prevbuflen, &(request->hreq));
 
   DBG_PARSER printf("parser requests rc %d\n",rc);
@@ -163,7 +172,15 @@ body:
   if ( self->body_length > ( self->end - self->start ) ) return -2;
 
   if ( request->hreq.flags == 2 ) {
+    // TODO how to handle errors.  Have unpackc not do a python error? Or clear py error if null...  Return negative? 
     request->py_mrpack = unpackc( self->start, self->body_length ); 
+    if ( request->py_mrpack == NULL ) {
+      printf("DELME unpackc returned null in parser\n");
+      printf("DELME data len %ld\n",self->body_length);
+      print_buffer(self->start, 16);
+      exit(1);
+    }
+
   }
   if ( request->hreq.ip != NULL ) {
     request->py_ip = PyUnicode_FromStringAndSize(request->hreq.ip, request->hreq.ip_len);
