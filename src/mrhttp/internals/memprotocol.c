@@ -175,7 +175,8 @@ int MemcachedProtocol_asyncGet( MemcachedProtocol* self, char *key, void *fn, vo
   self->queue[self->queue_end].connection = connection;
   self->queue_end = (self->queue_end+1)%self->queue_sz;
 
-  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 0;
+  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 0; }
+  Py_DECREF(bytes);
   return 1;
 }
 
@@ -215,7 +216,9 @@ int MemcachedProtocol_asyncSet( MemcachedProtocol* self, char *key, char *val, i
   *p++ = '\r';
   *p++ = '\n';
   PyObject *bytes = PyBytes_FromStringAndSize(self->set_cmd,p-self->set_cmd);
-  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 1;
+  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 1; }
+  Py_DECREF(bytes);
+
   return 0;  
 }
 

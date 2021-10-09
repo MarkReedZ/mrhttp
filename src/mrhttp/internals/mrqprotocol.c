@@ -143,6 +143,9 @@ PyObject* MrqProtocol_connection_lost(MrqProtocol* self, PyObject* args)
   self->closed = true;
   MrqClient_connection_lost((MrqClient*)self->client, self );
 
+  Py_DECREF(self->transport);
+  self->transport = NULL;
+
   Py_RETURN_NONE;
 }
 

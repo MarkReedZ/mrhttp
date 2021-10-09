@@ -93,7 +93,6 @@ void Request_dealloc(Request* self) {
 
 int Request_init(Request* self, PyObject *args, PyObject* kw)
 {
-
   //self->hreq.headers = malloc( sizeof(*(self->hreq.headers))*100 ); //TODO
   self->headers = malloc( sizeof(*(self->headers))*100 ); //TODO
   if(!(self->response = (Response*)PyObject_GetAttrString((PyObject*)self, "response"))) return -1;
@@ -118,9 +117,10 @@ void Request_reset(Request *self) {
   Py_XDECREF(self->py_form);   self->py_form = NULL;
   Py_XDECREF(self->py_file);   self->py_file = NULL;
   Py_XDECREF(self->py_files);  self->py_files= NULL;
+  Py_XDECREF(self->py_user);   self->py_user= NULL;
   self->py_ip   = NULL;
-  self->py_user = NULL;
   self->hreq.ip = NULL;
+  self->hreq.flags = 0;
   Py_XDECREF(self->py_mrq_servers_down);  self->py_mrq_servers_down= NULL;
   self->num_headers = 0;
   Response_reset(self->response);
@@ -155,7 +155,6 @@ PyObject* Request_add_done_callback(Request* self, PyObject* callback)
 }
 
 PyObject* Request_get_transport(Request* self, void* closure) {
-  DBG printf("request transport ptr %p\n",self->transport);
   if (self->transport) {
     Py_INCREF(self->transport);
     return self->transport;
@@ -604,9 +603,9 @@ PyObject* Request_get_query_args(Request* self, void* closure)
 PyObject* Request_notfound(Request* self)
 {
   self->return404 = true;
-  PyErr_SetString(PyExc_ValueError, "System command failed");
-  return NULL;
-  //Py_RETURN_NONE;
+  //PyErr_SetString(PyExc_ValueError, "System command failed");
+  //return NULL;
+  Py_RETURN_NONE;
 }
 
 PyObject* Request_parse_mp_form(Request* self) {

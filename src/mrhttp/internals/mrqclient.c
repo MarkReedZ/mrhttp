@@ -6,9 +6,6 @@
 #include "common.h"
 #include "module.h"
 
-// TODO return -1 for any push within 10 seconds of reconnecting
-//      Create pool size num conns after reconnect
-
 //static char *resp_buf;
 
 static int server_slotmap[256];
