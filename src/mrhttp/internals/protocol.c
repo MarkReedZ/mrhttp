@@ -257,8 +257,8 @@ Protocol* Protocol_on_headers(Protocol* self, char* method, size_t method_len,
 {
   DBG printf("on headers\n");
   Protocol* result = self;
+  DBG printf("path >%.*s<\n", (int)path_len, path );
   request_load( self->request, method, method_len, path, path_len, minor_version, headers, num_headers);
-  //DBG printf("path >%.*s<\n", (int)self->request->path_len, self->request->path );
   return result;
 }
 

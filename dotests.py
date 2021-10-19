@@ -47,6 +47,7 @@ import atexit
 
 
 def run_wrk(loop, endpoint=None, lua=None, options=None):
+  rps = 0
   try: 
     endpoint = endpoint or 'http://localhost:8080/'
     if lua:
@@ -73,8 +74,8 @@ def run_wrk(loop, endpoint=None, lua=None, options=None):
     retcode = loop.run_until_complete(wrk.wait())
     if retcode != 0:
       print('\r\n'.join(lines))
-  except:
-    print("WTF")
+  except Exception as e:
+    print(e)
 
 
   return rps
@@ -114,9 +115,9 @@ try:
     #print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies', options=opts), "Requests/second" )
     #print ("many args      ", run_wrk(loop, 'http://localhost:8080/sixargs/one/two/three/four/five/six'), "Requests/second" )
     #print ("404 natural    ", run_wrk(loop, 'http://localhost:8080/dfads404/'), "Requests/second" )
-    print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
-    print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
-    print ("Templates      ", run_wrk(loop, 'http://localhost:8080/template'),            "Requests/second" )
+    #print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
+    #print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
+    #print ("Templates      ", run_wrk(loop, 'http://localhost:8080/template'),            "Requests/second" )
     print ("mrpacker       ", run_wrk(loop,'http://localhost:8080/mrpacker',lua='tests/lua/mrpacker.lua'), "Requests/second" )
     #print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
     # Disabled in s_bench.py print ("Sessions (py)  ", run_wrk(loop, 'http://localhost:8080/pys',   options=opts), "Requests/second" )

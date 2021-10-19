@@ -15,7 +15,6 @@ typedef struct {
 
   enum connection_state conn_state;
   
-  int parsed_headers;
   long body_length;
 
   struct mr_chunked_decoder chunked_decoder;
