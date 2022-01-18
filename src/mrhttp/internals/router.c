@@ -176,7 +176,8 @@ Route* router_getRoute(Router* self, Request* request) {
 
   Route *r = self->staticRoutes;
   for (int i = 0; i<self->numStaticRoutes; i++,r++ ) {
-    //DBG printf("request path %.*s\n", (int)request->path_len, request->path);
+    DBG printf("request path len %d - %.*s\n", (int)request->path_len, (int)request->path_len, request->path);
+    DBG printf("route path %.*s \n", (int)r->len, r->path);
     if ( plen == r->len && !memcmp(r->path, request->path, plen) ) {
       DBG printf("router found path %.*s == %.*s\n", (int)r->len, r->path, (int)request->path_len, request->path);
       return r;

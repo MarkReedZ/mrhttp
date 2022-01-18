@@ -91,6 +91,10 @@ def query_string(r):
 def parseJ(r):
   return r.json["name"]
 
+@app.route('/mrp')
+def mrp(r):
+  return r.mrp["name"]
+
 @app.route('/form')
 def parseForm(r):
   if r.form == None: return "No form"

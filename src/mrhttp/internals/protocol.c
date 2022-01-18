@@ -37,7 +37,6 @@ void printErr(void) {
 PyObject * Protocol_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
   Protocol* self = NULL;
-  printf("protocol new\n");
 
   self = (Protocol*)type->tp_alloc(type, 0);
   if(!self) goto finally;
@@ -70,7 +69,7 @@ void Protocol_dealloc(Protocol* self)
   //Py_XDECREF(self->response);
   Py_XDECREF(self->router);
   Py_XDECREF(self->app);
-  Py_XDECREF(self->transport);
+  //Py_XDECREF(self->transport);
   Py_XDECREF(self->write);
   Py_XDECREF(self->writelines);
   Py_XDECREF(self->create_task);
@@ -127,18 +126,18 @@ PyObject* Protocol_connection_made(Protocol* self, PyObject* transport)
 {
 
   DBG printf("conn made %p\n",self);
-  PyObject* connections = NULL;
+  //PyObject* connections = NULL;
   self->transport = transport;
-  Py_INCREF(self->transport);
+  //Py_INCREF(self->transport);
   self->closed = false;
 
   if(!(self->write      = PyObject_GetAttrString(transport, "write"))) return NULL;
   if(!(self->writelines = PyObject_GetAttrString(transport, "writelines"))) return NULL;
 
-  if(!(connections = PyObject_GetAttrString((PyObject*)self->app, "_connections"))) return NULL;
-  if(PySet_Add(connections, (PyObject*)self) == -1) { Py_XDECREF(connections); return NULL; }
-  DBG printf("connection made num %ld %p\n", PySet_GET_SIZE(connections), self);
-  Py_XDECREF(connections);
+  //if(!(connections = PyObject_GetAttrString((PyObject*)self->app, "_connections"))) return NULL;
+  //if(PySet_Add(connections, (PyObject*)self) == -1) { Py_XDECREF(connections); return NULL; }
+  //DBG printf("connection made num %ld %p\n", PySet_GET_SIZE(connections), self);
+  //Py_XDECREF(connections);
 
   // TODO Only if session or mrq is enabled?
   //self->memclient = (MemcachedClient*)(self->app->py_mc);
@@ -174,15 +173,19 @@ PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
   self->closed = true;
   MrhttpApp_release_request( self->app, self->request );
 
+
+  //Py_XDECREF(self->transport);
+  //self->transport = NULL;
+
   PyObject* connections = NULL;
 
   //if(!Parser_feed_disconnect(&self->parser)) goto error;
 
   // Remove the connection from app.connections
-  if(!(connections = PyObject_GetAttrString((PyObject*)self->app, "_connections"))) return NULL;
-  int rc = PySet_Discard(connections, (PyObject*)self);
-  Py_XDECREF(connections);
-  if ( rc == -1 ) return NULL;
+  //if(!(connections = PyObject_GetAttrString((PyObject*)self->app, "_connections"))) return NULL;
+  //int rc = PySet_Discard(connections, (PyObject*)self);
+  //Py_XDECREF(connections);
+  //if ( rc == -1 ) return NULL;
 
   if(!Protocol_pipeline_cancel(self)) return NULL;
 
@@ -254,8 +257,8 @@ Protocol* Protocol_on_headers(Protocol* self, char* method, size_t method_len,
 {
   DBG printf("on headers\n");
   Protocol* result = self;
+  DBG printf("path >%.*s<\n", (int)path_len, path );
   request_load( self->request, method, method_len, path, path_len, minor_version, headers, num_headers);
-  //DBG printf("path >%.*s<\n", (int)self->request->path_len, self->request->path );
   return result;
 }
 
@@ -263,12 +266,13 @@ static inline bool _isdigit(char c)  { return  c >= '0'  && c <= '9'; }
 
 PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *request ) {
   PyObject* ret = NULL;
+  PyObject *args[10];
 
   int numArgs = request->numArgs;
   DBG printf("num args %d\n",numArgs);
   if ( numArgs ) {
     //PyObject *args = PyTuple_New( numArgs );
-    PyObject **args = malloc( numArgs * sizeof(PyObject*) );
+    //PyObject **args = malloc( numArgs * sizeof(PyObject*) );
     
     for (int i=0; i<numArgs; i++) { 
 
@@ -305,7 +309,6 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *req
     for (int i=0; i<numArgs; i++) { 
       Py_DECREF(args[i]);
     }
-    free(args);
   } else {
     return PyObject_CallFunctionObjArgs(func, request, NULL);
   }
@@ -332,7 +335,11 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
       //Py_XDECREF(o); 
     //} else {
     // TODO error clear py err or just not raise
+    //DELME PyObject *z = PyObject_GetAttrString((PyObject*)self->app, "printrefs"); PyObject* tmp = PyObject_CallFunctionObjArgs(z, NULL); Py_XDECREF(z); Py_XDECREF(tmp);
+
     req->py_user = unpackc( data, data_sz );
+
+    //DELME z = PyObject_GetAttrString((PyObject*)self->app, "printrefs"); tmp = PyObject_CallFunctionObjArgs(z, NULL); Py_XDECREF(z); Py_XDECREF(tmp);
     //if ( req->py_user == NULL ) {
       //printf("DELME unpackc returned null on memcached reply\n");
       //printf("DELME data sz %d\n",data_sz);

@@ -1,6 +1,4 @@
 
-
-
 #include <strings.h>
 #include <sys/param.h>
 #include <immintrin.h>
@@ -25,7 +23,6 @@ static void print_buffer( char* b, int len ) {
 
 
 static void _reset(Parser* self, bool reset_buffer) {
-  self->parsed_headers = 0;
   self->body_length = 0;
   if ( reset_buffer ) {
     self->start = self->buf;
@@ -35,6 +32,7 @@ static void _reset(Parser* self, bool reset_buffer) {
 
 
 int parser_init(Parser *self, void *protocol) {
+  DBG printf("parser_init\n");
   self->protocol = protocol;
   self->buf = malloc(8096); self->buf_size = 8096;
   if ( !self->buf ) return 0;
@@ -57,23 +55,27 @@ int parser_data_received(Parser *self, PyObject *py_data, Request *request ) {
   DBG printf("parser data\n%.*s\n",(int)datalen, data);
 
   // If we need more space increase the size of the buffer
+  // Can the headers be larger than our buffer size?
+// No, HTTP does not define any limit. However most web servers do limit size of headers they accept. For example in Apache default limit is 8KB, in IIS it's 16K. Server will return 413 Entity Too Large error if headers size exceeds that limit.
   DBG printf("parser datalen %lu buflen %ld buffer size %d\n", datalen, (self->end-self->start), self->buf_size);
   if ( unlikely( (datalen+(self->end-self->start)) > self->buf_size) ) {
     while ( (datalen+(self->end-self->start)) > self->buf_size )  self->buf_size *= 2;
+    int l = (self->end - self->buf);
     self->buf = realloc( self->buf, self->buf_size );
-    self->end = self->buf + (self->end-self->start);
+    self->end = self->buf + l;
     self->start = self->buf;
+    DBG printf("Increasing buffer size %ld end %p st %p\n", self->buf_size, self->end, self->start);
   }
+  DBG printf("buf    data\n%.*s\n",(int)(self->end-self->buf), self->buf);
 
-  DBG printf("parser data endptr %p dataptr %p\n",self->end, data);
+  DBG printf("parser data startptr %p endptr %p dataptr %p\n",self->start, self->end, data);
   memcpy(self->end, data, (size_t)datalen);
   self->end += (size_t)datalen;
 
 parse_headers:
 
-  if ( self->parsed_headers ) goto body;
+  if (0) {}  
 
-  
   char *method, *path;
   int rc, minor_version;
   //struct phr_header headers[100];
@@ -88,7 +90,6 @@ parse_headers:
   if ( rc < 0 ) return rc; // -2 incomplete, -1 error otherwise byte len of headers
 
   self->start += rc; 
-  self->parsed_headers = 1;
   
   DBG_PARSER printf("request is %d bytes long\n", rc);
   DBG_PARSER printf("method is %.*s\n", (int)method_len, method);
@@ -161,15 +162,23 @@ with nginx proxy_request_buffering on which is the default we will never see chu
 
   if(!Protocol_on_headers( self->protocol, method, method_len, path, path_len, minor_version, request->headers, request->num_headers)) goto error; 
 
-body:
+//body:
 
-  DBG_PARSER printf("body:\n%.*s", (int)(self->end-self->start),self->start);
+  DBG_PARSER printf("body:\n%.*s\n", (int)(self->end-self->start),self->start);
 
   // No body
   //if ( self->body_length == 0 ) { }
 
   // Need more data
-  if ( self->body_length > ( self->end - self->start ) ) return -2;
+  if ( self->body_length > ( self->end - self->start ) ) {
+    while ( (self->body_length+(self->end-self->start)) > self->buf_size )  self->buf_size *= 2;
+    int l = (self->end - self->buf);
+    self->buf = realloc( self->buf, self->buf_size );
+    self->end = self->buf + l;
+    self->start = self->buf;
+    DBG printf("Increasing buffer size %ld end %p st %p\n", self->buf_size, self->end, self->start);
+    return -2;
+  }
 
   if ( request->hreq.flags == 2 ) {
     // TODO how to handle errors.  Have unpackc not do a python error? Or clear py error if null...  Return negative? 
