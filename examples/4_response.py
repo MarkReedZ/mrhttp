@@ -1,5 +1,6 @@
 import mrhttp
 import http.cookies
+import mrpacker
 
 app = mrhttp.Application()
 
@@ -24,15 +25,19 @@ def hello(r):
 
 # Type text sets Content-Type to plain/text
 
-@app.route('/text', type="text")
+@app.route('/text', _type="text")
 def plaintext(r):
   return 'Hello World!'
 
 # Type text sets Content-Type to application/json
 
-@app.route('/json', type="json")
+@app.route('/json', _type="json")
 def json(r):
   return '[1,2,3]'
+
+@app.route('/mrp', _type="mrp")
+def mrp(r):
+  return mrpacker.pack([1,2,3])
 
 
 app.run(cores=2)
@@ -41,3 +46,4 @@ app.run(cores=2)
 
 # curl -i --raw 'http://localhost:8080/text'
 # curl -i --raw 'http://localhost:8080/json'
+# curl -i --raw 'http://localhost:8080/mrp'
