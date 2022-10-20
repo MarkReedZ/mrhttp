@@ -93,7 +93,11 @@ def parseJ(r):
 
 @app.route('/mrp')
 def mrp(r):
-  return r.mrp["name"]
+  print(r.headers)
+  print(r.mrpack)
+  if r.mrpack != None:
+    return r.mrpack["typ"]
+  return "Bad request"
 
 @app.route('/form')
 def parseForm(r):

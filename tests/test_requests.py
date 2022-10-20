@@ -81,6 +81,11 @@ def test_one():
   eq(r.text, '{"key": "value"}')
   r = requests.post('http://localhost:8080/json', json={"name": "value"})
   eq(r.text, 'value')
+  headers = {'Content-type': 'application/mrpacker'}
+  o = { "typ":"post", "s":subid, "t": 'Blonde: "What does IDK stand for?"', "l":"localhost/sub/3", "txt": 'Brunette: "I don’t know."\nBlonde: "OMG, nobody does!"' }
+  r = requests.post('http://localhost:8080/mrp', data=mrpacker.pack(o), headers=headers)
+  eq(r.text, 'post')
+
 
   #cookie = {'foo': 'b ar', 'zoo':'animals'}
   #r = requests.post('http://localhost:8080/printCookies', cookies=cookie)
