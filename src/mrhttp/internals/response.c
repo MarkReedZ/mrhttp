@@ -6,8 +6,9 @@
 #include "common.h"
 
 static char *resp_plain = "text/plain\r\n\r\n";
-static char *resp_html = "text/html; charset=utf-8\r\n\r\n";
+static char *resp_html  = "text/html; charset=utf-8\r\n\r\n";
 static char *resp_json  = "application/json\r\n\r\n";
+static char *resp_mrp   = "application/mrpacker\r\n\r\n";
 
 static char *rbuf   = NULL;
 static char *errbuf = NULL;
@@ -90,6 +91,7 @@ int response_updateHeaders(Response *self) {
     char *p = rbuf;
     if      ( self->mtype == 1 ) { memcpy( p+117, resp_plain, 14 ); ret = 131; }
     else if ( self->mtype == 2 ) { memcpy( p+117, resp_json,  20 ); ret = 137; }
+    else if ( self->mtype == 3 ) { memcpy( p+117, resp_mrp,   24 ); ret = 141; }
   } 
 
   if ( self->headers != NULL ) {

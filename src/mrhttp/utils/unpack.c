@@ -202,7 +202,7 @@ PyObject* unpack(PyObject* self, PyObject *args, PyObject *kwargs)
 
   if (! PyBytes_Check(arg))
   {
-    PyErr_Format(PyExc_TypeError, "Expected bytes");
+    PyErr_Format(PyExc_TypeError, "mrpacker.unpack expected bytes");
     return NULL;
   }
 

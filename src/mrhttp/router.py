@@ -16,7 +16,7 @@ class Router(mrhttp.CRouter):
   def finalize_routes(self):
     self.routes.sort(key=lambda x: x["sortlen"],reverse=True)
 
-  def add_route(self, handler, uri, methods=['GET'], options=[],type="html"):
+  def add_route(self, handler, uri, methods=['GET'], options=[],_type="html"):
 
     if handler.__name__ in self.func_namemap:
       raise ValueError("You have page handlers with the same name - use unique function names")
@@ -41,8 +41,9 @@ class Router(mrhttp.CRouter):
     r["methods"] = methods
     r["sortlen"] = len(uri.replace("{}","").replace("{num}",""))
     r["type"] = 0
-    if type == "text": r["type"] = 1
-    if type == "json": r["type"] = 2
+    if _type == "text": r["type"] = 1
+    if _type == "json": r["type"] = 2
+    if _type == "mrp": r["type"] = 3
     #r["user_key"] = optiondict.get("append_user_key",None)
     if "session" in options: r["session"] = True
     if "mrq" in options: r["mrq"] = True
