@@ -14,8 +14,6 @@ Templates          257,753 Requests/second
 Sessions:
   memcached        163,833 Requests/second
   mrcache          283,359 Requests/second
-Sessions (py)       83,119 Requests/second
-Session login      121,745 Requests/second
 MrWorkServer       338,891 Requests/second
 File Upload        132,242 Requests/second
 ```
@@ -27,7 +25,7 @@ Hello World       64,366 Requests/second
 Cookies           50,867 Requests/second
 404                9,256 Requests/second
 forms             27,104 Requests/second
-sessions          29,053 Requests/second
+sessions           4,053 Requests/second
 File upload       21,457 Requests/second
 ```
 
