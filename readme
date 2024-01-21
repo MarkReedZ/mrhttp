@@ -4,7 +4,10 @@
 
 
 wrk -t4 -c32 -d2s http://localhost:8080/
-
+    sudo apt-get install build-essential libssl-dev git -y
+    git clone https://github.com/wg/wrk.git 
+    cd wrk; make
+    sudo cp wrk /usr/local/bin
 
 
 ctest/blog/fast_str -- try AVX2 or tfw's
