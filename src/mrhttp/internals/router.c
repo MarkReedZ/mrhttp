@@ -124,8 +124,10 @@ PyObject *Router_setupRoutes (Router* self) {
     if ( rte->path[rte->len-1] == '/' ) numSegs -= 1;
     rte->numSegs = numSegs;
     DBG printf( " num segs %d\n", numSegs );
-    rte->segs     = malloc( numSegs * sizeof(*(rte->segs)) );
-    rte->segLens  = malloc( numSegs * sizeof(int)  );
+    if ( numSegs > 0 ) {
+      rte->segs     = malloc( numSegs * sizeof(*(rte->segs)) );
+      rte->segLens  = malloc( numSegs * sizeof(int)  );
+    }
     char* rest = rte->path+1;
     size_t rest_len = rte->len-1;
     DBG printf( " rest %.*s\n", (int)rest_len, rest );

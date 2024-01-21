@@ -162,7 +162,7 @@ PyObject* MrqProtocol_data_received(MrqProtocol* self, PyObject* data)
     printf("WARNING py bytes as string failed\n");
     return NULL; //TODO set error
   }
-  DBG_MRQ printf(" psz %ld\n",psz);
+  DBG_MRQ printf(" psz %zu\n",psz);
   int data_left = psz;
   if ( self->rbufp ) {
     DBG_MRQ printf(" rbufp! --------------------------------------------------------\n");

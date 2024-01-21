@@ -77,7 +77,7 @@ char *findchar(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *
       static char sbuf[16] = {0};
       memcpy( sbuf, buf, left );
       __m128i b16 = _mm_loadu_si128((const __m128i *)sbuf);
-      int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
+      size_t r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
       if (unlikely(r != 16) && r < left) {
         buf += r;
         *found = 1;
@@ -191,7 +191,7 @@ PyObject *timesince( PyObject *self, PyObject *ts ) {
   if ( !PyLong_Check(ts) ) { PyErr_SetString(PyExc_ValueError, "timesince requires a number and was passed something else"); return NULL; }
 
   uint64_t then = PyLong_AsUnsignedLong(ts);
-  if (then == -1) {
+  if (then == (unsigned long)-1) {
     PyErr_SetString(PyExc_ValueError, "timesince only accepts a number greater than 0");
     return NULL;
   }

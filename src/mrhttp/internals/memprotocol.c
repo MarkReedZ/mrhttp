@@ -138,7 +138,7 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
       p += 2;
 
       if ( l < (60+vlen) ) {
-        printf("Partial memc response! vlen %d l %ld\n",vlen,l);
+        printf("Partial memc response! vlen %d l %zu\n",vlen,l);
         PyObject_Print( data, stdout, 0 ); 
         printf("\n");
         exit(1);
@@ -154,7 +154,7 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
       p += vlen + 7;  
         
     } else {
-      printf("Bad memc response data len %ld\n", strlen(p));
+      printf("Bad memc response data len %zu\n", strlen(p));
       PyObject_Print( data, stdout, 0 ); 
       printf("\n");
       exit(1);

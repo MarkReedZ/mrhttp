@@ -47,7 +47,7 @@ int parser_data_received(Parser *self, PyObject *py_data, Request *request ) {
   DBG printf("parser data\n");
   char* data;
   Py_ssize_t datalen;
-  int i;
+  size_t i;
 
   if(PyBytes_AsStringAndSize(py_data, &data, &datalen) == -1) {
     DBG printf("WARNING py bytes as string failed\n");
@@ -58,14 +58,14 @@ int parser_data_received(Parser *self, PyObject *py_data, Request *request ) {
   // If we need more space increase the size of the buffer
   // Can the headers be larger than our buffer size?
 // No, HTTP does not define any limit. However most web servers do limit size of headers they accept. For example in Apache default limit is 8KB, in IIS it's 16K. Server will return 413 Entity Too Large error if headers size exceeds that limit.
-  DBG_PARSER printf("parser datalen %lu buflen %ld buffer size %d\n", datalen, (self->end-self->start), self->buf_size);
+  DBG_PARSER printf("parser datalen %zu buflen %ld buffer size %d\n", datalen, (self->end-self->start), self->buf_size);
   if ( unlikely( (datalen+(self->end-self->start)) > self->buf_size) ) {
     while ( (datalen+(self->end-self->start)) > self->buf_size )  self->buf_size *= 2;
     int l = (self->end - self->buf);
     self->buf = realloc( self->buf, self->buf_size );
     self->end = self->buf + l;
     self->start = self->buf;
-    DBG printf("Increasing buffer size %ld end %p st %p\n", self->buf_size, self->end, self->start);
+    DBG printf("Increasing buffer size %d end %p st %p\n", self->buf_size, self->end, self->start);
   }
   DBG_PARSER printf("buf    data\n%.*s\n",(int)(self->end-self->buf), self->buf);
 
@@ -177,7 +177,7 @@ with nginx proxy_request_buffering on which is the default we will never see chu
     self->buf = realloc( self->buf, self->buf_size );
     self->end = self->buf + l;
     self->start = self->buf;
-    DBG printf("Increasing buffer size %ld end %p st %p\n", self->buf_size, self->end, self->start);
+    DBG printf("Increasing buffer size %d end %p st %p\n", self->buf_size, self->end, self->start);
     return -2;
   }
 

@@ -200,7 +200,7 @@ PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
 PyObject* Protocol_data_received(Protocol* self, PyObject* data)
 {
   self->num_data_received++;
-  DBG printf("protocol data recvd %ld\n", Py_SIZE(data));
+  DBG printf("protocol data recvd %zu\n", Py_SIZE(data));
 
   // If -1 it was an error, but we should have raised it already
   if(parser_data_received(&self->parser, data, self->request) == -1) {
@@ -227,7 +227,7 @@ PyObject* pipeline_queue(Protocol* self, PipelineRequest r)
   pipeline_INCREF(r);
   
   self->queue_end++;
-  DBG printf("Queueing in position %ld task done %p\n", self->queue_end,self->task_done);
+  DBG printf("Queueing in position %zu task done %p\n", self->queue_end,self->task_done);
   
   if(pipeline_is_task(r)) {
     DBG printf(" is task\n");
@@ -684,7 +684,7 @@ error:
 
 static inline Protocol* protocol_write_response(Protocol* self, Request *req, PyObject *resp) { //, Response* response) {
 
-  long int rlen, t;
+  Py_ssize_t rlen, t;
   DBG_RESP printf("protocol write response\n");
 
   int headerLen = response_updateHeaders(req->response); // Add user headers 

@@ -133,7 +133,7 @@ PyObject* MrcacheProtocol_data_received(MrcacheProtocol* self, PyObject* data)
   do {
 
     if ( l < 6 ) {
-      printf("TODO Partial memc response! l %ld\n",l); 
+      printf("TODO Partial memc response! l %zu\n",l); 
       //PyObject_Print( data, stdout, 0 ); printf("\n");
       exit(1);
     }
@@ -153,8 +153,8 @@ PyObject* MrcacheProtocol_data_received(MrcacheProtocol* self, PyObject* data)
       else {
         p += 6; l -= 6;
   
-        if ( l < sz ) {
-          printf("TODO Partial memc response! sz %d l %ld\n",sz,l);
+        if ( (uint32_t)l < sz ) {
+          printf("TODO Partial memc response! sz %d l %zu\n",sz,l);
           //PyObject_Print( data, stdout, 0 ); printf("\n");
           exit(1);
         }
