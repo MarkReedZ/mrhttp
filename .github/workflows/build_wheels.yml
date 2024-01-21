@@ -11,6 +11,8 @@ jobs:
         os: [ubuntu-22.04]
         cibw_archs: ["auto64"]
         # os: [ubuntu-22.04, windows-2022, macos-11]
+    env:
+        CIBW_ARCHS: auto64
     steps:
       - uses: actions/checkout@v4
 
