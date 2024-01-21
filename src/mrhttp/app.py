@@ -313,7 +313,7 @@ class Application(mrhttp.CApp):
   # Update the response date string every few seconds
   def updateDateString(self):
     self.updateDate( format_date_time(None) )
-    self.loop.call_later(10, self.updateDateString)
+    self.loop.call_later(1, self.updateDateString)
 
 
   def _appStart(self):
