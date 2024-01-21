@@ -36,6 +36,8 @@ setup(
   version="0.7",
   license='MIT',
   description='A python web framework written in C',
+  long_description=open('README.md').read(),
+  long_description_content_type='text/markdown',
   ext_modules = [m1],
   package_dir={'':'src'},
   packages=find_packages('src'),# + ['prof'],
