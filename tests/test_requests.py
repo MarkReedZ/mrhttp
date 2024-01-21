@@ -1,9 +1,36 @@
 
 import tests.common
 import requests
+import mrpacker
 from tests.common import eq,contains,stop_server
 
 #process.terminate()
+
+longtext = """
+Once upon a time in a far-off kingdom, there was a small village known for its peculiar tradition. Every year, they held a competition to find the best story-teller in the village. This year, the competition was fierce, but the most anticipated contender was a man named Jack, famous for his long and humorous stories.
+
+The day of the competition arrived, and the village square was packed with people eager to hear the stories. One by one, the contenders took the stage, each telling a more elaborate tale than the last. Finally, it was Jack's turn.
+
+Jack cleared his throat and began, "In this very village, many years ago, there lived an old farmer named Tom. Tom had a chicken, but not just any chicken. This chicken laid golden eggs! Yes, golden eggs! Every morning, Tom would find a new golden egg in the chicken's nest. He became the richest man in the village. But Tom was greedy. He thought, 'If the chicken can lay golden eggs, its insides must be made of gold!'"
+
+The crowd gasped. Jack continued, "So, one day, Tom decided to cut open the chicken to get all the gold. But when he did, he found out the chicken was just like any other chicken on the inside. Tom was horrified. He realized his greed had cost him his precious source of gold."
+
+The villagers nodded, recognizing the moral of the story. But Jack wasn't finished. "Now, you must be thinking this is the end of the story," he said, "but remember, I'm known for long stories."
+
+He went on, "The spirit of the chicken was so moved by Tom's sorrow and regret that it decided to give him another chance. It appeared to Tom in a dream and said, 'I will give you a quest. If you succeed, you will find something more precious than gold.' The next morning, Tom woke up to find a map left by the chicken's spirit. The map led to a distant mountain where a rare, golden apple grew at the very top. This apple would grant wisdom to whoever ate it."
+
+The villagers leaned in, hooked by the tale. "Tom embarked on a long and perilous journey. He fought off bandits, escaped wild beasts, and climbed the tallest mountains. Finally, after many hardships, he reached the top and found the golden apple."
+
+Everyone waited with bated breath. "Tom picked the apple, and as soon as he took a bite, he was filled with the wisdom of the ages. He understood everything - why the sky is blue, why the birds sing, but most importantly, he understood the folly of greed."
+
+Jack paused, looking around at the captivated audience. "Tom returned to the village a changed man. He shared his newfound wisdom with everyone and lived the rest of his days in peace and happiness. And the moral of the story? It's not the gold or riches that matter, but the wisdom and experiences we gain in our pursuit of them."
+
+The crowd erupted in applause, impressed by the depth and length of Jack's story. As they clapped, Jack smiled, but then he said, "But wait, the story isn't over yet!"
+
+The crowd groaned. Jack chuckled and said, "Just kidding! That's the end."
+
+And that's how Jack won the competition, not just with his long story, but with his clever twist at the end. The villagers learned a valuable lesson about patience and humor, and they talked about Jack's legendary story for many years to come.
+"""
 
 server = None
 def setup():
@@ -17,13 +44,12 @@ def setup():
 
 def test_one():
   data = {}
-  s = "lo(ng"*10000
+  s = "lo(ng"*5000
   data["long"] = s
-  r = requests.post('http://localhost:8080/form',data)
+  r = requests.post('http://localhost:8080/form',data) # TODO have this timeout quickly
   eq(r.status_code, 200)
-  return
-
   eq(r.text, '{"long":"' + s + '"}')
+
   r = requests.get('http://localhost:8080/foo')
   eq(r.status_code, 200)
   r = requests.get('http://localhost:8080/to64')
@@ -82,7 +108,10 @@ def test_one():
   r = requests.post('http://localhost:8080/json', json={"name": "value"})
   eq(r.text, 'value')
   headers = {'Content-type': 'application/mrpacker'}
-  o = { "typ":"post", "s":subid, "t": 'Blonde: "What does IDK stand for?"', "l":"localhost/sub/3", "txt": 'Brunette: "I don’t know."\nBlonde: "OMG, nobody does!"' }
+  o = { "typ":"post", "s":2, "t": 'Blonde: "What does IDK stand for?"', "l":"localhost/sub/3", "txt": 'Brunette: "I don’t know."\nBlonde: "OMG, nobody does!"' }
+  r = requests.post('http://localhost:8080/mrp', data=mrpacker.pack(o), headers=headers)
+  eq(r.text, 'post')
+  o = { "typ":"post", "s":2, "t": longtext, "l":"localhost/sub/3", "txt": 'Brunette: "I don’t know."\nBlonde: "OMG, nobody does!"' }
   r = requests.post('http://localhost:8080/mrp', data=mrpacker.pack(o), headers=headers)
   eq(r.text, 'post')
 
@@ -103,12 +132,12 @@ def test_one():
   eq(r.text, '{"":"v","英文版本":"val(ue2"}')
   r = requests.post('http://localhost:8080/form', data={"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"","英":"+=&ue2"})
   eq(r.text, '{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"","英":"+=&ue2"}')
-  data = {}
-  s = "lo(ng"*10000
-  data["long"] = s
-  r = requests.post('http://localhost:8080/form',data)
-  eq(r.status_code, 200)
-  eq(r.text, '{"long":"' + s + '"}')
+  #data = {}
+  #s = "lo(ng"*10000
+  #data["long"] = s
+  #r = requests.post('http://localhost:8080/form',data)
+  #eq(r.status_code, 200)
+  #eq(r.text, '{"long":"' + s + '"}')
   r = requests.get('http://localhost:8080/form')
   eq(r.text, "No form")
 

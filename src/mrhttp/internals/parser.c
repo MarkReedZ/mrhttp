@@ -41,7 +41,8 @@ int parser_init(Parser *self, void *protocol) {
   return 1;
 }
 
-// TODO Check we don't exceed a max request size
+// TODO Check we don't exceed a max request size.  Nginx does this for us though
+//      Sanic:  app.config.REQUEST_MAX_SIZE = 300_000_000
 int parser_data_received(Parser *self, PyObject *py_data, Request *request ) {
   DBG printf("parser data\n");
   char* data;
@@ -52,12 +53,12 @@ int parser_data_received(Parser *self, PyObject *py_data, Request *request ) {
     DBG printf("WARNING py bytes as string failed\n");
     goto error;
   }
-  DBG printf("parser data\n%.*s\n",(int)datalen, data);
+  DBG_PARSER printf("parser data\n%.*s\n",(int)datalen, data);
 
   // If we need more space increase the size of the buffer
   // Can the headers be larger than our buffer size?
 // No, HTTP does not define any limit. However most web servers do limit size of headers they accept. For example in Apache default limit is 8KB, in IIS it's 16K. Server will return 413 Entity Too Large error if headers size exceeds that limit.
-  DBG printf("parser datalen %lu buflen %ld buffer size %d\n", datalen, (self->end-self->start), self->buf_size);
+  DBG_PARSER printf("parser datalen %lu buflen %ld buffer size %d\n", datalen, (self->end-self->start), self->buf_size);
   if ( unlikely( (datalen+(self->end-self->start)) > self->buf_size) ) {
     while ( (datalen+(self->end-self->start)) > self->buf_size )  self->buf_size *= 2;
     int l = (self->end - self->buf);
@@ -66,9 +67,9 @@ int parser_data_received(Parser *self, PyObject *py_data, Request *request ) {
     self->start = self->buf;
     DBG printf("Increasing buffer size %ld end %p st %p\n", self->buf_size, self->end, self->start);
   }
-  DBG printf("buf    data\n%.*s\n",(int)(self->end-self->buf), self->buf);
+  DBG_PARSER printf("buf    data\n%.*s\n",(int)(self->end-self->buf), self->buf);
 
-  DBG printf("parser data startptr %p endptr %p dataptr %p\n",self->start, self->end, data);
+  DBG_PARSER printf("parser data startptr %p endptr %p dataptr %p\n",self->start, self->end, data);
   memcpy(self->end, data, (size_t)datalen);
   self->end += (size_t)datalen;
 
@@ -187,7 +188,7 @@ with nginx proxy_request_buffering on which is the default we will never see chu
       printf("DELME unpackc returned null in parser\n");
       printf("DELME data len %ld\n",self->body_length);
       print_buffer(self->start, 16);
-      exit(1);
+      return -1;
     }
 
   }

@@ -1,3 +1,9 @@
+
+readme = """
+  pip install msgpack mrasyncmc tenjin mrpacker
+"""
+
+
 import pkgutil, time
 import inspect
 import types 
@@ -108,18 +114,18 @@ time.sleep(1)
 try:
 
   opts = ('-H','Cookie: mrsession=43709dd361cc443e976b05714581a7fb; foo=fdsfdasdfasdfdsfasdfsdfsdfasdfas; short=fazc;')
-  #print ("Hello pipelined", run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
+  #doesn't work print ("Hello pipelined", run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
   print ("Hello          ", run_wrk(loop, 'http://localhost:8080/'),             "Requests/second" )
 
   if 1:
-    #print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies', options=opts), "Requests/second" )
-    #print ("many args      ", run_wrk(loop, 'http://localhost:8080/sixargs/one/two/three/four/five/six'), "Requests/second" )
+    print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies', options=opts), "Requests/second" )
+    print ("many args      ", run_wrk(loop, 'http://localhost:8080/sixargs/one/two/three/four/five/six'), "Requests/second" )
     #print ("404 natural    ", run_wrk(loop, 'http://localhost:8080/dfads404/'), "Requests/second" )
     #print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
     #print ("Form parsing   ", run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/form.lua'), "Requests/second" )
     #print ("Templates      ", run_wrk(loop, 'http://localhost:8080/template'),            "Requests/second" )
     print ("mrpacker       ", run_wrk(loop,'http://localhost:8080/mrpacker',lua='tests/lua/mrpacker.lua'), "Requests/second" )
-    #print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
+    print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
     # Disabled in s_bench.py print ("Sessions (py)  ", run_wrk(loop, 'http://localhost:8080/pys',   options=opts), "Requests/second" )
     #print ("Session login  ", run_wrk(loop, 'http://localhost:8080/login'),               "Requests/second" )
     #print ("json post      ", run_wrk(loop,'http://localhost:8080/json',lua='tests/lua/json.lua'), "Requests/second" )
