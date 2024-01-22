@@ -33,7 +33,7 @@ m1 = Extension(
 
 setup(
   name="mrhttp", 
-  version="0.8",
+  version="0.9",
   license='MIT',
   description='A python web framework written in C',
   long_description=open('README.md').read(),
