@@ -66,23 +66,23 @@ static void print_buffer( char* b, int len ) {
 }
 
 
-#define TFW_LC_INT  0x20202020
-#define TFW_LC_LONG 0x2020202020202020UL
-#define TFW_CHAR4_INT(a, b, c, d)         \
+#define MR_LC_INT  0x20202020
+#define MR_LC_LONG 0x2020202020202020UL
+#define MR_CHAR4_INT(a, b, c, d)         \
    (unsigned int)((d << 24) | (c << 16) | (b << 8) | a)
-#define TFW_CHAR8_INT(a, b, c, d, e, f, g, h)       \
+#define MR_CHAR8_INT(a, b, c, d, e, f, g, h)       \
    (((long)h << 56) | ((long)g << 48) | ((long)f << 40)   \
     | ((long)e << 32) | (d << 24) | (c << 16) | (b << 8) | a)
-#define TFW_P2LCINT(p)  ((*(unsigned int *)(p)) | TFW_LC_INT)
+#define MR_P2LCINT(p)  ((*(unsigned int *)(p)) | MR_LC_INT)
 /*
  * Match 4 or 8 characters with conversion to lower case
  * and type conversion to int or long type.
  */
 #define C4_INT_LCM(p, a, b, c, d)         \
-   !((*(unsigned int *)(p) | TFW_LC_INT) ^ TFW_CHAR4_INT(a, b, c, d))
+   !((*(unsigned int *)(p) | MR_LC_INT) ^ MR_CHAR4_INT(a, b, c, d))
 #define C8_INT_LCM(p, a, b, c, d, e, f, g, h)       \
-   !((*(unsigned long *)(p) | TFW_LC_LONG)      \
-     ^ TFW_CHAR8_INT(a, b, c, d, e, f, g, h))
+   !((*(unsigned long *)(p) | MR_LC_LONG)      \
+     ^ MR_CHAR8_INT(a, b, c, d, e, f, g, h))
 
 #define CHECK_EOF()                                                                                                                \
     if (buf == buf_end) {                                                                                                          \
@@ -307,7 +307,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
         // Listed small to larger - probably best as most used TODO check bounds
         switch ( TOLC(*buf) ) {
           case 'h': // Host
-            if ( TFW_CHAR4_INT('o', 's', 't',':') == *((unsigned int *)(buf+1)) ) {
+            if ( MR_CHAR4_INT('o', 's', 't',':') == *((unsigned int *)(buf+1)) ) {
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 4;
               buf += 6;
@@ -315,7 +315,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
             }
             break;
           case 'c': 
-            if ( buf[6] == ':' && TFW_CHAR4_INT('o', 'o', 'k','i') == *((unsigned int *)(buf+1)) ) { // Cookie:
+            if ( buf[6] == ':' && MR_CHAR4_INT('o', 'o', 'k','i') == *((unsigned int *)(buf+1)) ) { // Cookie:
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 6;
               buf += 8;
@@ -367,7 +367,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
             }
             break;
             //printf( "%.*s\n" , 10, buf);
-            //printf( "Host: %08x == %08x\n" , TFW_CHAR4_INT('o', 's', 't',':'), *((unsigned int *)(buf+1)));
+            //printf( "Host: %08x == %08x\n" , MR_CHAR4_INT('o', 's', 't',':'), *((unsigned int *)(buf+1)));
           case 'd':
             if ( buf[4] == ':' ) { // Date:
               headers[*num_headers].name = buf;
@@ -591,9 +591,9 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
     /* parse request line */
     //ADVANCE_TOKEN(*method, *method_len);
     switch (*(unsigned int *)buf) {
-      case TFW_CHAR4_INT('G', 'E', 'T', ' '):
+      case MR_CHAR4_INT('G', 'E', 'T', ' '):
         *method = buf; *method_len = 3; buf += 4; goto uri;
-      case TFW_CHAR4_INT('P', 'O', 'S', 'T'):
+      case MR_CHAR4_INT('P', 'O', 'S', 'T'):
         *method = buf; *method_len = 4; buf += 5; goto uri;
     }
     ++buf;
@@ -601,9 +601,9 @@ uri:
     ADVANCE_TOKEN(*path, *path_len);
     ++buf;
     switch (*(unsigned long *)buf) {
-      case TFW_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','0'):
+      case MR_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','0'):
         *minor_version = 0; buf += 8; goto endfirst;
-      case TFW_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','1'):
+      case MR_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','1'):
         *minor_version = 1; buf += 8; goto endfirst;
       default:
         *ret = -2;
@@ -672,15 +672,15 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
       return NULL;
     }
     switch (*(unsigned long *)buf) {
-      case TFW_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','0'):
+      case MR_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','0'):
         *minor_version = 0; buf += 8; break;
-      case TFW_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','1'):
+      case MR_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','1'):
         *minor_version = 1; buf += 8; break;
       default:
         *ret = -2;
         return NULL;
     }
-    if ( *(unsigned long*)buf == TFW_CHAR8_INT(' ', '2', '0', '0',' ','O','K','\r') ) {
+    if ( *(unsigned long*)buf == MR_CHAR8_INT(' ', '2', '0', '0',' ','O','K','\r') ) {
       *status = 200;
       *msg = buf+5; *msg_len = 2;
       buf += 9;
