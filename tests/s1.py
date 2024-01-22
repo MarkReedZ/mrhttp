@@ -45,7 +45,6 @@ def testing(r):
 @app.route('/404/')
 def notFound(r):
   raise mrhttp.HTTPError(404)
-  return 'Hello World!'
 
 @app.route('/500/')
 def error500(r):

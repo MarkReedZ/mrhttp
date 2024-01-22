@@ -1,0 +1,12 @@
+
+
+ echo -en "GET / HTTP/1.1\r\nHost: localhost:8080\r\n\r\nGET / HTTP/1.1\r\nHost: localhost:8080\r\n\r\n" | nc localhost 8080
+
+nc -N localhost 8080 < data/pipe_alt
+nc -N localhost 8080 < data/pipe_alt100
+
+
+socat - tcp:localhost:8080 < data/pipe_alt100 &
+socat - tcp:localhost:8080 < data/pipe_alt100 &
+socat - tcp:localhost:8080 < data/pipe_alt100 &
+socat - tcp:localhost:8080 < data/pipe_alt100 &

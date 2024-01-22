@@ -10,14 +10,11 @@
 #include "memcachedclient.h"
 #include "mrqclient.h"
 
-//MrMemcachedProtocol_CAPI
-
-
 
 typedef struct {
   bool is_task;
   Request* request;
-  PyObject* task; // Task if coroutine otherwise output
+  PyObject* task; // Task if coroutine otherwise response output
 } PipelineRequest;
 
 struct Protocol {

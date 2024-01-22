@@ -1,7 +1,7 @@
 pip install sanic
 pip install sanic_session
 
-wrk -t 4 -c 32 -d 2 http://localhost:8000/
+wrk -t 4 -c 32 -d 2 http://localhost:8080/
 
 Install wrk:
     sudo apt-get install build-essential libssl-dev git -y

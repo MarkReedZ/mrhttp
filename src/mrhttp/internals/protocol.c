@@ -1,5 +1,4 @@
 
-
 // PyObject_Print( req->py_user, stdout, 0 ); printf("\n");
 
 #include "protocol.h"
@@ -126,22 +125,11 @@ PyObject* Protocol_connection_made(Protocol* self, PyObject* transport)
 {
 
   DBG printf("conn made %p\n",self);
-  //PyObject* connections = NULL;
   self->transport = transport;
-  //Py_INCREF(self->transport);
   self->closed = false;
 
   if(!(self->write      = PyObject_GetAttrString(transport, "write"))) return NULL;
   if(!(self->writelines = PyObject_GetAttrString(transport, "writelines"))) return NULL;
-
-  //if(!(connections = PyObject_GetAttrString((PyObject*)self->app, "_connections"))) return NULL;
-  //if(PySet_Add(connections, (PyObject*)self) == -1) { Py_XDECREF(connections); return NULL; }
-  //DBG printf("connection made num %ld %p\n", PySet_GET_SIZE(connections), self);
-  //Py_XDECREF(connections);
-
-  // TODO Only if session or mrq is enabled?
-  //self->memclient = (MemcachedClient*)(self->app->py_mc);
-  //self->mrqclient = (MrqClient*)      (self->app->py_mrq);
 
   Py_RETURN_NONE;
 }
@@ -150,6 +138,7 @@ void* Protocol_close(Protocol* self)
 {
   DBG printf("protocol close\n");
   void* result = self;
+  self->closed = true;
 
   PyObject* close = PyObject_GetAttrString(self->transport, "close");
   if(!close) return NULL;
@@ -157,7 +146,6 @@ void* Protocol_close(Protocol* self)
   Py_XDECREF(close);
   if(!tmp) return NULL;
   Py_DECREF(tmp);
-  self->closed = true;
 
   return result;
 
@@ -167,32 +155,16 @@ PyObject* Protocol_eof_received(Protocol* self) {
   DBG printf("eof received\n");
   Py_RETURN_NONE; // Closes the connection and conn lost will be called next
 }
+
 PyObject* Protocol_connection_lost(Protocol* self, PyObject* args)
 {
   DBG printf("conn lost %p\n",self);
   self->closed = true;
   MrhttpApp_release_request( self->app, self->request );
 
-
-  //Py_XDECREF(self->transport);
-  //self->transport = NULL;
-
   PyObject* connections = NULL;
 
-  //if(!Parser_feed_disconnect(&self->parser)) goto error;
-
-  // Remove the connection from app.connections
-  //if(!(connections = PyObject_GetAttrString((PyObject*)self->app, "_connections"))) return NULL;
-  //int rc = PySet_Discard(connections, (PyObject*)self);
-  //Py_XDECREF(connections);
-  //if ( rc == -1 ) return NULL;
-
   if(!Protocol_pipeline_cancel(self)) return NULL;
-
-  //Py_XDECREF(self->write);
-  //Py_XDECREF(self->writelines);
-  //Py_XDECREF(self->task_done); // TODO Why is this helping
-
 
   Py_RETURN_NONE;
 }
@@ -228,10 +200,12 @@ PyObject* pipeline_queue(Protocol* self, PipelineRequest r)
   
   self->queue_end++;
   DBG printf("Queueing in position %zu task done %p\n", self->queue_end,self->task_done);
-  
+
+  // If this is a task then have it call Protocol_task_done when it is done
   if(pipeline_is_task(r)) {
     DBG printf(" is task\n");
-    PyObject* task = pipeline_get_task(r);
+    //PyObject* task = pipeline_get_task(r);
+    PyObject* task = r.task;
     if(!(add_done_callback = PyObject_GetAttrString(task, "add_done_callback")))
       goto error;
     
@@ -484,6 +458,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
   request->app = (PyObject*)self->app; //TODO need this?
 
 
+  // URL:  /  /json 
   Route *r = router_getRoute( self->router, self->request );
   if ( r == NULL ) {
     // TODO If the pipeline isn't empty...
@@ -559,12 +534,16 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
   PyObject* result = NULL;
   DBG printf("protocol handle request\n");
 
+  // if the page is an async def or there are already requests in the Q get a free request object
+  // TODO look at the iscoro
   if ( r->iscoro || !PIPELINE_EMPTY(self)) {
     //self->gather.enabled = false;
     // If we can't finish now save this request by grabbing a new free request if we haven't already done so
+    // TODO what if all request objects are busy
     if ( self->request == request ) self->request = (Request*)MrhttpApp_get_request( self->app );
   }
 
+  
   if(!(result = protocol_callPageHandler(self, r->func, request)) ) {
 
     if ( request->return404 ) {
@@ -662,6 +641,8 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
   request->response->mtype = r->mtype;
 
   if(!protocol_write_response(self, request, result)) goto error;
+
+  if ( !request->keep_alive ) Protocol_close(self);
 
   Py_DECREF(result);
   return self;
@@ -887,9 +868,17 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
 PyObject* protocol_task_done(Protocol* self, PyObject* task)
 {
   DBG printf("  coro task done proto %p\n",self);
+  
   PyObject* result = Py_True;
   PipelineRequest *r;
 
+  // task is the task that just finished.  
+  //   If task is at the head of the Q then return the response.
+  //     then continue looping through the Q and return a response for anything that is already done
+
+
+  // This code loops the whole Q and asks each task if they are done and if so calls ready on each one 
+  //   until we hit a task that is still waiting or the Q is empty
   for(r = self->queue + self->queue_start;
       r < self->queue + self->queue_end; r++) {
     PyObject* done = NULL;
@@ -906,6 +895,7 @@ PyObject* protocol_task_done(Protocol* self, PyObject* task)
         result = Py_False;
         goto loop_finally;
       }
+    } else {
     }
     if(!protocol_pipeline_ready(self, *r)) goto loop_error;
 

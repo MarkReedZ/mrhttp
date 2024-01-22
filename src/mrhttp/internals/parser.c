@@ -101,8 +101,8 @@ parse_headers:
     printf("%.*s: %.*s\n", (int)request->headers[i].name_len, request->headers[i].name, (int)request->headers[i].value_len, request->headers[i].value);
   }
 
-  if(minor_version == 0) self->conn_state = CONN_CLOSE;
-  else                   self->conn_state = CONN_KEEP_ALIVE;
+  if(minor_version == 0) request->keep_alive = false;
+  else                   request->keep_alive = true;
  
   //self->body_length = request->hreq.body_length;
 
@@ -136,30 +136,11 @@ parse_headers:
       }
 
     } else if(header_name_equal("Connection")) {
-      if      (header_value_equal("close"))      self->conn_state = CONN_CLOSE;
-      else if (header_value_equal("keep-alive")) self->conn_state = CONN_KEEP_ALIVE;
+      if      (header_value_equal("close"))      request->keep_alive = false;
       else goto error;
       //TODO ERROR
     }
   } 
-
-/*
-Transfer-Encoding: chunked
-Transfer-Encoding: compress
-Transfer-Encoding: deflate
-Transfer-Encoding: gzip
-Transfer-Encoding: identity
-
-// Several values can be listed, separated by a comma
-Transfer-Encoding: gzip, chunked
-
-with nginx proxy_request_buffering on which is the default we will never see chunked
-    if(header_name_equal("Transfer-Encoding")) {
-      if(header_value_equal("chunked"))
-        self->transfer = PARSER_CHUNKED;
-      else if(header_value_equal("identity"))
-        self->transfer = PARSER_IDENTITY;
-*/
 
   if(!Protocol_on_headers( self->protocol, method, method_len, path, path_len, minor_version, request->headers, request->num_headers)) goto error; 
 
@@ -185,8 +166,8 @@ with nginx proxy_request_buffering on which is the default we will never see chu
     // TODO how to handle errors.  Have unpackc not do a python error? Or clear py error if null...  Return negative? 
     request->py_mrpack = unpackc( self->start, self->body_length ); 
     if ( request->py_mrpack == NULL ) {
-      printf("DELME unpackc returned null in parser\n");
-      printf("DELME data len %ld\n",self->body_length);
+      printf("WARNING unpackc returned null in parser\n");
+      printf("WARNING data len %ld\n",self->body_length);
       print_buffer(self->start, 16);
       return -1;
     }

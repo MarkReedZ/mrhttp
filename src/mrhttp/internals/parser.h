@@ -5,16 +5,8 @@
 
 #include "mrhttpparser.h"
 
-enum connection_state {
-  UNSET,
-  CONN_KEEP_ALIVE,
-  CONN_CLOSE
-};
-
 typedef struct {
 
-  enum connection_state conn_state;
-  
   long body_length;
 
   struct mr_chunked_decoder chunked_decoder;

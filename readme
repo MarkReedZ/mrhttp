@@ -1,4 +1,8 @@
 
+Updating version:
+  setup.py
+  src/mrhttp/__init__.py
+  internals app.c and response.c
 
 
 

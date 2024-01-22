@@ -33,6 +33,7 @@ struct Request {
   int numArgs;
   bool inprog;
   bool return404;
+  bool keep_alive;
 
   char* session_id;
   int session_id_sz;

@@ -37,8 +37,8 @@ except ImportError:
 
 #import mrmemcache
 
-#import uvloop
-#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+import uvloop
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 signames = {
     int(v): v.name for k, v in signal.__dict__.items()
@@ -233,7 +233,7 @@ class Application(mrhttp.CApp):
       elif self.session_backend == "mrcache":
         self.session_backend_type = 3
 
-      self.requests = [Request() for x in range(128)]
+      self.requests = [Request() for x in range(128)] # TODO multiple connections each have 128 req objects?
       self.cinit()
       self.router.finalize_routes()
       self.router.setupRoutes()
@@ -257,12 +257,18 @@ class Application(mrhttp.CApp):
 
       self.trigger_event("at_start")
 
-      server_coro = loop.create_server( lambda: self._protocol_factory(self), sock=sock)
+      try:
+        server_coro = loop.create_server( lambda: self._protocol_factory(self), sock=sock)
+      except:
+        pass
       if run_async: 
         return server_coro
 
       # Try except here?
-      server = loop.run_until_complete(server_coro)
+      try:
+        server = loop.run_until_complete(server_coro)
+      except:
+        pass
 
       print('Accepting connections on http://{}:{}'.format(host, port))
 

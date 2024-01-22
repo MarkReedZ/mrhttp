@@ -30,10 +30,11 @@ void response_setupResponseBuffer(void) {
   char *p = rbuf;
 
   char *s;
-  // Update updateDate and write_response if this changes
+  // Change updateDate and write_response if this changes
+  //   Also all 115 and 143s ( updateHeaders )
   s = "HTTP/1.1 200 OK\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
   s = "Content-Length: 1        \r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
-  s = "Server: MrHTTP/0.1.1\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
+  s = "Server: MrHTTP/0.8\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
   s = "Date: Thu, 05 Apr 2018 22:54:19 GMT\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
   s = "Content-Type: text/html; charset=utf-8\r\n\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
   DBG_RESP printf("Init resp buffer:\n%.*s", (int)(p-rbuf), rbuf);
@@ -72,26 +73,26 @@ PyObject *response_updateDate(PyObject *date) {
   Py_ssize_t l;
   char *d = PyUnicode_AsUTF8AndSize( date, &l );
   char *p = rbuf;
-  p += strlen("HTTP/1.1 200 OK\r\n") + strlen("Server: MrHTTP/0.1.1\r\n") + strlen("Content-Length: 1        \r\n");
+  p += strlen("HTTP/1.1 200 OK\r\n") + strlen("Server: MrHTTP/0.8\r\n") + strlen("Content-Length: 1        \r\n");
   p += 6;
   memcpy(p, d, l);
   Py_RETURN_NONE;
 }
 
 void response_setHtmlHeader() {
-  memcpy( rbuf+117, resp_html, 28 );
+  memcpy( rbuf+115, resp_html, 28 );
 }
 
 // Returns the header length
 int response_updateHeaders(Response *self) {
-  int ret = 145;
+  int ret = 143;
 
   // Set Content-Type:  1 plain, 2 json, default is html
   if ( self->mtype ) {
     char *p = rbuf;
-    if      ( self->mtype == 1 ) { memcpy( p+117, resp_plain, 14 ); ret = 131; }
-    else if ( self->mtype == 2 ) { memcpy( p+117, resp_json,  20 ); ret = 137; }
-    else if ( self->mtype == 3 ) { memcpy( p+117, resp_mrp,   24 ); ret = 141; }
+    if      ( self->mtype == 1 ) { memcpy( p+115, resp_plain, 14 ); ret = 129; }
+    else if ( self->mtype == 2 ) { memcpy( p+115, resp_json,  20 ); ret = 135; }
+    else if ( self->mtype == 3 ) { memcpy( p+115, resp_mrp,   24 ); ret = 139; }
   } 
 
   if ( self->headers != NULL ) {
@@ -234,10 +235,10 @@ PyObject *response_getErrorResponse(int code, char *reason, char *msg) {
   sprintf( body, "<html><head><title>%d %s</title></head><body><h1>%s</h1><p>%s</p></body></html>", code, reason, reason, msg );
   int blen = strlen(body);   
   
-  sprintf(p, "HTTP/1.1 %d %s\r\nServer: MrHTTP/0.1.1\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\n", code, reason, blen);
+  sprintf(p, "HTTP/1.1 %d %s\r\nServer: MrHTTP/0.8\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\n", code, reason, blen);
   p += strlen(p);
   memcpy(p, 
-         rbuf + strlen("HTTP/1.1 200 OK\r\n") + strlen("Server: MrHTTP/0.1.1\r\n") + strlen("Content-Length: 17       \r\n"), 
+         rbuf + strlen("HTTP/1.1 200 OK\r\n") + strlen("Server: MrHTTP/0.8\r\n") + strlen("Content-Length: 17       \r\n"), 
          strlen("Date: Thu, 05 Apr 2018 22:54:19 GMT\r\n"));
   p += strlen("Date: Thu, 05 Apr 2018 22:54:19 GMT\r\n");
 
