@@ -137,8 +137,6 @@ parse_headers:
 
     } else if(header_name_equal("Connection")) {
       if      (header_value_equal("close"))      request->keep_alive = false;
-      else goto error;
-      //TODO ERROR
     }
   } 
 

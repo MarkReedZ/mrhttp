@@ -642,7 +642,8 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
 
   if(!protocol_write_response(self, request, result)) goto error;
 
-  if ( !request->keep_alive ) Protocol_close(self);
+  // TODO We aren't closing the connection if issued a connection: close header.  This is okay behind nginx
+  //if ( !request->keep_alive ) Protocol_close(self);
 
   Py_DECREF(result);
   return self;

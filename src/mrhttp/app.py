@@ -257,18 +257,12 @@ class Application(mrhttp.CApp):
 
       self.trigger_event("at_start")
 
-      try:
-        server_coro = loop.create_server( lambda: self._protocol_factory(self), sock=sock)
-      except:
-        pass
+      server_coro = loop.create_server( lambda: self._protocol_factory(self), sock=sock)
       if run_async: 
         return server_coro
 
       # Try except here?
-      try:
-        server = loop.run_until_complete(server_coro)
-      except:
-        pass
+      server = loop.run_until_complete(server_coro)
 
       print('Accepting connections on http://{}:{}'.format(host, port))
 
