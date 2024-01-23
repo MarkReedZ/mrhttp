@@ -307,15 +307,12 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
         // Listed small to larger - probably best as most used TODO check bounds
         switch ( TOLC(*buf) ) {
           case 'h': // Host
-            if ( MR_CHAR4_INT('o', 's', 't',':') == *((unsigned int *)(buf+1)) ) {
-              headers[*num_headers].name = buf;
-              headers[*num_headers].name_len = 4;
-              buf += 6;
-              goto hvalue;
-            }
-            break;
+            headers[*num_headers].name = buf;
+            headers[*num_headers].name_len = 4;
+            buf += 6;
+            goto hvalue;
           case 'c': 
-            if ( buf[6] == ':' && MR_CHAR4_INT('o', 'o', 'k','i') == *((unsigned int *)(buf+1)) ) { // Cookie:
+            if ( buf[6] == ':' ) { // Cookie:
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 6;
               buf += 8;
@@ -356,7 +353,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               buf += 16;
               goto hvalue;
             }
-            if ( buf[1] == 'F' || buf[16] == ':' ) { // CF-Connecting-IP
+            if ( buf[16] == ':' ) { // CF-Connecting-IP
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 16;
               buf += 18;
@@ -383,7 +380,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
             }
             break;
           case 'x':
-            if ( buf[1] == '-' && buf[9] == ':' ) { // X-Real-IP
+            if ( buf[9] == ':' ) { // X-Real-IP
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 9;
               buf += 11;
@@ -392,7 +389,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               mrr->ip_len = headers[*num_headers].value_len;
               goto skipvalue;
             }
-            if ( buf[1] == '-' && buf[15] == ':' ) { // X-Forwarded-For:       
+            if ( buf[15] == ':' ) { // X-Forwarded-For:       
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 15;
               buf += 17;
@@ -402,7 +399,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
               goto skipvalue;
               //goto hvalue;
             }
-            if ( buf[1] == '-' && buf[16] == ':' ) { // X-Forwarded-Host:       
+            if ( buf[16] == ':' ) { // X-Forwarded-Host:       
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 16;
               buf += 18;
@@ -438,31 +435,22 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
             }
             break;
           case 'o':
-            if ( buf[6] == ':' ) { // Origin:       
-              headers[*num_headers].name = buf;
-              headers[*num_headers].name_len = 6;
-              buf += 8;
-              goto hvalue;
-            }
-            break;
+            headers[*num_headers].name = buf;
+            headers[*num_headers].name_len = 6;
+            buf += 8;
+            goto hvalue;
           case 'r':
-            if ( buf[7] == ':' ) { // referer
-              headers[*num_headers].name = buf;
-              headers[*num_headers].name_len = 7;
-              buf += 9;
-              goto hvalue;
-            }
-            break;
+            headers[*num_headers].name = buf;
+            headers[*num_headers].name_len = 7;
+            buf += 9;
+            goto hvalue;
           case 't': // Transfer-Encoding:
-            if ( buf[8] == '-' && buf[17] == ':' ) {
-              headers[*num_headers].name = buf;
-              headers[*num_headers].name_len = 17;
-              buf += 19;
-              goto hvalue;
-            }
-            break;
+            headers[*num_headers].name = buf;
+            headers[*num_headers].name_len = 17;
+            buf += 19;
+            goto hvalue;
           case 'u':
-            if ( buf[5] == '-' && buf[10] == ':' ) { // User-Agent:     
+            if ( buf[10] == ':' ) { // User-Agent:     
               headers[*num_headers].name = buf;
               headers[*num_headers].name_len = 10;
               buf += 12;
