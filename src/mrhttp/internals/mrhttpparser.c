@@ -271,7 +271,7 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
     } while (0)
 
 
-#ifdef __AVX2__
+#ifdef __DELMEAVX2__
 static unsigned long TZCNT(unsigned long long in) {
   unsigned long res;
   asm("tzcnt %1, %0\n\t" : "=r"(res) : "r"(in));
@@ -700,7 +700,7 @@ uri:
         return NULL;
     }
 
-#ifdef __AVX2__
+#ifdef __DELMEAVX2__
     return parse_headers_avx2(buf, buf_end, headers, num_headers, max_headers, ret, mrr);
 #else
     return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret, mrr);
