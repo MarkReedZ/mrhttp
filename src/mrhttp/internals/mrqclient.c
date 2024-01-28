@@ -128,7 +128,6 @@ PyObject *MrqClient_set(MrqClient* self, PyObject *args) {
 }
 
 
-// TODO We trust the slot is & 0xFF
 int MrqClient_push(MrqClient* self, int slot, char *d, int dsz) {
   DBG_MRQ printf(" MrqClient_push slot %d\n", slot );
   int server = server_slotmap[slot&0xFF];
