@@ -28,7 +28,6 @@
 
 #include <assert.h>
 #include <stddef.h>
-#include <stdlib.h>
 #include <string.h>
 #ifdef __AVX2__
 #include <immintrin.h>
@@ -44,8 +43,6 @@
 #define likely(x) (x)
 #define unlikely(x) (x)
 #endif
-
-#define ALIGNED(x) __attribute__ ((aligned(x)))
 
 #define IS_PRINTABLE_ASCII(c) ((unsigned char)(c)-040u < 0137u)
 
@@ -270,109 +267,6 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
         *valp_ += res_;                                                                                                            \
     } while (0)
 
-
-#ifdef __AVX2__
-static unsigned long TZCNT(unsigned long long in) {
-  unsigned long res;
-  asm("tzcnt %1, %0\n\t" : "=r"(res) : "r"(in));
-  return res;
-}
-static const char *parse_headers_avx2(const char *buf, const char *buf_end, struct mr_header *headers, size_t *num_headers,
-                                 size_t max_headers, int *ret, struct mr_request *mrr)
-{
-  unsigned long long msk[8];  // 1 bit for each of 512 bytes matching  : or \r
-  const char *sbuf = buf;
-  int cnt = 0;
-  int name_or_value = 0;
-
-__m256i m13 = _mm256_set1_epi8(13);
-__m256i m58 = _mm256_set1_epi8(58);
-
-  // Parse in 512B chunks with avx2 instructions
-  do {
-
-    const char *block_start = buf; // Start of each 64B block
-    __m256i b0,b1,b2,b3,b4,b5,b6,b7;
-  
-    b0 = _mm256_loadu_si256((const __m256i *) (buf + 32*0)); // buf[0]
-    b1 = _mm256_loadu_si256((const __m256i *) (buf + 32*1)); // buf[32]
-    b2 = _mm256_loadu_si256((const __m256i *) (buf + 32*2)); // buf[64]
-    b3 = _mm256_loadu_si256((const __m256i *) (buf + 32*3)); // buf[96]
-    b4 = _mm256_loadu_si256((const __m256i *) (buf + 32*4)); // buf[128]
-    b5 = _mm256_loadu_si256((const __m256i *) (buf + 32*5));
-    b6 = _mm256_loadu_si256((const __m256i *) (buf + 32*6));
-    b7 = _mm256_loadu_si256((const __m256i *) (buf + 32*7)); // 256 bytes
-  
-    msk[0] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m13), _mm256_cmpeq_epi8(b1, m58) ) ) << 32);
-    msk[1] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b2, m13), _mm256_cmpeq_epi8(b2, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b3, m13), _mm256_cmpeq_epi8(b3, m58) ) ) << 32);
-    msk[2] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b4, m13), _mm256_cmpeq_epi8(b4, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b5, m13), _mm256_cmpeq_epi8(b5, m58) ) ) << 32);
-    msk[3] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b6, m13), _mm256_cmpeq_epi8(b6, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b7, m13), _mm256_cmpeq_epi8(b7, m58) ) ) << 32);
-  
-    b0 = _mm256_loadu_si256((const __m256i *) (buf + 32*8));
-    b1 = _mm256_loadu_si256((const __m256i *) (buf + 32*9));
-    b2 = _mm256_loadu_si256((const __m256i *) (buf + 32*10));
-    b3 = _mm256_loadu_si256((const __m256i *) (buf + 32*11));
-    b4 = _mm256_loadu_si256((const __m256i *) (buf + 32*12));
-    b5 = _mm256_loadu_si256((const __m256i *) (buf + 32*13));
-    b6 = _mm256_loadu_si256((const __m256i *) (buf + 32*14));
-    b7 = _mm256_loadu_si256((const __m256i *) (buf + 32*15));
-  
-    msk[4] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m13), _mm256_cmpeq_epi8(b1, m58) ) ) << 32);
-    msk[5] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b2, m13), _mm256_cmpeq_epi8(b2, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b3, m13), _mm256_cmpeq_epi8(b3, m58) ) ) << 32);
-    msk[6] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b4, m13), _mm256_cmpeq_epi8(b4, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b5, m13), _mm256_cmpeq_epi8(b5, m58) ) ) << 32);
-    msk[7] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b6, m13), _mm256_cmpeq_epi8(b6, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b7, m13), _mm256_cmpeq_epi8(b7, m58) ) ) << 32);
-  
-    // "Host: server\r\n"
-    // Headers end on \r\n\r\n
-    int i = 0;  // msk[i]
-    int t;
-    do {
-  
-      while(1) {
-        t = TZCNT((msk[i]>>(buf-block_start)));
-        if ( t < 64 ) {
-          buf += t;
-          //printf(">%.*s<\n", 16, sbuf);
-          if ( name_or_value == 1 ) {
-            if ( buf[0] != '\r' ) { buf++; continue; } // Handle : in the value
-            headers[*num_headers].value = sbuf;
-            headers[*num_headers].value_len = buf-sbuf;
-            ++*num_headers;
-            name_or_value = 0;
-          } else {
-            headers[*num_headers].name = sbuf;
-            headers[*num_headers].name_len = buf-sbuf;
-            name_or_value = 1;
-          }
-          buf += 2; if ( buf[0] == '\r' ) { return buf+2; } // End of headers
-          sbuf = buf;
-          if ( (buf-block_start)> 64 ) break; 
-        } else {
-          buf = block_start + 64;
-          break;
-        }
-  
-      }
-  
-      block_start += 64;
-      //if ( buf[0] == '\r' ) { return buf+2; } // End of headers
-    } while ( ++i < 8 );
-    
-  } while (++cnt < 32);
-
-  // If we get here the header was too large so abort. TODO abort with appropriate error code
-  *ret = -1;
-  return NULL;
-}
-#endif
 
 static const char *parse_headers(const char *buf, const char *buf_end, struct mr_header *headers, size_t *num_headers,
                                  size_t max_headers, int *ret, struct mr_request *mrr)
@@ -700,11 +594,7 @@ uri:
         return NULL;
     }
 
-#ifdef __AVX2__
-    return parse_headers_avx2(buf, buf_end, headers, num_headers, max_headers, ret, mrr);
-#else
     return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret, mrr);
-#endif
 }
 
 static __inline__ unsigned long long rdtsc(void)
@@ -746,6 +636,242 @@ int mr_parse_request(const char *buf_start, size_t len, const char **method, siz
     return (int)(buf - buf_start);
 }
 
+static const char *parse_response(const char *buf, const char *buf_end, int *minor_version, int *status, const char **msg,
+                                  size_t *msg_len, struct mr_header *headers, size_t *num_headers, size_t max_headers, int *ret)
+{
+    /* parse "HTTP/1.x" */
+    if ( buf_end - buf < 16 ) {
+      *ret = -2;
+      return NULL;
+    }
+    switch (*(unsigned long *)buf) {
+      case MR_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','0'):
+        *minor_version = 0; buf += 8; break;
+      case MR_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','1'):
+        *minor_version = 1; buf += 8; break;
+      default:
+        *ret = -2;
+        return NULL;
+    }
+    if ( *(unsigned long*)buf == MR_CHAR8_INT(' ', '2', '0', '0',' ','O','K','\r') ) {
+      *status = 200;
+      *msg = buf+5; *msg_len = 2;
+      buf += 9;
+      //printf(">%.*s<", 16, buf);
+      return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret, NULL);
+    }
+    /* skip space */
+    if (*buf++ != ' ') {
+        *ret = -1;
+        return NULL;
+    }
+    /* parse status code, we want at least [:digit:][:digit:][:digit:]<other char> to try to parse */
+    if (buf_end - buf < 4) {
+        *ret = -2;
+        return NULL;
+    }
+    PARSE_INT_3(status);
+
+    /* skip space */
+    if (*buf++ != ' ') {
+        *ret = -1;
+        return NULL;
+    }
+    /* get message */
+    if ((buf = get_token_to_eol(buf, buf_end, msg, msg_len, ret)) == NULL) {
+        return NULL;
+    }
+
+    return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret, NULL);
+}
+
+int mr_parse_response(const char *buf_start, size_t len, int *minor_version, int *status, const char **msg, size_t *msg_len,
+                       struct mr_header *headers, size_t *num_headers, size_t last_len)
+{
+    const char *buf = buf_start, *buf_end = buf + len;
+    size_t max_headers = *num_headers;
+    int r;
+
+    *minor_version = -1;
+    *status = 0;
+    *msg = NULL;
+    *msg_len = 0;
+    *num_headers = 0;
+
+    /* if last_len != 0, check if the response is complete (a fast countermeasure
+       against slowloris */
+    if (last_len != 0 && is_complete(buf, buf_end, last_len, &r) == NULL) {
+        return r;
+    }
+
+    if ((buf = parse_response(buf, buf_end, minor_version, status, msg, msg_len, headers, num_headers, max_headers, &r)) == NULL) {
+        return r;
+    }
+
+    return (int)(buf - buf_start);
+}
+
+int mr_parse_headers(const char *buf_start, size_t len, struct mr_header *headers, size_t *num_headers, size_t last_len)
+{
+    const char *buf = buf_start, *buf_end = buf + len;
+    size_t max_headers = *num_headers;
+    int r;
+
+    *num_headers = 0;
+
+    /* if last_len != 0, check if the response is complete (a fast countermeasure
+       against slowloris */
+    if (last_len != 0 && is_complete(buf, buf_end, last_len, &r) == NULL) {
+        return r;
+    }
+
+    //if ((buf = parse_headers(buf, buf_end, headers, num_headers, max_headers, &r, NULL)) == NULL) { return r; }
+    if ((buf = parse_headers_avx2(buf, buf_end, headers, num_headers, max_headers, &r, NULL)) == NULL) { return r; }
+
+    return (int)(buf - buf_start);
+}
+
+enum {
+    CHUNKED_IN_CHUNK_SIZE,
+    CHUNKED_IN_CHUNK_EXT,
+    CHUNKED_IN_CHUNK_DATA,
+    CHUNKED_IN_CHUNK_CRLF,
+    CHUNKED_IN_TRAILERS_LINE_HEAD,
+    CHUNKED_IN_TRAILERS_LINE_MIDDLE
+};
+
+static int decode_hex(int ch)
+{
+    if ('0' <= ch && ch <= '9') {
+        return ch - '0';
+    } else if ('A' <= ch && ch <= 'F') {
+        return ch - 'A' + 0xa;
+    } else if ('a' <= ch && ch <= 'f') {
+        return ch - 'a' + 0xa;
+    } else {
+        return -1;
+    }
+}
+
+ssize_t mr_decode_chunked(struct mr_chunked_decoder *decoder, char *buf, size_t *_bufsz)
+{
+    size_t dst = 0, src = 0, bufsz = *_bufsz;
+    ssize_t ret = -2; /* incomplete */
+
+    while (1) {
+        switch (decoder->_state) {
+        case CHUNKED_IN_CHUNK_SIZE:
+            for (;; ++src) {
+                int v;
+                if (src == bufsz)
+                    goto Exit;
+                if ((v = decode_hex(buf[src])) == -1) {
+                    if (decoder->_hex_count == 0) {
+                        ret = -1;
+                        goto Exit;
+                    }
+                    break;
+                }
+                if (decoder->_hex_count == sizeof(size_t) * 2) {
+                    ret = -1;
+                    goto Exit;
+                }
+                decoder->bytes_left_in_chunk = decoder->bytes_left_in_chunk * 16 + v;
+                ++decoder->_hex_count;
+            }
+            decoder->_hex_count = 0;
+            decoder->_state = CHUNKED_IN_CHUNK_EXT;
+        /* fallthru */
+        case CHUNKED_IN_CHUNK_EXT:
+            /* RFC 7230 A.2 "Line folding in chunk extensions is disallowed" */
+            for (;; ++src) {
+                if (src == bufsz)
+                    goto Exit;
+                if (buf[src] == '\012')
+                    break;
+            }
+            ++src;
+            if (decoder->bytes_left_in_chunk == 0) {
+                if (decoder->consume_trailer) {
+                    decoder->_state = CHUNKED_IN_TRAILERS_LINE_HEAD;
+                    break;
+                } else {
+                    goto Complete;
+                }
+            }
+            decoder->_state = CHUNKED_IN_CHUNK_DATA;
+        /* fallthru */
+        case CHUNKED_IN_CHUNK_DATA: {
+            size_t avail = bufsz - src;
+            if (avail < decoder->bytes_left_in_chunk) {
+                if (dst != src)
+                    memmove(buf + dst, buf + src, avail);
+                src += avail;
+                dst += avail;
+                decoder->bytes_left_in_chunk -= avail;
+                goto Exit;
+            }
+            if (dst != src)
+                memmove(buf + dst, buf + src, decoder->bytes_left_in_chunk);
+            src += decoder->bytes_left_in_chunk;
+            dst += decoder->bytes_left_in_chunk;
+            decoder->bytes_left_in_chunk = 0;
+            decoder->_state = CHUNKED_IN_CHUNK_CRLF;
+        }
+        /* fallthru */
+        case CHUNKED_IN_CHUNK_CRLF:
+            for (;; ++src) {
+                if (src == bufsz)
+                    goto Exit;
+                if (buf[src] != '\015')
+                    break;
+            }
+            if (buf[src] != '\012') {
+                ret = -1;
+                goto Exit;
+            }
+            ++src;
+            decoder->_state = CHUNKED_IN_CHUNK_SIZE;
+            break;
+        case CHUNKED_IN_TRAILERS_LINE_HEAD:
+            for (;; ++src) {
+                if (src == bufsz)
+                    goto Exit;
+                if (buf[src] != '\015')
+                    break;
+            }
+            if (buf[src++] == '\012')
+                goto Complete;
+            decoder->_state = CHUNKED_IN_TRAILERS_LINE_MIDDLE;
+        /* fallthru */
+        case CHUNKED_IN_TRAILERS_LINE_MIDDLE:
+            for (;; ++src) {
+                if (src == bufsz)
+                    goto Exit;
+                if (buf[src] == '\012')
+                    break;
+            }
+            ++src;
+            decoder->_state = CHUNKED_IN_TRAILERS_LINE_HEAD;
+            break;
+        default:
+            assert(!"decoder is corrupt");
+        }
+    }
+
+Complete:
+    ret = bufsz - src;
+Exit:
+    if (dst != src)
+        memmove(buf + dst, buf + src, bufsz - src);
+    *_bufsz = dst;
+    return ret;
+}
+
+int mr_decode_chunked_is_in_data(struct mr_chunked_decoder *decoder)
+{
+    return decoder->_state == CHUNKED_IN_CHUNK_DATA;
+}
 
 #undef CHECK_EOF
 #undef EXPECT_CHAR

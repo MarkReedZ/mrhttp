@@ -434,9 +434,8 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
           }
         }
       }
-      // TODO else tell user to login?
   
-      // TODO set a client member to say success/fail? Have to start failing if slow consumer / connection gone.
+      // TODO What if the connection is gone? Does MrqClient_push fail?
     } 
 
     Protocol_handle_request( self, req, req->route );

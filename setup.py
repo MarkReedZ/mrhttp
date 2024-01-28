@@ -25,7 +25,7 @@ m1 = Extension(
       './src/mrhttp/utils/unpack.c',
      ],
      include_dirs = ['./src/mrhttp/internals','./src/mrhttp/utils'],
-     extra_compile_args = ['-msse4.2', '-mavx2', '-mbmi2', '-Wunused-variable','-std=c99','-Wno-discarded-qualifiers', '-Wno-unused-variable','-Wno-unused-function'],
+     extra_compile_args = ['-msse4.2', '-mavx2', '-mbmi2', '-Wunused-variable','-std=gnu99','-Wno-discarded-qualifiers', '-Wno-unused-variable','-Wno-unused-function'],
      extra_link_args = [],
      #extra_link_args = ['-lasan'],
      define_macros = [('DEBUG_PRINT',1)]

@@ -1,7 +1,7 @@
 
 import traceback
 from mrhttp import app
-import asyncmrq, mrpacker
+#import asyncmrq, mrpacker
 
 app.config["memcache"] = [ ("127.0.0.1", 11211) ]
 
@@ -10,17 +10,12 @@ app.config["memcache"] = [ ("127.0.0.1", 11211) ]
   #app.c = asyncmrq.Client()
   #await app.c.connect(servers=[("127.0.0.1",7100)])
 
-msg = mrpacker.pack( [1,2,3] )
-msglen = len(msg)
-print(msg)
-
-@app.route('/',options=['session'])
+#@app.route('/',options=['session'])
+@app.route('/')
 async def index(r):
-  #await app.c.push( r.user["id"], 0, msg, msglen )
-  #print( r.headers )
+  print( r.headers )
   #print( r.ip )
   return "yay"  
-  #x = r.form
   #d = r.mrpack
   #return d["name"]
   #x = r.form
