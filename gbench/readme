@@ -1,0 +1,18 @@
+
+Benches
+ g++ tst.cpp -std=c++11 -lbenchmark -lpthread -o tst
+ g++ parse.cpp -std=c++11 -lbenchmark -lpthread -o parse
+
+Test code first:
+  g++ t.cpp -msse4.2 -mavx2 -std=c++11 -lpthread -o t
+
+https://github.com/google/benchmark
+
+Install gbench
+  sudo apt install cmake
+  git clone https://github.com/google/benchmark.git
+  cd benchmark/
+  cmake -E make_directory "build"
+  cmake -E chdir "build" cmake -DBENCHMARK_DOWNLOAD_DEPENDENCIES=on -DCMAKE_BUILD_TYPE=Release ../
+  cmake --build "build" --config Release
+  sudo cmake --build "build" --config Release --target install
