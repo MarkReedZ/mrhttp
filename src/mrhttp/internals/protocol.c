@@ -1,4 +1,3 @@
-
 // PyObject_Print( req->py_user, stdout, 0 ); printf("\n");
 
 #include "protocol.h"
@@ -174,9 +173,9 @@ PyObject* Protocol_data_received(Protocol* self, PyObject* data)
   self->num_data_received++;
   DBG printf("protocol data recvd %zu\n", Py_SIZE(data));
 
-  // If -1 it was an error, but we should have raised it already
   if(parser_data_received(&self->parser, data, self->request) == -1) {
-    Py_RETURN_NONE;
+    printf("DELME YAY\n");
+    return protocol_write_error_response_bytes(self, self->app->err400);
   }
 
   Py_RETURN_NONE;

@@ -29,6 +29,7 @@ typedef struct {
 
   // Custom error pages
   PyObject* err404;
+  PyObject* err400;
 
   // Request pool
   PyObject *func_expand_requests;

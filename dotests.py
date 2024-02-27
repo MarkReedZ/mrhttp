@@ -16,7 +16,7 @@ import tests
 #     memcached -l 127.0.0.1 -p 11211 -d -m 50
 
 
-if 0:
+if 1:
   package = tests
   for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
     if modname.startswith("test"):
@@ -121,12 +121,13 @@ try:
      '-H','Accept-Language: en-US,en;q=0.5',
      '-H','Connection: keep-alive')
   opts = ('-H','Cookie: mrsession=43709dd361cc443e976b05714581a7fb; foo=fdsfdasdfasdfdsfasdfsdfsdfasdfas; short=fazc;')
-  print ("Hello pipelined", run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
-  print ("More hdrs pipelined", run_wrk(loop, 'http://localhost:8080/',options=more_headers,lua='tests/lua/pipeline.lua'), "Requests/second" )
   print ("Hello          ", run_wrk(loop, 'http://localhost:8080/'),             "Requests/second" )
-  print ("Hello hdrs     ", run_wrk(loop, 'http://localhost:8080/', options=more_headers), "Requests/second" )
+  if 0:
+    print ("Hello pipelined", run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
+    print ("More hdrs pipelined", run_wrk(loop, 'http://localhost:8080/',options=more_headers,lua='tests/lua/pipeline.lua'), "Requests/second" )
+    print ("Hello          ", run_wrk(loop, 'http://localhost:8080/'),             "Requests/second" )
+    print ("Hello hdrs     ", run_wrk(loop, 'http://localhost:8080/', options=more_headers), "Requests/second" )
 
-  if 1:
     #print ("Cookies        ", run_wrk(loop, 'http://localhost:8080/printCookies', options=opts), "Requests/second" )
     #print ("many args      ", run_wrk(loop, 'http://localhost:8080/sixargs/one/two/three/four/five/six'), "Requests/second" )
     #print ("404 natural    ", run_wrk(loop, 'http://localhost:8080/dfads404/'), "Requests/second" )

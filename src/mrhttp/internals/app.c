@@ -218,6 +218,18 @@ void MrhttpApp_setup_error_pages(MrhttpApp* self) {
 
   self->err404 = PyBytes_FromStringAndSize( resp, (p-resp) + l );
   free(resp);
+  u = PyObject_GetAttrString((PyObject*)self, "err400");
+  if ( !u ) return;
+
+  body = PyUnicode_AsUTF8AndSize( u, &l );
+
+  resp = malloc( l + 1024 );
+  sprintf(resp, "HTTP/1.1 400 Bad Request\r\nServer: MrHTTP/0.8\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %zu\r\n\r\n", l);
+  p = resp + strlen(resp);
+  memcpy(p, body, l);
+
+  self->err400 = PyBytes_FromStringAndSize( resp, (p-resp) + l );
+  free(resp);
  
 }
 

@@ -73,6 +73,7 @@ class Application(mrhttp.CApp):
     self.uses_session = False
     self.uses_mrq = False
     self.err404 = "<html><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested page was not found</p></body></html>"
+    self.err400 = "<html><head><title>400 Bad Request</title></head><body><p>Invalid Request</p></body></html>"
    
   def setup(self, log_request=None, protocol_factory=None, debug=False):
     self._log_request = log_request

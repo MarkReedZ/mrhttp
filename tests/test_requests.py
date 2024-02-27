@@ -152,6 +152,8 @@ def test_one():
   r = requests.get('http://localhost:8080/printIP')
   eq(r.text, "None")
 
+  # TODO we can't test bad headers as requests won't send them curl localhost:8080/ -H "ƒtest:ƒart"
+
   #contains(r.text, "Internal Server Error")
   #print( r.status_code, r.headers, r.text )
 
