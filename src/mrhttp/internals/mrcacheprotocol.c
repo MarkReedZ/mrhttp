@@ -1,5 +1,6 @@
 
 
+
 #include "mrcacheprotocol.h"
 #include "mrcacheclient.h"
 #include "Python.h"
@@ -132,26 +133,24 @@ PyObject* MrcacheProtocol_data_received(MrcacheProtocol* self, PyObject* data)
   char *end = start+l;
   do {
 
-    if ( l < 6 ) {
+    if ( l < 4 ) {
       printf("TODO Partial memc response! l %zu\n",l); 
       //PyObject_Print( data, stdout, 0 ); printf("\n");
       exit(1);
     }
-    bool get = ((p[0]==0)&&(p[1] == 1));
-    uint32_t sz  = *((uint32_t*)(p+2));
+    int32_t sz  = *((int32_t*)(p));
 
-    if ( get ) {
       // No session found
       if ( sz == 0 ) {
-        p += 6;
+        p += 4;
         tSessionCallback cb = self->queue[self->queue_start].cb;
         cb(self->queue[self->queue_start].connection, NULL, 0);
         self->queue_start = (self->queue_start+1)%self->queue_sz;
       }
       // Session found
       // TODO The session key length must be 32 , allow variable and check performance
-      else {
-        p += 6; l -= 6;
+      else if ( sz > 0 ) {
+        p += 4; l -= 4;
   
         if ( (uint32_t)l < sz ) {
           printf("TODO Partial memc response! sz %d l %zu\n",sz,l);
@@ -169,7 +168,6 @@ PyObject* MrcacheProtocol_data_received(MrcacheProtocol* self, PyObject* data)
         p += sz; l -= sz;
           
       } 
-  	}
     else {
       printf("TODO Bad memc response data len %ld\n", l);
       PyObject_Print( data, stdout, 0 ); printf("\n"); // Print on error
@@ -208,7 +206,7 @@ int MrcacheProtocol_asyncSet( MrcacheProtocol* self, char *key, char *val, int v
   }
 
   uint16_t *klenp = (uint16_t*)(self->set_cmd+2);
-  uint32_t *vlenp = (uint32_t*)(self->set_cmd+4);
+  int32_t *vlenp = (int32_t*)(self->set_cmd+4);
   *klenp = 32;
   *vlenp = val_sz;
 
