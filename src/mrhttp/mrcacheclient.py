@@ -33,7 +33,7 @@ class MrcacheClient(mrhttp.CMrcacheClient):
           loop.run_until_complete(coro)
         snum += 1
     except ConnectionRefusedError:
-      print("Could not connect to the memcached server(s)")
+      print("Could not connect to the mrcache server(s)")
       exit(1)
     except Exception as e:
       print(e)

@@ -1,6 +1,6 @@
 
 readme = """
-  pip install msgpack mrasyncmc tenjin mrpacker
+  pip install psutil requests msgpack mrasyncmc tenjin mrpacker
 """
 
 
@@ -122,6 +122,7 @@ try:
      '-H','Connection: keep-alive')
   opts = ('-H','Cookie: mrsession=43709dd361cc443e976b05714581a7fb; foo=fdsfdasdfasdfdsfasdfsdfsdfasdfas; short=fazc;')
   print ("Hello          ", run_wrk(loop, 'http://localhost:8080/'),             "Requests/second" )
+  print ("Sessions       ", run_wrk(loop, 'http://localhost:8080/s',     options=opts), "Requests/second" )
   if 0:
     print ("Hello pipelined", run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
     print ("More hdrs pipelined", run_wrk(loop, 'http://localhost:8080/',options=more_headers,lua='tests/lua/pipeline.lua'), "Requests/second" )
