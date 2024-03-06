@@ -18,7 +18,7 @@ class MrqServer():
     self.num_connections = 0
     self.reconnecting = False
     self.reconnect_attempts = 0
-    self.q = asyncio.Queue( loop=loop )
+    self.q = asyncio.Queue( )
     
        
 class MrqClient(mrhttp.CMrqClient):
