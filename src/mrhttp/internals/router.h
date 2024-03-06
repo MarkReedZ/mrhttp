@@ -17,6 +17,7 @@ typedef struct {
   bool mrq;
   bool append_user;
   char mtype;
+  int max_byte_size;
 
   PyObject *user_key;
   //char *user_key;

@@ -236,24 +236,12 @@ PyObject* MrqProtocol_data_received(MrqProtocol* self, PyObject* data)
         p += len;
       }
 
-      //PyObject *b = PyBytes_FromStringAndSize(p,len);
-      //PyObject_Print( b, stdout, 0 ); 
-      //printf("\n");
-
-      //DBG_MRQ printf("putting on q %p\n",self->q);
-      //DBG_MRQ printf("pfunc        %p\n",self->pfunc);
-      //if(!PyObject_CallFunctionObjArgs(self->pfunc, b, NULL)) { printf("WTF\n"); Py_XDECREF(b); return NULL; }
-      //DBG_MRQ printf("after putting on q\n");
-      //Py_DECREF(b);
-
     } else {
       printf("Unrecognized cmd %d\n", p[0]);
       return NULL;
     }
   }
 
-  //tMrqCallback cb = self->queue[0].cb;
-  //cb(self->queue[0].connection);
   Py_RETURN_NONE;
 }
 
@@ -324,10 +312,10 @@ int MrqProtocol_set(MrqProtocol* self, char *d, int dsz) {
 //int MrqProtocol_push(MrqProtocol* self, int topic, int slot, char *d, int dsz) {
 int MrqProtocol_push(MrqProtocol* self, char *d, int dsz) {
 
-  if ( dsz > 10*1024 ) return -1;
+  if ( dsz > 100*1024 ) return -1;
 
   if ( dsz > self->bsz ) {
-    self->bsz = 12*1024;
+    self->bsz *= 2;
     self->b = realloc( self->b, self->bsz ); 
     self->bb = self->b+6;
     self->bp4 = (int*)(self->b+2);
@@ -342,7 +330,7 @@ int MrqProtocol_push(MrqProtocol* self, char *d, int dsz) {
   memcpy(self->bb, d, dsz);
 
   PyObject *bytes = PyBytes_FromStringAndSize(self->b, dsz + 6);
-  //PyObject_Print(bytes, stdout,0); printf("\n");
+  //printf("mrq push buytes:\n"); PyObject_Print(bytes, stdout,0); printf("\n"); //DELME
   if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 1; }
   Py_DECREF(bytes);
 

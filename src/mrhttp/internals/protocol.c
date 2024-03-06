@@ -1,3 +1,4 @@
+
 // PyObject_Print( req->py_user, stdout, 0 ); printf("\n");
 
 
@@ -24,6 +25,7 @@ static void print_buffer( char* b, int len ) {
   }
   printf("\n");
 }
+
 
 void printErr(void) {
   PyObject *type, *value, *traceback;
@@ -175,7 +177,6 @@ PyObject* Protocol_data_received(Protocol* self, PyObject* data)
   DBG printf("protocol data recvd %zu\n", Py_SIZE(data));
 
   if(parser_data_received(&self->parser, data, self->request) == -1) {
-    printf("DELME YAY\n");
     return protocol_write_error_response_bytes(self, self->app->err400);
   }
 
@@ -293,13 +294,13 @@ PyObject *protocol_callPageHandler( Protocol* self, PyObject *func, Request *req
 void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data_sz ) {
   Protocol *self = (Protocol*)scd->protocol;
   Request  *req  = (Request*)scd->request;
-
-
-  DBG_MEMCAC printf(" memcached reply data len %d data %.*s\n",data_sz,data_sz,data);
+  DBG_MEMCAC printf("  memc_reply r%p scd%p\n", req, scd);
+  DBG_MEMCAC printf(" cac reply len %d data %.*s\n",data_sz,data_sz,data);
 
   bool json = false;
   // If append_user then the stored session's format must match the incoming.  json or mrpacker
 
+  // TODO if we did not find the session id in memcache what does data/data_sz look like
   // TODO Support json?  
   if ( data_sz ) {
     //if ( data[0] == '{' ) {
@@ -377,7 +378,7 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
             free(tmp);
           } else {
 
-            char *tmp = malloc( req->body_len + data_sz + 16 );
+            char *tmp = malloc( req->body_len + data_sz + 16 ); // TODO avoid malloc with static buffer
             tmp[0] = 0x42;
             char *p = tmp+1;
             memcpy(p, req->body, req->body_len);
@@ -433,6 +434,8 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
             MrqClient_push ( (MrqClient*)self->app->py_mrq, slot, req->body, req->body_len );
           }
         }
+      } else {
+        // User not logged in.  The python handler can check r.user and handle this case
       }
   
       // TODO What if the connection is gone? Does MrqClient_push fail?
@@ -464,6 +467,16 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     if ( self->app->err404 ) {
       return protocol_write_error_response_bytes(self, self->app->err404);
     }
+    return self;
+  }
+
+  // Check to see if the route exceeds the max byte size  
+  //  TODO Can we drop too small requests
+  //  TODO What about fuzzing requests completely broken requests.  Probably stopped by nginx
+  //  TODO What about headers and bad header and do some fuzzing
+
+  if ( r->max_byte_size && (body_len > r->max_byte_size) ) {
+    //Protocol_handle_request( self, self->request, r );
     return self;
   }
 

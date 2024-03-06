@@ -110,8 +110,7 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
   DBG_MEMCAC printf("memcached protocol - data recvd\n");
   DBG_MEMCAC PyObject_Print( data, stdout, 0 ); 
   DBG_MEMCAC printf("\n");
-//                                                    50  
-//b"VALUE mrsession43709dd361cc443e976b05714581a7fb 0 19\r\n{'username':'Mark'}\r\nEND\r\nVALUE mrqsession43709dd361cc443e976b05714581a7fb 0 19\r\n{'username':'Mark'}\r\nEND\r\nVALUE mrqsession43709dd361cc443e976b05714581a7fb 0 19\r\n{'username':'Mark'}\r\nEND\r\nVALUE mrqsession43709dd361cc443e976b05714581a7fb 0 19\r\n{'username':'Mark'}\r\nEND\r\n"
+
   char *p, *start;
   Py_ssize_t l;
 
@@ -128,8 +127,12 @@ PyObject* MemcachedProtocol_data_received(MemcachedProtocol* self, PyObject* dat
     }
     // Session found
     // TODO The session key length must be 32 , allow variable and check performance
+    //                                                    50  
+    //b"VALUE mrsession43709dd361cc443e976b05714581a7fb 0 19\r\n{'username':'Mark'}\r\nEND\r\n
+    // VALUE <key> <flags> <bytes> [<cas unique>]\r\n <data block>\r\n
     else if ( p[0] == 'V' ) {
-      p += 50;
+      p += 50; // Skip to the number of bytes for the value (assume key size is 32)
+               // TODO We can actually store the key length in queue to handle variable keys
       int vlen = 0;
       while( *p != '\r' ) {
         vlen = (*p-'0') + 10*vlen;

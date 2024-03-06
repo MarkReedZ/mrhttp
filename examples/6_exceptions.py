@@ -5,7 +5,7 @@ app = mrhttp.Application()
 @app.route('/404/')
 def not_found(r):
   print("404")
-  return r.NotFound()
+  return app.err404
 
 # Python errors should return 500 and print the exception
 
