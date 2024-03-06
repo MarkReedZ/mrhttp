@@ -503,6 +503,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
 
       // If the get failed (no servers) then we're done
       if ( rc != 0 ) {
+        free(scd);
         Protocol_handle_request( self, self->request, r );
         return self;
       }
@@ -513,6 +514,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
 
     // if mrq return now as the user is not logged in
     if ( r->mrq ) {
+      free(scd);
       return Protocol_handle_request( self, self->request, r );
     }
 
