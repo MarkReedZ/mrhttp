@@ -12,13 +12,13 @@ engine = tenjin.Engine(path=['tests/templates'])
 
 
 app = Application()
-app.config["memcache"] = [("127.0.0.1", 11211)]
-#app.config["mrq"] =      [("127.0.0.1", 7100 )]
+#app.config["memcache"] = [("127.0.0.1", 11211)]
+app.config["mrq"] =      [("127.0.0.1", 7100 )]
 #app.config["mrq"] =      [("127.0.0.1", 7100 ),("127.0.0.1",7001)]
-#app.config["mrcache"] =  [("127.0.0.1", 7000 )]
-app.session_backend = "memcached"
+app.config["mrcache"] =  [("127.0.0.1", 7000 )]
+#app.session_backend = "memcached"
 #app.session_backend = "mrworkserver"
-#app.session_backend = "mrcache"
+app.session_backend = "mrcache"
 
 
 #@app.on('at_start')
@@ -140,9 +140,11 @@ def session(r):
     return "user"
   return "session"
 
-#@app.route('/mrq/{}',options=['session',"mrq","append_user"])
-#def mrq(r, tstid):
-  #return "ok"
+@app.route('/mrq/{}',options=['session',"mrq","append_user"])
+def mrq(r, tstid):
+  if r.user:
+    return "user"
+  return "not logged in"
 
 @app.route('/mrqget')
 async def mrqget(r):
@@ -167,5 +169,5 @@ def longresp(r):
   return "fart"*128*1000
 
 
-app.run(cores=4)
+app.run(cores=1)
 

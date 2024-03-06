@@ -77,8 +77,8 @@ wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -s tests/lua/json.lua
 wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -s tests/lua/q-pipeline.lua
 
 MRQ test:
-curl -i --raw http://localhost:8080/q/0/0/ -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;" -X POST -d '{"username":"xyz","type":"add"}' 
-wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;" -s tests/lua/json.lua
+curl -i --raw http://localhost:8080/mrq/0 -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;" -X POST -d '{"username":"xyz","type":"add"}' 
+wrk -t4 -c32 -d1s http://localhost:8080/mrq/0 -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;" -H "Content-Type: application/mrpacker" -s tests/lua/mrpacker.lua
 
 wrk -t4 -c32 -d1s http://localhost:8080/q/1/2/ -H "Content-Type: application/mrpacker" -s tests/lua/mrpacker.lua
 curl -H "Content-Type: application/mrpacker" --data-binary @tests/lua/test.mrp http://localhost:8080/
