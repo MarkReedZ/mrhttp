@@ -1,7 +1,8 @@
 
 import traceback
 from mrhttp import app
-#import asyncmrq, mrpacker
+import mrpacker
+
 
 app.config["memcache"] = [ ("127.0.0.1", 11211) ]
 
@@ -11,8 +12,8 @@ app.config["memcache"] = [ ("127.0.0.1", 11211) ]
   #await app.c.connect(servers=[("127.0.0.1",7100)])
 
 #@app.route('/',options=['session'])
-@app.route('/')
-async def index(r):
+@app.route('/',_type="html")
+def index(r):
   print( r.headers )
   #print( r.ip )
   return "yay"  
@@ -25,13 +26,13 @@ async def index(r):
 def json(r):
   return r.json["name"]
 
-@app.route('/mrpacker')
-def mrpacker(r):
-  return r.mrpack["name"]
+@app.route('/mrp',_type="mrp")
+def mrp(r):
+  return mrpacker.pack("hello")
 
 
 try:
-  app.run(cores=4)
+  app.run(cores=1)
 except Exception as e:
   print("YAY",e)
 

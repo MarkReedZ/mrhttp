@@ -26,6 +26,7 @@ typedef struct {
   PyObject* cookies;
 
   int mtype; // mime type 0 html 1 plain 2 json
+  int mtype_end;
 
   char* buffer;
   size_t buffer_len;
@@ -40,6 +41,7 @@ void Response_reset(Response *self);
 
 PyObject *response_updateDate(PyObject *date);
 int       response_updateHeaders(Response *self);
+void      response_setMimeType(int mt);
 void      response_setHtmlHeader(void);
 
 PyObject* Response_get_headers(Response* self, void* closure);

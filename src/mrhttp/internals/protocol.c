@@ -618,6 +618,8 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
 
 
   if ( r->iscoro ) {
+    response_setMimeType(r->mtype); // TODO this doesn't work if we pipeline different types
+
     DBG printf("protocol - Request is a coroutine\n");
     PyObject *task;
     if(!(task = PyObject_CallFunctionObjArgs(self->create_task, result, NULL))) return NULL;
@@ -651,7 +653,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
     return NULL;
   }
 
-  request->response->mtype = r->mtype;
+  response_setMimeType(r->mtype);
 
   if(!protocol_write_response(self, request, result)) goto error;
 
@@ -727,9 +729,6 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
   if(!(o = PyObject_CallFunctionObjArgs(self->write, bytes, NULL))) return NULL;
   Py_DECREF(o);
   Py_DECREF(bytes);
-
-  // If we modified the header in the response buffer return it to default TODO
-  if ( req->response->mtype ) response_setHtmlHeader();
 
   if ( req != self->request ) MrhttpApp_release_request( self->app, req );
   else                        Request_reset(req);
@@ -857,6 +856,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
     }
     return NULL;
   }
+
 
   if(!self->closed) {
     if(!protocol_write_response(self, request, response)) goto error;

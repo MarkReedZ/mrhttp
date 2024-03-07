@@ -13,6 +13,8 @@ static char *resp_mrp   = "application/mrpacker\r\n\r\n";
 static char *rbuf   = NULL;
 static char *errbuf = NULL;
 static int rbuf_sz = 0;
+static int mime_type = 0;
+static int mime_type_end = 144;
 
 PyObject* Response_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -63,7 +65,6 @@ char *getResponseBuffer(int sz) {
 
 int Response_init(Response* self, PyObject *args, PyObject* kw)
 {
-  self->mtype = 0;
   self->headers = NULL;
   self->cookies = NULL;
   return 0;
@@ -79,21 +80,19 @@ PyObject *response_updateDate(PyObject *date) {
   Py_RETURN_NONE;
 }
 
-void response_setHtmlHeader() {
-  memcpy( rbuf+116, resp_html, 28 );
+void response_setMimeType(int mt) {
+  if ( mt != mime_type ) {
+    mime_type = mt;
+    if      ( mime_type == 1 ) { memcpy( rbuf+116, resp_plain, 14 ); mime_type_end = 130;  }
+    else if ( mime_type == 2 ) { memcpy( rbuf+116, resp_json,  20 ); mime_type_end = 136; }
+    else if ( mime_type == 3 ) { memcpy( rbuf+116, resp_mrp,   24 ); mime_type_end = 140; }
+    else                       { memcpy( rbuf+116, resp_html,  28 ); mime_type_end = 144; }
+  }
 }
 
 // Returns the header length
 int response_updateHeaders(Response *self) {
-  int ret = 144;
-
-  // Set Content-Type:  1 plain, 2 json, default is html
-  if ( self->mtype ) {
-    char *p = rbuf;
-    if      ( self->mtype == 1 ) { memcpy( p+116, resp_plain, 14 ); ret = 130; }
-    else if ( self->mtype == 2 ) { memcpy( p+116, resp_json,  20 ); ret = 136; }
-    else if ( self->mtype == 3 ) { memcpy( p+116, resp_mrp,   24 ); ret = 140; }
-  } 
+  int ret = mime_type_end; // Mime type is the last header in the response
 
   if ( self->headers != NULL ) {
     int hlen = response_add_headers( self, rbuf+ret-2 );
