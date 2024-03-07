@@ -122,8 +122,7 @@ PyObject* MrcacheProtocol_data_received(MrcacheProtocol* self, PyObject* data)
   DBG_MEMCAC printf("mrcache protocol - data recvd\n");
   DBG_MEMCAC PyObject_Print( data, stdout, 0 ); 
   DBG_MEMCAC printf("\n");
-//                                                    50  
-//b"VALUE mrsession43709dd361cc443e976b05714581a7fb 0 19\r\n{'username':'Mark'}\r\nEND\r\nVALUE mrqsession43709dd361cc443e976b05714581a7fb 0 19\r\n{'username':'Mark'}\r\nEND\r\nVALUE mrqsession43709dd361cc443e976b05714581a7fb 0 19\r\n{'username':'Mark'}\r\nEND\r\nVALUE mrqsession43709dd361cc443e976b05714581a7fb 0 19\r\n{'username':'Mark'}\r\nEND\r\n"
+
   char *p, *start;
   Py_ssize_t l;
 
@@ -190,7 +189,8 @@ int MrcacheProtocol_asyncGet( MrcacheProtocol* self, char *key, void *fn, void *
   self->queue[self->queue_end].connection = connection;
   self->queue_end = (self->queue_end+1)%self->queue_sz;
 
-  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 0;
+  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 0; }
+  Py_DECREF(bytes);
   return 1;
 }
 
@@ -215,7 +215,6 @@ int MrcacheProtocol_asyncSet( MrcacheProtocol* self, char *key, char *val, int v
 
   char *p = self->set_cmd+8;
   memcpy(p, key, 32);
-  DBG_MEMCAC printf("MrcacheProtocol - asyncSet3.1\n");
 
   p += 32;
   // write val_sz
@@ -223,7 +222,8 @@ int MrcacheProtocol_asyncSet( MrcacheProtocol* self, char *key, char *val, int v
   PyObject *bytes = PyBytes_FromStringAndSize(self->set_cmd, 8+32+val_sz);
   //PyObject_Print(bytes,stdout,0); 
   //print_buffer( self->set_cmd, 40+val_sz ); 
-  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) return 1;
+  if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 1; }
+  Py_DECREF(bytes);
   return 0;  
 }
 

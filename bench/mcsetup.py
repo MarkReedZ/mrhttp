@@ -1,11 +1,12 @@
 import mrpacker
-from pymemcache.client.base import Client
-c = Client(('localhost', 11211))
-c.set( "mrsession43709dd361cc443e976b05714581a7fb",mrpacker.pack({"user":"Mark"}) )
-c = Client(('localhost', 11212))
-c.set( "mrsession43709dd361cc443e976b05714581a7fb",mrpacker.pack({"user":"Mark"}) )
+#from pymemcache.client.base import Client
+#c = Client(('localhost', 11211))
+#c.set( "mrsession43709dd361cc443e976b05714581a7fb",mrpacker.pack({"user":"Mark"}) )
+#c = Client(('localhost', 11212))
+#c.set( "mrsession43709dd361cc443e976b05714581a7fb",mrpacker.pack({"user":"Mark"}) )
 #print( c.get("mrsessionZZZZ9dd361cc443e976b05714581a7fb"))
 
+#exit()
 import asyncmrcache, asyncio
 
 def lcb(client):
@@ -16,7 +17,10 @@ async def run(loop):
 
   rc = await asyncmrcache.create_client( [("localhost",7000)], loop, lost_cb=lcb)
 
+  print("YAY")
+  print(await rc.get(b"mrsession43709dd361cc443e976b05714581a7fb"))
   await rc.set( b"mrsession43709dd361cc443e976b05714581a7fb",mrpacker.pack({"user":"Mark"}) )
+  await rc.set( b"43709dd361cc443e976b05714581a7fb",mrpacker.pack({"user":"Mark"}) )
   print(await rc.get(b"mrsession43709dd361cc443e976b05714581a7fb"))
   exit()
 
