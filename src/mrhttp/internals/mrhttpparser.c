@@ -77,13 +77,13 @@ static void print_buffer( char* b, int len ) {
         const char *tok_start = buf;                                                                                               \
         static const char ALIGNED(16) ranges2[] = "\000\042\177\177";                                                              \
         int found2;                                                                                                                \
-        buf = findchar(buf, buf_end, ranges2, sizeof(ranges2) - 1, &found2);                                                  \
+        buf = findchar(buf, buf_end, ranges2, sizeof(ranges2) - 1, &found2);                                                       \
         if (!found2) {                                                                                                             \
             CHECK_END();                                                                                                           \
-        } else if ( unlikely(*buf != ' ' )) {                                                                                       \
-            *ret = -1;                                                                                                                \
-            return NULL;                                                                                                                \
-        }                                                                                                                \
+        } else if ( unlikely(*buf != ' ' )) {                                                                                      \
+            *ret = -1;                                                                                                             \
+            return NULL;                                                                                                           \
+        }                                                                                                                          \
         while (1) {                                                                                                                \
             if (*buf == ' ') {                                                                                                     \
                 break;                                                                                                             \
@@ -642,7 +642,7 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
                                  size_t *path_len, int *minor_version, struct mr_header *headers, size_t *num_headers,
                                  size_t max_headers, int *ret, struct mr_request *mrr)
 {
-    /* skip first empty line (some clients add CRLF after POST content) */
+    // skip first empty line (some clients add CRLF after POST content)
     CHECK_END();
     if (*buf == '\015') {
         ++buf;
@@ -653,14 +653,16 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
 
     // parse request line
     //ADVANCE_TOKEN(*method, *method_len);
+    // TODO Support other methods
     switch (*(unsigned int *)buf) {
       case CHAR4_TO_INT('G', 'E', 'T', ' '):
-        *method = buf; *method_len = 3; buf += 4; goto uri;
+        *method = buf; *method_len = 3; buf += 4; break;
       case CHAR4_TO_INT('P', 'O', 'S', 'T'):
-        *method = buf; *method_len = 4; buf += 5; goto uri;
+        *method = buf; *method_len = 4; buf += 5; break;
+      default:
+        *ret = -2;
+        return NULL;
     }
-    ++buf;
-uri:
     ADVANCE_TOKEN(*path, *path_len);
     ++buf;
     switch (*(unsigned long *)buf) {
