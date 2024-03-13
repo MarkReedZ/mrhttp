@@ -13,6 +13,7 @@
 
 typedef struct {
   bool is_task;
+  int mtype;
   Request* request;
   PyObject* task; // Task if coroutine otherwise response output
 } PipelineRequest;

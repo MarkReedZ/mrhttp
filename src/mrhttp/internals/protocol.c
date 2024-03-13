@@ -517,7 +517,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
       return Protocol_handle_request( self, self->request, r );
     }
 
-    //?  PyObject *ret = pipeline_queue(self, (PipelineRequest){true, self->request, task});
+    //?  PyObject *ret = pipeline_queue(self, (PipelineRequest){true, 0, self->request, task});
   }
   if ( r->mrq ) { //TODO
     DBG printf("Route uses mrq\n"); 
@@ -602,7 +602,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
         return self;
       }
     }
-    printf("Unhandled exception :\n");
+    printf("Unhandled exception in the page handler :\n");
     PyObject_Print( type, stdout, 0 ); printf("\n");
     if ( value ) { PyObject_Print( value, stdout, 0 ); printf("\n"); }
     PyErr_Clear();
@@ -618,12 +618,11 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
 
 
   if ( r->iscoro ) {
-    response_setMimeType(r->mtype); // TODO this doesn't work if we pipeline different types
 
     DBG printf("protocol - Request is a coroutine\n");
     PyObject *task;
     if(!(task = PyObject_CallFunctionObjArgs(self->create_task, result, NULL))) return NULL;
-    PyObject *ret = pipeline_queue(self, (PipelineRequest){true, request, task});
+    PyObject *ret = pipeline_queue(self, (PipelineRequest){true, r->mtype, request, task});
     Py_XDECREF(task);
     Py_DECREF(result);
     if ( !ret ) return NULL;
@@ -632,7 +631,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
 
   if(!PIPELINE_EMPTY(self))
   {
-    if(!pipeline_queue(self, (PipelineRequest){false, request, result})) goto error;
+    if(!pipeline_queue(self, (PipelineRequest){false, r->mtype, request, result})) goto error;
     Py_DECREF(result);
     return self;
   }
@@ -823,7 +822,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
       }
       PyErr_Clear();
 
-      printf("Unhandled exception:\n");
+      printf("Unhandled exception in coro page handler:\n");
       PyObject_Print( type, stdout, 0 ); printf("\n");
       PyObject_Print( value, stdout, 0 ); printf("\n");
  
@@ -843,6 +842,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
     //response = PyUnicode_FromEncodedObject( response, "utf-8", "strict" );
     //printf("WARNING: Page handler should return a string. Bytes object returned from the page handler is being converted to unicode using utf-8\n");
   //}
+  response_setMimeType(r.mtype); 
 
   //if ( !PyUnicode_Check( response ) ) {
   if ( !( PyUnicode_Check( response ) || PyBytes_Check( response ) ) ) {
