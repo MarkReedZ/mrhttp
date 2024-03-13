@@ -35,6 +35,12 @@
 extern "C" {
 #endif
 
+#define CHAR4_TO_INT(a, b, c, d)         \
+   (unsigned int)((d << 24) | (c << 16) | (b << 8) | a)
+#define CHAR8_TO_LONG(a, b, c, d, e, f, g, h)       \
+   (((long)h << 56) | ((long)g << 48) | ((long)f << 40)   \
+    | ((long)e << 32) | (d << 24) | (c << 16) | (b << 8) | a)
+
 // Table for converting to lower case
 #define TOLC(c) __lct[(unsigned char)c]
 static const unsigned char __lct[] __attribute__((aligned(64))) = {

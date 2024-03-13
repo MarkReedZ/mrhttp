@@ -56,24 +56,7 @@ static void print_buffer( char* b, int len ) {
   printf("\n");
 }
 
-
-#define MR_LC_INT  0x20202020
-#define MR_LC_LONG 0x2020202020202020UL
-#define MR_CHAR4_INT(a, b, c, d)         \
-   (unsigned int)((d << 24) | (c << 16) | (b << 8) | a)
-#define MR_CHAR8_INT(a, b, c, d, e, f, g, h)       \
-   (((long)h << 56) | ((long)g << 48) | ((long)f << 40)   \
-    | ((long)e << 32) | (d << 24) | (c << 16) | (b << 8) | a)
-#define MR_P2LCINT(p)  ((*(unsigned int *)(p)) | MR_LC_INT)
-
-// Match with case conversion
-#define C4_INT_LCM(p, a, b, c, d)         \
-   !((*(unsigned int *)(p) | MR_LC_INT) ^ MR_CHAR4_INT(a, b, c, d))
-#define C8_INT_LCM(p, a, b, c, d, e, f, g, h)       \
-   !((*(unsigned long *)(p) | MR_LC_LONG)      \
-     ^ MR_CHAR8_INT(a, b, c, d, e, f, g, h))
-
-#define CHECK_EOF()                                                                                                                \
+#define CHECK_END()                                                                                                                \
     if (buf == buf_end) {                                                                                                          \
         *ret = -2;                                                                                                                 \
         return NULL;                                                                                                               \
@@ -86,7 +69,7 @@ static void print_buffer( char* b, int len ) {
     }
 
 #define EXPECT_CHAR(ch)                                                                                                            \
-    CHECK_EOF();                                                                                                                   \
+    CHECK_END();                                                                                                                   \
     EXPECT_CHAR_NO_CHECK(ch);
 
 #define ADVANCE_TOKEN(tok, toklen)                                                                                                 \
@@ -96,7 +79,7 @@ static void print_buffer( char* b, int len ) {
         int found2;                                                                                                                \
         buf = findchar(buf, buf_end, ranges2, sizeof(ranges2) - 1, &found2);                                                  \
         if (!found2) {                                                                                                             \
-            CHECK_EOF();                                                                                                           \
+            CHECK_END();                                                                                                           \
         } else if ( unlikely(*buf != ' ' )) {                                                                                       \
             *ret = -1;                                                                                                                \
             return NULL;                                                                                                                \
@@ -111,7 +94,7 @@ static void print_buffer( char* b, int len ) {
                 }                                                                                                                  \
             }                                                                                                                      \
             ++buf;                                                                                                                 \
-            CHECK_EOF();                                                                                                           \
+            CHECK_END();                                                                                                           \
         }                                                                                                                          \
         tok = tok_start;                                                                                                           \
         toklen = buf - tok_start;                                                                                                  \
@@ -199,7 +182,7 @@ static const char *get_token_to_eol(const char *buf, const char *buf_end, const 
     }
 #endif
     for (;; ++buf) {
-        CHECK_EOF();
+        CHECK_END();
         if (unlikely(!IS_PRINTABLE_ASCII(*buf))) {
             if ((likely((unsigned char)*buf < '\040') && likely(*buf != '\011')) || unlikely(*buf == '\177')) {
                 goto FOUND_CTL;
@@ -229,10 +212,10 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
     buf = last_len < 3 ? buf : buf + last_len - 3;
 
     while (1) {
-        CHECK_EOF();
+        CHECK_END();
         if (*buf == '\015') {
             ++buf;
-            CHECK_EOF();
+            CHECK_END();
             EXPECT_CHAR('\012');
             ++ret_cnt;
         } else if (*buf == '\012') {
@@ -382,7 +365,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
       return NULL;
     }
     for (;; ++*num_headers) {
-        CHECK_EOF();
+        CHECK_END();
         if (*buf == '\015') {
             ++buf;
             EXPECT_CHAR('\012');
@@ -456,7 +439,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
             }
             break;
             //printf( "%.*s\n" , 10, buf);
-            //printf( "Host: %08x == %08x\n" , MR_CHAR4_INT('o', 's', 't',':'), *((unsigned int *)(buf+1)));
+            //printf( "Host: %08x == %08x\n" , CHAR4_TO_INT('o', 's', 't',':'), *((unsigned int *)(buf+1)));
           case 'd':
             if ( buf[4] == ':' ) { // Date:
               headers[*num_headers].name = buf;
@@ -616,7 +599,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
             int found;
             buf = findchar(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
             if (!found) {
-                CHECK_EOF();
+                CHECK_END();
             }
             while (1) {
                 if (*buf == ':') {
@@ -626,7 +609,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
                     return NULL;
                 }
                 ++buf;
-                CHECK_EOF();
+                CHECK_END();
             }
             if ((headers[*num_headers].name_len = buf - headers[*num_headers].name) == 0) {
                 *ret = -1;
@@ -634,7 +617,7 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct mr
             }
             ++buf;
             for (;; ++buf) {
-                CHECK_EOF();
+                CHECK_END();
                 if (!(*buf == ' ' || *buf == '\t')) {
                     break;
                 }
@@ -660,7 +643,7 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
                                  size_t max_headers, int *ret, struct mr_request *mrr)
 {
     /* skip first empty line (some clients add CRLF after POST content) */
-    CHECK_EOF();
+    CHECK_END();
     if (*buf == '\015') {
         ++buf;
         EXPECT_CHAR('\012');
@@ -671,9 +654,9 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
     // parse request line
     //ADVANCE_TOKEN(*method, *method_len);
     switch (*(unsigned int *)buf) {
-      case MR_CHAR4_INT('G', 'E', 'T', ' '):
+      case CHAR4_TO_INT('G', 'E', 'T', ' '):
         *method = buf; *method_len = 3; buf += 4; goto uri;
-      case MR_CHAR4_INT('P', 'O', 'S', 'T'):
+      case CHAR4_TO_INT('P', 'O', 'S', 'T'):
         *method = buf; *method_len = 4; buf += 5; goto uri;
     }
     ++buf;
@@ -681,9 +664,9 @@ uri:
     ADVANCE_TOKEN(*path, *path_len);
     ++buf;
     switch (*(unsigned long *)buf) {
-      case MR_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','0'):
+      case CHAR8_TO_LONG('H', 'T', 'T', 'P','/','1','.','0'):
         *minor_version = 0; buf += 8; break;
-      case MR_CHAR8_INT('H', 'T', 'T', 'P','/','1','.','1'):
+      case CHAR8_TO_LONG('H', 'T', 'T', 'P','/','1','.','1'):
         *minor_version = 1; buf += 8; break;
       default:
         *ret = -2;
@@ -747,6 +730,6 @@ int mr_parse_request(const char *buf_start, size_t len, const char **method, siz
 }
 
 
-#undef CHECK_EOF
+#undef CHECK_END
 #undef EXPECT_CHAR
 #undef ADVANCE_TOKEN
