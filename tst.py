@@ -21,6 +21,10 @@ async def index(r):
   #x = r.form
   #return x["param2"]
 
+@app.route('/123456789123456789')
+async def long(r):
+  return "long"
+
 @app.route('/json')
 def json(r):
   return r.json["name"]

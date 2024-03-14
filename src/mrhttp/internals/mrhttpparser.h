@@ -93,7 +93,7 @@ struct mr_request {
 
 // These functions return -2 if partial request, -1 if parsing failed, and the number of bytes parsed otherwise
 int mr_parse_request(const char *buf, size_t len, const char **method, size_t *method_len, const char **path, size_t *path_len,
-                      int *minor_version, struct mr_header *headers, size_t *num_headers, size_t last_len, struct mr_request *mrr);
+                      int *minor_version, struct mr_header *headers, size_t *num_headers, struct mr_request *mrr);
 
 struct mr_chunked_decoder {
     size_t bytes_left_in_chunk; 

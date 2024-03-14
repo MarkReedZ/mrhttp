@@ -20,6 +20,13 @@
 
 #define IS_PRINTABLE_ASCII(c) ((unsigned char)(c)-040u < 0137u)
 
+#define CHECK_END()                                                                                                                \
+    if (buf == buf_end) {                                                                                                          \
+        *ret = -2;                                                                                                                 \
+        return NULL;                                                                                                               \
+    }
+
+
 #define CHECK_EOF()                                                                                                                \
     if (buf == buf_end) {                                                                                                          \
         *ret = -2;                                                                                                                 \
@@ -35,6 +42,7 @@
 #define EXPECT_CHAR(ch)                                                                                                            \
     CHECK_EOF();                                                                                                                   \
     EXPECT_CHAR_NO_CHECK(ch);
+
 
 // Table for converting to lower case
 #define TOLC(c) __lct[(unsigned char)c]
@@ -133,6 +141,33 @@ static const char *findchar(const char *buf, const char *buf_end, const char *ra
     }
     return buf;
 }
+static const char *adv_token(const char *buf, int *ret) {
+        const char *tok_start = buf;                                                                                               
+        const char *buf_end = buf+512;
+        static const char ranges2[] = "\000\042\177\177";                                                              
+        int found2;                                                                                                               
+        buf = findchar(buf, buf+512, ranges2, sizeof(ranges2) - 1, &found2);                                                       
+        if (!found2) {                                                                                                             
+            CHECK_END();                                                                                                           
+        } else if ( unlikely(*buf != ' ' )) {                                                                                      
+            *ret = -1;                                                                                                             
+            return NULL;                                                                                                           
+        }                                                                                                                          
+        while (1) {                                                                                                                
+            if (*buf == ' ') {                                                                                                    
+                return buf;                                                                                                             
+            } else if (unlikely(!IS_PRINTABLE_ASCII(*buf))) {                                                                      
+                if ((unsigned char)*buf < '\040' || *buf == '\177') {                                                          
+                    *ret = -1;                                                                                                     
+                    return NULL;
+                }                                                                                                             
+            }                                                                                                                
+            ++buf;                                                                                                         
+            CHECK_END();                                                                                                  
+        }                                                                                                                
+        *ret = buf - tok_start;                                                                                      
+        return tok_start;
+}
 
 static const char *get_token_to_eol(const char *buf, const char *buf_end, int *ret)
 {
@@ -169,6 +204,60 @@ FOUND_CTL:
 
     return buf;
 }
+static const char *my_get_eol128(const char *buf) {
+  //__m128i* pSrc1 = (__m128i *)string;         // init pointer to start of string
+  __m128i m0 = _mm_set1_epi8(13);              // vector of 16 `\0` characters
+
+  while (1)
+  {
+    __m128i v0 = _mm_loadu_si128((const __m128i *)buf);
+    __m128i v1 = _mm_cmpeq_epi8(v0, m0);    // compare all 16 chars
+    unsigned int vmask = _mm_movemask_epi8(v1);      // get 16 comparison result bits
+    if (vmask != 0) {
+        buf += TZCNT(vmask) + 2;
+        break;                              // we found a `\0`, break out of loop
+    }
+    buf += 16; //pSrc1++;                                // next 16 characters...
+  }
+  return buf;
+}
+
+ //64bits  256bits  bytes 8 * 32 
+__m256i m13 = _mm256_set1_epi8(13);             
+__m256i m32 = _mm256_set1_epi8(32);             
+static const char *my_get_eol(const char *buf) {
+
+  while (1)
+  {
+    __m256i v0 = _mm256_loadu_si256((const __m256i *)buf);
+    __m256i v1 = _mm256_cmpeq_epi8(v0, m13);     
+    unsigned long vmask = _mm256_movemask_epi8(v1);  
+    if (vmask != 0) {
+        buf += TZCNT(vmask) + 2;
+        break;                             
+    }
+    buf += 32; //pSrc1++;                 
+  }
+  return buf;
+}
+static const char *get_to_space(const char *buf, int *len) {
+  const char *orig = buf;
+  while (1)
+  {
+    __m256i v0 = _mm256_loadu_si256((const __m256i *)buf);
+    __m256i v1 = _mm256_cmpeq_epi8(v0, m32);     
+    unsigned long vmask = _mm256_movemask_epi8(v1);  
+    if (vmask != 0) {
+        buf += TZCNT(vmask) + 1;
+        break;                             
+    }
+    buf += 32; 
+  }
+  *len = buf-orig-1;
+  return buf;
+}
+
+
 
 static const char *parse_headers(const char *buf, const char *buf_end, int *ret)
 {
@@ -227,7 +316,8 @@ static const char *parse_headers(const char *buf, const char *buf_end, int *ret)
               //if ( buf[0] == 'a' && buf[13] == 'r' ) { //"application/mrpacker"
                 //mrr->flags = 2;
               //} 
-              buf = get_token_to_eol(buf, buf_end, ret); 
+              //buf = get_token_to_eol(buf, buf_end, ret); 
+              buf = my_get_eol(buf);
               goto skipvalue;
             }
             if ( buf[13] == ':' ) { // Cache-Control:
@@ -247,7 +337,8 @@ static const char *parse_headers(const char *buf, const char *buf_end, int *ret)
               //headers[*num_headers].name_len = 16;
               buf += 18;
               //mrr->ip = buf;
-              buf = get_token_to_eol(buf, buf_end, ret); 
+              //buf = get_token_to_eol(buf, buf_end, ret); 
+              buf = my_get_eol(buf);
               //mrr->ip_len = headers[*num_headers].value_len;
               goto skipvalue;
             }
@@ -274,7 +365,8 @@ static const char *parse_headers(const char *buf, const char *buf_end, int *ret)
               //headers[*num_headers].name_len = 9;
               buf += 11;
               //mrr->ip = buf;
-              buf = get_token_to_eol(buf, buf_end, ret); 
+              //buf = get_token_to_eol(buf, buf_end, ret); 
+              buf = my_get_eol(buf);
               //mrr->ip_len = headers[*num_headers].value_len;
               goto skipvalue;
             }
@@ -441,7 +533,8 @@ static const char *parse_headers(const char *buf, const char *buf_end, int *ret)
             //headers[*num_headers].name_len = 0;
         }
 hvalue:
-        if ((buf = get_token_to_eol(buf, buf_end, ret)) == NULL) {
+        //if ((buf = get_token_to_eol(buf, buf_end, ret)) == NULL) {
+        if ((buf = my_get_eol(buf)) == NULL) {
             return NULL;
         }
 skipvalue:
@@ -661,42 +754,6 @@ wedone:
 }
 
 
-static const char *my_get_eol128(const char *buf) {
-  //__m128i* pSrc1 = (__m128i *)string;         // init pointer to start of string
-  __m128i m0 = _mm_set1_epi8(13);              // vector of 16 `\0` characters
-
-  while (1)
-  {
-    __m128i v0 = _mm_loadu_si128((const __m128i *)buf);
-    __m128i v1 = _mm_cmpeq_epi8(v0, m0);    // compare all 16 chars
-    unsigned int vmask = _mm_movemask_epi8(v1);      // get 16 comparison result bits
-    if (vmask != 0) {
-        buf += TZCNT(vmask) + 2;
-        break;                              // we found a `\0`, break out of loop
-    }
-    buf += 16; //pSrc1++;                                // next 16 characters...
-  }
-  return buf;
-}
-
- //64bits  256bits  bytes 8 * 32 
-__m256i m13 = _mm256_set1_epi8(13);             
-
-static const char *my_get_eol(const char *buf) {
-
-  while (1)
-  {
-    __m256i v0 = _mm256_loadu_si256((const __m256i *)buf);
-    __m256i v1 = _mm256_cmpeq_epi8(v0, m13);     
-    unsigned long vmask = _mm256_movemask_epi8(v1);  
-    if (vmask != 0) {
-        buf += TZCNT(vmask) + 2;
-        break;                             
-    }
-    buf += 32; //pSrc1++;                 
-  }
-  return buf;
-}
 
 //__m256i m13 = _mm256_set1_epi8(13);
 __m256i m58 = _mm256_set1_epi8(58);   //  0x1313131313131313...
@@ -948,10 +1005,18 @@ static void parse_mysse4( const char* buf ) {
 static char buf[8096] = "Host: server\r\n"
 "User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\r\n"
 "Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
 "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,* /*;q=0.8\r\n"
 "Accept-Language: en-US,en;q=0.5\r\n"
 "Connection: keep-alive\r\n\r\n";
 static char buf2[8096] = "Host: localhost:8080\r\nUser-Agent: python-requests/2.31.0\r\nAccept-Encoding: gzip, deflate\r\nAccept: * /*\r\nConnection: keep-alive\r\nCookie: foo=b=ar\r\nContent-Length: 0\r\n\r\n";
+static char path[8096] = "/foo/bar/bazfdasfffffffffffffffffffffffffffffffffffffffdfffffffffffffffffffffffffffffffffffffffffffffffffff ";
 
 static void BM_SlowParse(benchmark::State& state) {
   // Perform setup here
@@ -983,43 +1048,48 @@ static void BM_my_get_eol(benchmark::State& state) {
 }
 
 static void BM_my_header_parse(benchmark::State& state) {
-  // Perform setup here
   for (auto _ : state) {
-    // This code gets timed
     parse_mine(buf);
   }
 }
 static void BM_my2_header_parse(benchmark::State& state) {
-  // Perform setup here
   for (auto _ : state) {
-    // This code gets timed
     parse_mine2(buf);
   }
 }
 static void BM_my3_header_parse(benchmark::State& state) {
-  // Perform setup here
   for (auto _ : state) {
-    // This code gets timed
     parse_mine3(buf);
   }
 }
 
 
 static void BM_old_header_parse(benchmark::State& state) {
-  // Perform setup here
   int ret = 0;
   for (auto _ : state) {
-    // This code gets timed
     parse_headers(buf,buf+2048,&ret);
   }
 }
 
 static void BM_avx2_header_parse(benchmark::State& state) {
-  // Perform setup here
   int ret = 0;
   for (auto _ : state) {
-    // This code gets timed
     parse_headers_avx2(buf,buf+2048,&ret);
+  }
+}
+
+static void BM_adv_token(benchmark::State& state) {
+  int ret = 0;
+  int path_len = 0;
+  for (auto _ : state) {
+    adv_token(path, &path_len);
+  }
+}
+static void BM_adv_token_avx2(benchmark::State& state) {
+  int ret = 0;
+  int path_len = 0;
+  for (auto _ : state) {
+    get_to_space(path, &path_len);
   }
 }
 
@@ -1030,10 +1100,12 @@ static void BM_avx2_header_parse(benchmark::State& state) {
 //BENCHMARK(BM_sse4_get_eol);
 //BENCHMARK(BM_my_get_eol);
 BENCHMARK(BM_my3_header_parse);
-BENCHMARK(BM_my2_header_parse);
+//BENCHMARK(BM_my2_header_parse);
 //BENCHMARK(BM_my_header_parse);
 BENCHMARK(BM_old_header_parse);
-BENCHMARK(BM_avx2_header_parse);
+//BENCHMARK(BM_avx2_header_parse);
+BENCHMARK(BM_adv_token);
+BENCHMARK(BM_adv_token_avx2);
 BENCHMARK_MAIN();
 
 /*

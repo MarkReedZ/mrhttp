@@ -81,12 +81,12 @@ parse_headers:
   char *method, *path;
   int rc, minor_version;
   //struct phr_header headers[100];
-  size_t prevbuflen = 0, method_len, path_len;//, num_headers;
+  size_t method_len, path_len;//, num_headers;
 
   request->num_headers = 100; // Max allowed headers
   DBG_PARSER printf("before parser requests\n");
   request->hreq.flags = 0; // TODO clear the mr_request struct
-  rc = mr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, request->headers, &(request->num_headers), prevbuflen, &(request->hreq));
+  rc = mr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, request->headers, &(request->num_headers), &(request->hreq));
 
   DBG_PARSER printf("parser requests rc %d\n",rc);
   if ( rc < 0 ) return rc; // -2 incomplete, -1 error otherwise byte len of headers

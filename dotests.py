@@ -144,7 +144,7 @@ try:
   
     opts = ('-H','XX-Real-IP: 1.2.3.4')
     #print ("get ip         ", run_wrk(loop,'http://localhost:8080/getip',options=opts), "Requests/second" )
-    #print ("many num args  ", run_wrk(loop, 'http://localhost:8080/sixargs/155/2001/29999/25/29999543/93243242394'), "Requests/second" )
+    print ("many num args  ", run_wrk(loop, 'http://localhost:8080/sixargs/155/2001/29999/25/29999543/93243242394'), "Requests/second" )
     #print ("404            ", run_wrk(loop, 'http://localhost:8080/404/'), "Requests/second" )
 
   # Grab the stdout for debug 

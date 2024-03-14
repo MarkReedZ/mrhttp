@@ -73,35 +73,6 @@ static void print_buffer( char* b, int len ) {
     CHECK_END();                                                                                                                   \
     EXPECT_CHAR_NO_CHECK(ch);
 
-#define ADVANCE_TOKEN(tok, toklen)                                                                                                 \
-    do {                                                                                                                           \
-        const char *tok_start = buf;                                                                                               \
-        static const char ALIGNED(16) ranges2[] = "\000\042\177\177";                                                              \
-        int found2;                                                                                                                \
-        buf = findchar(buf, buf_end, ranges2, sizeof(ranges2) - 1, &found2);                                                       \
-        if (!found2) {                                                                                                             \
-            CHECK_END();                                                                                                           \
-        } else if ( unlikely(*buf != ' ' )) {                                                                                      \
-            *ret = -1;                                                                                                             \
-            return NULL;                                                                                                           \
-        }                                                                                                                          \
-        while (1) {                                                                                                                \
-            if (*buf == ' ') {                                                                                                     \
-                break;                                                                                                             \
-            } else if (unlikely(!IS_PRINTABLE_ASCII(*buf))) {                                                                      \
-                if ((unsigned char)*buf < '\040' || *buf == '\177') {                                                              \
-                    *ret = -1;                                                                                                     \
-                    return NULL;                                                                                                   \
-                }                                                                                                                  \
-            }                                                                                                                      \
-            ++buf;                                                                                                                 \
-            CHECK_END();                                                                                                           \
-        }                                                                                                                          \
-        tok = tok_start;                                                                                                           \
-        toklen = buf - tok_start;                                                                                                  \
-    } while (0)
-
-
 static const char *token_char_map = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
                                     "\0\1\0\1\1\1\1\1\0\0\1\1\0\1\1\0\1\1\1\1\1\1\1\1\1\1\0\0\0\0\0\0"
                                     "\0\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\0\0\0\1\1"
@@ -207,60 +178,30 @@ FOUND_CTL:
     return buf;
 }
 
-static const char *is_complete(const char *buf, const char *buf_end, size_t last_len, int *ret)
-{
-    int ret_cnt = 0;
-    buf = last_len < 3 ? buf : buf + last_len - 3;
-
-    while (1) {
-        CHECK_END();
-        if (*buf == '\015') {
-            ++buf;
-            CHECK_END();
-            EXPECT_CHAR('\012');
-            ++ret_cnt;
-        } else if (*buf == '\012') {
-            ++buf;
-            ++ret_cnt;
-        } else {
-            ++buf;
-            ret_cnt = 0;
-        }
-        if (ret_cnt == 2) {
-            return buf;
-        }
-    }
-
-    *ret = -2;
-    return NULL;
-}
-
-#define PARSE_INT(valp_, mul_)                                                                                                     \
-    if (*buf < '0' || '9' < *buf) {                                                                                                \
-        buf++;                                                                                                                     \
-        *ret = -1;                                                                                                                 \
-        return NULL;                                                                                                               \
-    }                                                                                                                              \
-    *(valp_) = (mul_) * (*buf++ - '0');
-
-#define PARSE_INT_3(valp_)                                                                                                         \
-    do {                                                                                                                           \
-        int res_ = 0;                                                                                                              \
-        PARSE_INT(&res_, 100)                                                                                                      \
-        *valp_ = res_;                                                                                                             \
-        PARSE_INT(&res_, 10)                                                                                                       \
-        *valp_ += res_;                                                                                                            \
-        PARSE_INT(&res_, 1)                                                                                                        \
-        *valp_ += res_;                                                                                                            \
-    } while (0)
-
-
 #ifdef __AVX2__
 static unsigned long TZCNT(unsigned long long in) {
   unsigned long res;
   asm("tzcnt %1, %0\n\t" : "=r"(res) : "r"(in));
   return res;
 }
+static int get_len_to_space(const char *buf, const char *buf_end) {
+  const char *orig = buf;
+  __m256i m32 = _mm256_set1_epi8(32);
+  while (1)
+  {
+    __m256i v0 = _mm256_loadu_si256((const __m256i *)buf);
+    __m256i v1 = _mm256_cmpeq_epi8(v0, m32);
+    unsigned long vmask = _mm256_movemask_epi8(v1);
+    if (vmask != 0) {
+        buf += TZCNT(vmask);
+        return buf-orig;
+    }
+    buf += 32;
+    if ( buf >= buf_end ) return -1;
+  }
+}
+
+
 static const char *parse_headers_avx2(const char *buf, const char *buf_end, struct mr_header *headers, size_t *num_headers,
                                  size_t max_headers, int *ret, struct mr_request *mrr)
 {
@@ -285,6 +226,7 @@ static const char *parse_headers_avx2(const char *buf, const char *buf_end, stru
 av_new512:
   i = 0;
   buf = obuf;
+  if ( buf >= buf_end ) { *ret = -1; return NULL; }
 
   b0 = _mm256_loadu_si256((const __m256i *) (buf + 32*0)); // buf[0]
   b1 = _mm256_loadu_si256((const __m256i *) (buf + 32*1)); // buf[32]
@@ -338,7 +280,7 @@ av_new512:
           headers[*num_headers].value = sbuf;
           headers[*num_headers].value_len = buf-sbuf;
           ++*num_headers;
-          if (*num_headers >= max_headers) { printf("DELME hdr too many\n"); *ret = -1; return NULL; }
+          if (*num_headers >= max_headers) { *ret = -1; return NULL; }
           name_or_value = 0;
           buf += 2; if ( *buf == '\r' ) { goto av_done; } // \r\n\r\n marks the end
         } else {
@@ -362,6 +304,7 @@ av_new512:
 
   obuf += 512;
   goto av_new512;
+
 av_done:
   buf += 2;
   *ret = 0;
@@ -721,7 +664,6 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
     }
 
     // parse request line
-    //ADVANCE_TOKEN(*method, *method_len);
     // TODO Support other methods
     switch (*(unsigned int *)buf) {
       case CHAR4_TO_INT('G', 'E', 'T', ' '):
@@ -729,10 +671,16 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
       case CHAR4_TO_INT('P', 'O', 'S', 'T'):
         *method = buf; *method_len = 4; buf += 5; break;
       default:
-        *ret = -2;
+        *ret = -1;
         return NULL;
     }
-    ADVANCE_TOKEN(*path, *path_len);
+    *path = buf;
+    int l = get_len_to_space(buf, buf_end);
+    if ( l == -1 ) {
+        *ret = -1; // TODO Should we return -2 (needs more bytes?)
+        return NULL;
+    }
+    buf += l; *path_len = l;
     ++buf;
     switch (*(unsigned long *)buf) {
       case CHAR8_TO_LONG('H', 'T', 'T', 'P','/','1','.','0'):
@@ -768,7 +716,7 @@ static __inline__ unsigned long long rdtsc(void)
 }
 
 int mr_parse_request(const char *buf_start, size_t len, const char **method, size_t *method_len, const char **path,
-                      size_t *path_len, int *minor_version, struct mr_header *headers, size_t *num_headers, size_t last_len,struct mr_request *mrr)
+                      size_t *path_len, int *minor_version, struct mr_header *headers, size_t *num_headers, struct mr_request *mrr)
 {
     const char *buf = buf_start, *buf_end = buf_start + len;
     size_t max_headers = *num_headers;
@@ -783,12 +731,6 @@ int mr_parse_request(const char *buf_start, size_t len, const char **method, siz
     *minor_version = -1;
     *num_headers = 0;
 
-    /* if last_len != 0, check if the request is complete (a fast countermeasure
-       againt slowloris */
-    if (last_len != 0 && is_complete(buf, buf_end, last_len, &r) == NULL) {
-        return r;
-    }
-
     if ((buf = parse_request(buf, buf_end, method, method_len, path, path_len, minor_version, headers, num_headers, max_headers, &r, mrr)) == NULL) {
         return r;
     }
@@ -801,4 +743,3 @@ int mr_parse_request(const char *buf_start, size_t len, const char **method, siz
 
 #undef CHECK_END
 #undef EXPECT_CHAR
-#undef ADVANCE_TOKEN
