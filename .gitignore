@@ -8,5 +8,8 @@
 *.swp
 settings.py
 build/*
+gbench/parse
+gbench/t
+gbench/string
 .DS_Store
 __pycache__

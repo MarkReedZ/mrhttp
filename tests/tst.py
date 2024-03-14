@@ -4,6 +4,24 @@ import requests
 from common import eq,contains,stop_server
 import mrpacker
 
+if 1:
+
+  headers = {'Content-Type': 'application/mrpacker'}
+  o = { "typ":"post", "s":2, "t": 'Blonde: "What does IDK stand for?"', "l":"localhost/sub/3", "txt": 'Brunette: "I don’t know."\nBlonde: "OMG, nobody does!"' }
+  r = requests.post('http://localhost:8080/mrp', data=mrpacker.pack(o), headers=headers)
+  if eq(r.text, 'post') != 0:
+    print( r.raw.headers )
+    print( "text is ", r.text )
+
+  cookie = {'foo': 'bar','baz':'3'}
+  r = requests.post('http://localhost:8080/printCookies', cookies=cookie)
+  eq(r.text, "{'baz': '3', 'foo': 'bar'}")
+
+  cookie = {'foo': 'b=ar'}
+  r = requests.post('http://localhost:8080/printCookies', cookies=cookie)
+  eq(r.text, "{'foo': 'b=ar'}")
+  
+
 if 0:
   data = {}
   s = "lo(ng"*10000
@@ -11,7 +29,7 @@ if 0:
   r = requests.post('http://localhost:8080/form',data)
   eq(r.status_code, 200)
 
-if 1:
+if 0:
   headers = {'Content-type': 'application/mrpacker'}
   o = { "typ":"post", "s":4, "t": 'Blonde: "What does IDK stand for?"', "l":"", "txt": 'Brunette: "I don’t know."\nBlonde: "OMG, nobody does!"' }
   o = { "typ": "post", "l": "", "t": "Blonde: \"What does IDK stand for?\"", "txt": "Brunette: \"I don’t know.\"\n\nBlonde: \"OMG, nobody does!\"", "s": 3}

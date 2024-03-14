@@ -1,4 +1,5 @@
 
+
 #include <strings.h>
 #include <sys/param.h>
 #include <immintrin.h>
@@ -115,7 +116,11 @@ parse_headers:
       header < request->headers + request->num_headers;
       header++) {
 
-
+    if(header_name_equal("Content-Type")) {
+      if ( header->value[0] == 'a' && header->value[13] == 'r' ) { //"application/mrpacker"
+        request->hreq.flags = 2;
+      } 
+    }
     if(header_name_equal("Content-Length")) {
       char * endptr = (char *)header->value + header->value_len;
       self->body_length = strtol(header->value, &endptr, 10);

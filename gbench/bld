@@ -1,0 +1,6 @@
+
+g++ t.cpp -g -O0 -msse4.2 -mavx2 -std=c++11 -lbenchmark -lpthread -o t
+#g++ tst.cpp -O3 -msse4.2 -mavx2 -std=c++11 -lbenchmark -lpthread -o tst
+g++ parse.cpp -O3 -msse4.2 -mavx2 -std=c++11 -lbenchmark -lpthread -o parse
+#g++ string.cpp -O3 -msse4.2 -mavx2 -std=c++11 -lbenchmark -lpthread -o string
+

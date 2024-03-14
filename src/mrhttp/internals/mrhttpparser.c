@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2013-2018 Mark Reed
  *
@@ -254,7 +255,7 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
     } while (0)
 
 
-#ifdef __DELMEAVX2__
+#ifdef __AVX2__
 static unsigned long TZCNT(unsigned long long in) {
   unsigned long res;
   asm("tzcnt %1, %0\n\t" : "=r"(res) : "r"(in));
@@ -264,96 +265,164 @@ static const char *parse_headers_avx2(const char *buf, const char *buf_end, stru
                                  size_t max_headers, int *ret, struct mr_request *mrr)
 {
   unsigned long long msk[8];  // 1 bit for each of 512 bytes matching  : or \r
+
+  //__m256i b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11,b12,b13,b14,b15;
+  __m256i b0,b1,b2,b3,b4,b5,b6,b7;
+
+  __m256i m13 = _mm256_set1_epi8(13); // \r
+  __m256i m58 = _mm256_set1_epi8(58); // :
+
+  const char *obuf = buf;
   const char *sbuf = buf;
-  int cnt = 0;
+
+  int i;  // msk[i] 
+  int t;
+  unsigned int s = 0;
   int name_or_value = 0;
 
-__m256i m13 = _mm256_set1_epi8(13);
-__m256i m58 = _mm256_set1_epi8(58);
+  const char *block_start = obuf;
 
-  // Parse in 512B chunks with avx2 instructions
+av_new512:
+  i = 0;
+  buf = obuf;
+
+  b0 = _mm256_loadu_si256((const __m256i *) (buf + 32*0)); // buf[0]
+  b1 = _mm256_loadu_si256((const __m256i *) (buf + 32*1)); // buf[32]
+  b2 = _mm256_loadu_si256((const __m256i *) (buf + 32*2)); // buf[64]
+  b3 = _mm256_loadu_si256((const __m256i *) (buf + 32*3)); // buf[96]
+  b4 = _mm256_loadu_si256((const __m256i *) (buf + 32*4)); // buf[128]
+  b5 = _mm256_loadu_si256((const __m256i *) (buf + 32*5));
+  b6 = _mm256_loadu_si256((const __m256i *) (buf + 32*6));
+  b7 = _mm256_loadu_si256((const __m256i *) (buf + 32*7)); // 256 bytes
+
+  msk[0] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) )  |
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m13), _mm256_cmpeq_epi8(b1, m58) ) ) << 32);
+  msk[1] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b2, m13), _mm256_cmpeq_epi8(b2, m58) ) )  |
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b3, m13), _mm256_cmpeq_epi8(b3, m58) ) ) << 32);
+  msk[2] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b4, m13), _mm256_cmpeq_epi8(b4, m58) ) )  |
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b5, m13), _mm256_cmpeq_epi8(b5, m58) ) ) << 32);
+  msk[3] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b6, m13), _mm256_cmpeq_epi8(b6, m58) ) )  |
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b7, m13), _mm256_cmpeq_epi8(b7, m58) ) ) << 32);
+
+  b0 = _mm256_loadu_si256((const __m256i *) (buf + 32*8));
+  b1 = _mm256_loadu_si256((const __m256i *) (buf + 32*9));
+  b2 = _mm256_loadu_si256((const __m256i *) (buf + 32*10));
+  b3 = _mm256_loadu_si256((const __m256i *) (buf + 32*11));
+  b4 = _mm256_loadu_si256((const __m256i *) (buf + 32*12));
+  b5 = _mm256_loadu_si256((const __m256i *) (buf + 32*13));
+  b6 = _mm256_loadu_si256((const __m256i *) (buf + 32*14));
+  b7 = _mm256_loadu_si256((const __m256i *) (buf + 32*15));
+
+  msk[4] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) )  ^
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m13), _mm256_cmpeq_epi8(b1, m58) ) ) << 32);
+  msk[5] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b2, m13), _mm256_cmpeq_epi8(b2, m58) ) )  ^
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b3, m13), _mm256_cmpeq_epi8(b3, m58) ) ) << 32);
+  msk[6] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b4, m13), _mm256_cmpeq_epi8(b4, m58) ) )  ^
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b5, m13), _mm256_cmpeq_epi8(b5, m58) ) ) << 32);
+  msk[7] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b6, m13), _mm256_cmpeq_epi8(b6, m58) ) )  ^
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b7, m13), _mm256_cmpeq_epi8(b7, m58) ) ) << 32);
+
+
+  // "Host: server\r\n"
   do {
 
-    const char *block_start = buf; // Start of each 64B block
-    __m256i b0,b1,b2,b3,b4,b5,b6,b7;
-  
-    b0 = _mm256_loadu_si256((const __m256i *) (buf + 32*0)); // buf[0]
-    b1 = _mm256_loadu_si256((const __m256i *) (buf + 32*1)); // buf[32]
-    b2 = _mm256_loadu_si256((const __m256i *) (buf + 32*2)); // buf[64]
-    b3 = _mm256_loadu_si256((const __m256i *) (buf + 32*3)); // buf[96]
-    b4 = _mm256_loadu_si256((const __m256i *) (buf + 32*4)); // buf[128]
-    b5 = _mm256_loadu_si256((const __m256i *) (buf + 32*5));
-    b6 = _mm256_loadu_si256((const __m256i *) (buf + 32*6));
-    b7 = _mm256_loadu_si256((const __m256i *) (buf + 32*7)); // 256 bytes
-  
-    msk[0] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m13), _mm256_cmpeq_epi8(b1, m58) ) ) << 32);
-    msk[1] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b2, m13), _mm256_cmpeq_epi8(b2, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b3, m13), _mm256_cmpeq_epi8(b3, m58) ) ) << 32);
-    msk[2] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b4, m13), _mm256_cmpeq_epi8(b4, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b5, m13), _mm256_cmpeq_epi8(b5, m58) ) ) << 32);
-    msk[3] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b6, m13), _mm256_cmpeq_epi8(b6, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b7, m13), _mm256_cmpeq_epi8(b7, m58) ) ) << 32);
-  
-    b0 = _mm256_loadu_si256((const __m256i *) (buf + 32*8));
-    b1 = _mm256_loadu_si256((const __m256i *) (buf + 32*9));
-    b2 = _mm256_loadu_si256((const __m256i *) (buf + 32*10));
-    b3 = _mm256_loadu_si256((const __m256i *) (buf + 32*11));
-    b4 = _mm256_loadu_si256((const __m256i *) (buf + 32*12));
-    b5 = _mm256_loadu_si256((const __m256i *) (buf + 32*13));
-    b6 = _mm256_loadu_si256((const __m256i *) (buf + 32*14));
-    b7 = _mm256_loadu_si256((const __m256i *) (buf + 32*15));
-  
-    msk[4] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m13), _mm256_cmpeq_epi8(b1, m58) ) ) << 32);
-    msk[5] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b2, m13), _mm256_cmpeq_epi8(b2, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b3, m13), _mm256_cmpeq_epi8(b3, m58) ) ) << 32);
-    msk[6] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b4, m13), _mm256_cmpeq_epi8(b4, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b5, m13), _mm256_cmpeq_epi8(b5, m58) ) ) << 32);
-    msk[7] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b6, m13), _mm256_cmpeq_epi8(b6, m58) ) )  |
-       ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b7, m13), _mm256_cmpeq_epi8(b7, m58) ) ) << 32);
-  
+    block_start = obuf+64*i;
+
+    while(1) {
+      s = buf-block_start;
+      t = TZCNT((msk[i]>>s));
+      if ( t < 64 ) {
+        buf += t;
+        if ( name_or_value == 1 ) {
+          if ( *buf == ':' ) { buf += 1; continue; } // : in value field
+          headers[*num_headers].value = sbuf;
+          headers[*num_headers].value_len = buf-sbuf;
+          ++*num_headers;
+          if (*num_headers >= max_headers) { printf("DELME hdr too many\n"); *ret = -1; return NULL; }
+          name_or_value = 0;
+          buf += 2; if ( *buf == '\r' ) { goto av_done; } // \r\n\r\n marks the end
+        } else {
+          headers[*num_headers].name = sbuf;
+          headers[*num_headers].name_len = buf-sbuf;
+          name_or_value = 1;
+          buf += 2;
+        }
+        sbuf = buf;
+        if ( (buf-block_start)> 64 ) break; // TODO?
+      } else {
+        buf = block_start + 64;
+        break;
+      }
+
+    }
+
+    i+=1;
+    if ( buf[0] == '\r' ) goto av_done;
+  } while ( i < 8 && buf[0] != '\r' );
+
+  obuf += 512;
+  goto av_new512;
+av_done:
+  buf += 2;
+  *ret = 0;
+  return buf;
+}
+
+
+
+static const char *parse_headers_avx2_old(const char *buf, const char *buf_end, struct mr_header *headers, size_t *num_headers,
+                                 size_t max_headers, int *ret, struct mr_request *mrr)
+{
+  unsigned long msk;
+  int i=0,tz; // 32B index
+  int shifted;
+  const char *sbuf = buf;
+  const char *obuf = buf;
+  int name_or_value = 0;
+
+  __m256i m13 = _mm256_set1_epi8(13); // \r
+  __m256i m58 = _mm256_set1_epi8(58); // :
+
+  do {
+    const char *block_start = obuf+32*i; i += 1;
+    if ( block_start > buf_end ) { printf("DELME hdr too big\n"); *ret = -1; return NULL; }
+    __m256i b0 = _mm256_loadu_si256((const __m256i *) block_start);
+    msk = _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) );
+
+    while (1) {
+    
     // "Host: server\r\n"
     // Headers end on \r\n\r\n
-    int i = 0;  // msk[i]
-    int t;
-    do {
-  
-      while(1) {
-        t = TZCNT((msk[i]>>(buf-block_start)));
-        if ( t < 64 ) {
-          buf += t;
-          //printf(">%.*s<\n", 16, sbuf);
-          if ( name_or_value == 1 ) {
-            if ( buf[0] != '\r' ) { buf++; continue; } // Handle : in the value
-            headers[*num_headers].value = sbuf;
-            headers[*num_headers].value_len = buf-sbuf;
-            ++*num_headers;
-            name_or_value = 0;
-          } else {
-            headers[*num_headers].name = sbuf;
-            headers[*num_headers].name_len = buf-sbuf;
-            name_or_value = 1;
-          }
-          buf += 2; if ( buf[0] == '\r' ) { return buf+2; } // End of headers
-          sbuf = buf;
-          if ( (buf-block_start)> 64 ) break; 
-        } else {
-          buf = block_start + 64;
-          break;
-        }
-  
-      }
-  
-      block_start += 64;
-      //if ( buf[0] == '\r' ) { return buf+2; } // End of headers
-    } while ( ++i < 8 );
-    
-  } while (++cnt < 32);
+      shifted = buf-block_start;
+      tz = TZCNT((msk >> shifted));
+      if ( tz < 32 ) {
+        buf += tz;
 
-  // If we get here the header was too large so abort. TODO abort with appropriate error code
-  *ret = -1;
-  return NULL;
+        if ( name_or_value == 1 ) {
+          if ( *buf == ':' ) { buf += 1; continue; } // : in value field
+          headers[*num_headers].value = sbuf;
+          headers[*num_headers].value_len = buf-sbuf;
+          ++*num_headers;
+          if (*num_headers >= max_headers) { printf("DELME hdr too many\n"); *ret = -1; return NULL; }
+          name_or_value = 0;
+          buf += 2; if ( *buf == '\r' ) { break; } // \r\n\r\n marks the end
+        } else {
+          headers[*num_headers].name = sbuf;
+          headers[*num_headers].name_len = buf-sbuf;
+          name_or_value = 1;
+          buf += 2;
+        }
+        sbuf = buf;
+      } else {
+        buf += 32 - shifted;
+        break;
+      }
+
+    }
+  } while ( *buf != '\r' );
+  buf += 2;
+  *ret = 0;
+  return buf;
 }
 #endif
 
@@ -684,8 +753,7 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
         *ret = -2;
         return NULL;
     }
-
-#ifdef __DELMEAVX2__
+#ifdef __AVX2__
     return parse_headers_avx2(buf, buf_end, headers, num_headers, max_headers, ret, mrr);
 #else
     return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret, mrr);
@@ -714,7 +782,6 @@ int mr_parse_request(const char *buf_start, size_t len, const char **method, siz
     *path_len = 0;
     *minor_version = -1;
     *num_headers = 0;
-
 
     /* if last_len != 0, check if the request is complete (a fast countermeasure
        againt slowloris */
