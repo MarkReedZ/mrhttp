@@ -20,6 +20,7 @@ class Request(mrhttp.CRequest):
   response = mrhttp.Response()
   def __init__(self):
     super().__init__(self)
+    self._ip = None
     pass
 
   def parsed_content_type(self):
@@ -63,6 +64,18 @@ class Request(mrhttp.CRequest):
       if self.mime_type == 'multipart/form-data':
         self.parse_mp_form()
     return self._file
+
+  @property
+  def ip(self):
+    if self._ip == None:
+      self._ip = self.headers.get("CF-Connecting-IP")
+    if self._ip == None:       
+      self._ip = self.headers.get("X-Real-IP")
+    if self._ip == None:       
+      self._ip = self.headers.get("X-Forwarded-For")
+
+    return self._ip
+
 
   @property
   def files(self):

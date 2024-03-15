@@ -1,6 +1,4 @@
 
-
-
 #include <stddef.h>
 #include <sys/param.h>
 #include <strings.h>
@@ -39,7 +37,7 @@
   ((x <= '9' ? 0 : 9) + (x & 0x0f))
 #define is_hex(x) ((x >= '0' && x <= '9') || (x >= 'A' && x <= 'F'))
 
-#define CHAR4_INT(a, b, c, d)         \
+#define CHAR4_TO_INT(a, b, c, d)         \
    (unsigned int)((d << 24) | (c << 16) | (b << 8) | a)
 
 
@@ -54,6 +52,11 @@
 //static PyObject* request;
 
 
+static unsigned long TZCNT(unsigned long long in) {
+  unsigned long res;
+  asm("tzcnt %1, %0\n\t" : "=r"(res) : "r"(in));
+  return res;
+}
 
 
 PyObject* Request_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -78,7 +81,6 @@ void Request_dealloc(Request* self) {
   Py_XDECREF(self->py_args);
   Py_XDECREF(self->py_path);
   Py_XDECREF(self->py_method);
-  //Py_XDECREF(self->py_ip);
   Py_XDECREF(self->py_json);
   Py_XDECREF(self->py_mrpack);
   Py_XDECREF(self->py_form);
@@ -118,7 +120,6 @@ void Request_reset(Request *self) {
   Py_XDECREF(self->py_file);   self->py_file = NULL;
   Py_XDECREF(self->py_files);  self->py_files= NULL;
   Py_XDECREF(self->py_user);   self->py_user= NULL;
-  self->py_ip   = NULL;
   self->hreq.ip = NULL;
   self->hreq.flags = 0;
   Py_XDECREF(self->py_mrq_servers_down);  self->py_mrq_servers_down= NULL;
@@ -230,9 +231,157 @@ static inline size_t sse_decode(char* path, ssize_t length, size_t *qs_len) {
 }
 //#endif
 
+static inline int path_decode(char* buf, int len, int *qs_len) {
+  unsigned long msk;
+  int i=0,tz; // 32B index
+  int cnt = 0;
+  unsigned int shifted;
+  char *sbuf = buf;
+  char *obuf = buf;
+  char *buf_end = buf+len;
+  char *wbuf;
+  int found = 0;
+
+  __m256i m37 = _mm256_set1_epi8(37);
+  __m256i m63 = _mm256_set1_epi8(63);
+
+  do {
+    const char *block_start = obuf+64*i;
+    __m256i b0 = _mm256_loadu_si256((const __m256i *) block_start);
+    __m256i b1 = _mm256_loadu_si256((const __m256i *) (block_start+32));
+    msk = (unsigned int) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m37), _mm256_cmpeq_epi8(b0, m63) ) )  |
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m37), _mm256_cmpeq_epi8(b1, m63) ) ) << 32);
+
+    while (1) {
+
+      //if ( buf >= buf_end ) { goto decdone; }
+      shifted = buf-block_start;
+      if ( shifted >= 64 ) break;
+      tz = TZCNT((msk >> shifted));
+      if ( tz < 64 ) {
+        buf += tz;
+        //printf( " fnd >%.*s<\n", (int)(buf-sbuf), sbuf );  
+        if ( buf >= buf_end ) { goto decdone; }
+        if ( *buf == '?' ) {
+          len -= buf_end-buf;
+          *qs_len = buf_end-buf;
+          //printf("path_decode len %d path >%.*s<\n", (int)len, (int)len, obuf);
+          goto decdone;
+        }
+        if ( *buf == '%' ) {
+          if ( found ) {
+            memcpy( wbuf, sbuf, buf-sbuf );
+            wbuf += buf-sbuf;
+            *wbuf = (hex_to_dec(buf[1]) << 4) + hex_to_dec(buf[2]);
+            wbuf++;
+          } else {
+            found = 1;
+            *buf = (hex_to_dec(buf[1]) << 4) + hex_to_dec(buf[2]);
+            wbuf = buf+1;
+          }
+          len -= 2;
+          buf += 3;
+        }
+        sbuf = buf;
+      } else {
+        buf += 64 - shifted;
+        break;
+      }
+
+    }
+    i+=1;
+    if ( buf >= buf_end ) { goto decdone; }
+  } while ( buf < buf_end ); // Why doesn't this work
+
+decdone:
+  if ( found ) {
+    memcpy( wbuf, sbuf, buf_end-sbuf );
+  }
+  return len;
+}
+
+static inline PyObject* parse_query_args( char *buf, size_t len ) {
+  unsigned long long msk;
+  int i=0,tz; // 32B index
+  unsigned int shifted;
+  char *sbuf = buf;
+  char *obuf = buf;
+  int state = 0;
+  int ignore_me = 0;
+
+  PyObject* args = PyDict_New();
+  PyObject* key = NULL; PyObject* value = NULL;
+
+  if ( len == 0 ) return;
+  //len = path_decode( buf, len, &ignore_me );
+  char *buf_end = buf+len;
+
+  __m256i m38 = _mm256_set1_epi8(38); // &
+  __m256i m61 = _mm256_set1_epi8(61); // =
+  do {
+    const char *block_start = obuf+64*i;
+    __m256i b0 = _mm256_loadu_si256((const __m256i *) block_start);
+    __m256i b1 = _mm256_loadu_si256((const __m256i *) (block_start+32));
+    msk = (unsigned int) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m38), _mm256_cmpeq_epi8(b0, m61) ) )  |
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m38), _mm256_cmpeq_epi8(b1, m61) ) ) << 32);
+    while (1) {
+
+      //if ( buf >= buf_end ) { goto decdone; }
+      shifted = buf-block_start;
+      if ( shifted >= 64 ) break;
+      tz = TZCNT((msk >> shifted));
+      if ( tz < 64 ) {
+        buf += tz;
+        if ( buf >= buf_end ) { goto pdone; }
+        if ( *buf == '=' ) {
+          if ( state == 1 ) { buf+=1; continue; }
+          //printf( " key >%.*s<\n", (int)(buf-sbuf), sbuf );  
+          //key = PyUnicode_FromStringAndSize(sbuf, buf-sbuf); 
+          len = path_decode( sbuf, buf-sbuf, &ignore_me );
+          key = PyUnicode_FromStringAndSize(sbuf, len);
+
+          state = 1;
+          buf += 1;
+        }
+        else if ( *buf == '&' ) {
+          if ( state == 0 ) { buf+=1; continue; }
+          //printf( " val >%.*s<\n", (int)(buf-sbuf), sbuf);
+          //value = PyUnicode_FromStringAndSize(sbuf, buf-sbuf); 
+          len = path_decode( sbuf, buf-sbuf, &ignore_me );
+          value = PyUnicode_FromStringAndSize(sbuf, len);
+          PyDict_SetItem(args, key, value);  
+          Py_XDECREF(key);
+          Py_XDECREF(value);
+
+          state = 0;
+          buf+=1;
+        }
+        sbuf = buf;
+      } else {
+        buf += 64 - shifted;
+        break;
+      }
+
+    }
+    i+=1;
+    if ( buf >= buf_end ) { goto pdone; }
+  } while ( buf < buf_end ); // Why doesn't this work
+
+pdone:
+  //printf( " done >%.*s<\n", (int)(buf_end-sbuf), sbuf );  
+  //value = PyUnicode_FromStringAndSize(sbuf, buf_end-sbuf); 
+  len = path_decode( sbuf, buf_end-sbuf, &ignore_me );
+  value = PyUnicode_FromStringAndSize(sbuf, len);
+  PyDict_SetItem(args, key, value);  
+  Py_XDECREF(key);
+  Py_XDECREF(value);
+  return args;
+}
+
+
 void request_decodePath(Request* self) {
   if(!self->path_decoded) {
-    self->path_len = sse_decode( self->path, self->path_len, &(self->qs_len) );
+    self->path_len = path_decode( self->path, self->path_len, &(self->qs_len) );
     self->path_decoded = true;
   }
 }
@@ -322,136 +471,148 @@ PyObject* Request_get_headers(Request* self, void* closure) {
   Py_XINCREF(self->py_headers);
   return self->py_headers;
 }
-PyObject* Request_get_ip(Request* self, void* closure) {
-  if(!self->py_ip) {
-    if ( self->hreq.ip_len ) {
-      self->py_ip = PyUnicode_FromStringAndSize(self->hreq.ip, self->hreq.ip_len);
-    } else {
-      self->py_ip = Py_None;
-    }
-  }
-  Py_INCREF(self->py_ip);
-  return self->py_ip;
-}
 
 static inline PyObject* parseCookies( Request* r, char *buf, size_t buflen ) {
-  char *end = buf + buflen;
-  char *last = buf;
+  unsigned int msk;
+  int i=0,tz; // 32B index
+  int cnt = 0;
+  unsigned int shifted;
+  const char *sbuf = buf;
+  const char *obuf = buf;
+  const char *buf_end = buf+buflen;
+  int name_or_value = 0;
+  int found = 0;
+
+  __m256i m59 = _mm256_set1_epi8(59);
+  __m256i m61 = _mm256_set1_epi8(61);
+
   PyObject* cookies = PyDict_New();
   PyObject* key = NULL; PyObject* value = NULL;
 
   DBG printf("parse cookies: %.*s\n",(int)buflen, buf);
 
-  static char ALIGNED(16) ranges1[] = "==" ";;" "\x00 "; // Control chars up to space illegal
-  int found;
-  int state = 0;
-  int grab_session = 0;
-//Cookie: key=session_key; bar=2; nosemi=foo
-  do { 
-    last = buf;
-    buf = findchar(buf, end, ranges1, sizeof(ranges1) - 1, &found);
-    if ( found ) {
-      if ( *buf == '=' ) {
-        if ( state == 0 ) {
-          // Save out the mrsession id 
-          if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
-            DBG printf("Grab session\n");
-            grab_session = 1;
+  do {
+    const char *block_start = obuf+32*i;
+    __m256i b0 = _mm256_loadu_si256((const __m256i *) block_start);
+    msk = _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m59), _mm256_cmpeq_epi8(b0, m61) ) );
+    while (1) {
+      //if ( buf >= buf_end ) { goto sesdone; }
+      shifted = buf-block_start;
+      if ( shifted >= 32 ) break;
+      tz = TZCNT((msk >> shifted));
+      if ( tz < 32 ) {
+        buf += tz;
+        DBG printf( " fnd >%.*s<\n", buf-sbuf, sbuf );  
+        if ( buf >= buf_end ) { goto sesdone; }
+        if ( name_or_value == 1 ) {
+          if ( *buf == '=' ) { buf += 1; continue; } // = in value field
+          if ( found ) {
+            DBG printf("session key %.*s\n", (int)(buf-sbuf), sbuf);
+            r->session_id = sbuf;
+            r->session_id_sz = buf-sbuf;
           }
-          key = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
-          DBG printf("session key %.*s\n", (int)(buf-last), last);
-          state = 1;
+          value = PyUnicode_FromStringAndSize(sbuf, buf-sbuf); //TODO error
+          PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
+          Py_XDECREF(key);
+          Py_XDECREF(value);
           buf+=1;
+          name_or_value = 0;
         } else {
-          // If we're in the value ignore the = so cookie name/value splits on the first =
-          while(found && *buf == '=') buf = findchar(++buf, end, ranges1, sizeof(ranges1) - 1, &found);
+          key = PyUnicode_FromStringAndSize(sbuf, buf-sbuf); //TODO error
+          if ( buf-sbuf == 9 && ( *((unsigned int *)(sbuf)) == CHAR4_TO_INT('m', 'r', 's','e') ) ) {
+            found = 1;
+          }
+          name_or_value = 1;
         }
-      } 
-      else if ( *buf == ';' ) {
-        if ( state == 0 ) key  = PyUnicode_FromString("");
-        if (grab_session) {
-          grab_session = 0;
-          r->session_id = last;
-          r->session_id_sz = buf-last;
-        }
-        value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
-        DBG printf(" value %.*s\n", (int)(buf-last), last);
-        state = 0;
-        PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
-        Py_XDECREF(key);
-        Py_XDECREF(value);
-        buf+=1;
-        while ( *buf == 32 ) buf++;
+        buf += 1;
+        sbuf = buf;
+      } else {
+        buf += 32 - shifted;
+        break;
       }
-      else {
-        // Bad character found so skip
-        state = 0;
-        while(found && *buf != ';') buf = findchar(++buf, end, ranges1, sizeof(ranges1) - 1, &found);
-        if ( buf != end ) buf += 1;
-        while ( *buf == 32 ) buf++;
-      }
-      //else if(*buf == '%' && is_hex(*(buf + 1)) && is_hex(*(buf + 2))) {
-        //*write = (hex_to_dec(*(buf + 1)) << 4) + hex_to_dec(*(buf + 2));
-        //write+=1;
-        //length -= 2;
-      //}
-    }
-  } while( found );
 
-  // If the trailing ; is left off we need to finish up
-  if (state) {
-    if (grab_session) {
-      grab_session = 0;
-      r->session_id = last;
-      r->session_id_sz = buf-last;
-      DBG printf("session2 %.*s\n", r->session_id_sz, r->session_id);
     }
-    value = PyUnicode_FromStringAndSize(last, buf-last); //TODO error
-    PyDict_SetItem(cookies, key, value);  //  == -1) goto loop_error;
+    i+=1;
+    if ( buf >= buf_end ) { goto sesdone; }
+  } while ( buf-obuf < buf_end-obuf );
+
+sesdone:
+  if ( found ) {
+    r->session_id = sbuf;
+    r->session_id_sz = buf_end-sbuf;
+  }
+  if ( name_or_value ) {
+    value = PyUnicode_FromStringAndSize(sbuf, buf_end-sbuf); //TODO error
+    PyDict_SetItem(cookies, key, value); 
     Py_XDECREF(key);
     Py_XDECREF(value);
   }
-
   return cookies;
 }
-static inline void getSession( Request* r, char *buf, size_t buflen ) {
-  char *end = buf + buflen;
-  char *last = buf;
 
-  static char ALIGNED(16) ranges1[] = "==" ";;";
-  int found;
-  int state = 0;
-  do { 
-    last = buf;
-    buf = findchar(buf, end, ranges1, sizeof(ranges1) - 1, &found);
-    if ( found ) {
-      if ( *buf == '=' ) {
-        if ( state == 0 ) {
-          // Save out the mrsession id 
-          if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_INT('m', 'r', 's','e') ) ) {
-            DBG printf("Grab session\n");
-            state = 1;
+static inline void getSession( Request* r, char *buf, size_t buflen ) {
+  unsigned int msk;
+  int i=0,tz; // 32B index
+  int cnt = 0;
+  unsigned int shifted;
+  const char *sbuf = buf;
+  const char *obuf = buf;
+  const char *buf_end = buf+buflen;
+  int name_or_value = 0;
+  int found = 0;
+
+  __m256i m59 = _mm256_set1_epi8(59);
+  __m256i m61 = _mm256_set1_epi8(61);
+
+  do {
+    const char *block_start = obuf+32*i;
+    __m256i b0 = _mm256_loadu_si256((const __m256i *) block_start);
+    msk = _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m59), _mm256_cmpeq_epi8(b0, m61) ) );
+    while (1) {
+      //if ( buf >= buf_end ) { goto sesdone; }
+      shifted = buf-block_start;
+      if ( shifted >= 32 ) break;
+      tz = TZCNT((msk >> shifted));
+      if ( tz < 32 ) {
+        buf += tz;
+        //printf( " fnd >%.*s<\n", buf-sbuf, sbuf );  
+        if ( buf >= buf_end ) { goto sesdone; }
+        if ( name_or_value == 1 ) {
+          if ( *buf == '=' ) { buf += 1; continue; } // = in value field
+          if ( found ) {
+            //printf( " done >%.*s<\n", buf-sbuf, sbuf );  
+            r->session_id = sbuf;
+            r->session_id_sz = buf-sbuf;
+            return;
           }
           buf+=1;
-        } 
-      } 
-      else if ( *buf == ';' ) {
-        if (state == 1 ) {
-          r->session_id = last;
-          r->session_id_sz = buf-last;
-          return;
+          name_or_value = 0;
+        } else {
+          if ( buf-sbuf == 9 && ( *((unsigned int *)(sbuf)) == CHAR4_TO_INT('m', 'r', 's','e') ) ) {
+            found = 1;
+          }
+          name_or_value = 1;
         }
-        state = 0;
-        buf+=1;
-        while ( *buf == 32 ) buf++;
+        buf += 1;
+        sbuf = buf;
+      } else {
+        buf += 32 - shifted;
+        break;
       }
+
     }
-  } while( found );
-  if (state) {
-    r->session_id = last;
-    r->session_id_sz = buf-last;
+    i+=1;
+    if ( buf >= buf_end ) { goto sesdone; }
+  } while ( buf-obuf < buf_end-obuf );
+
+sesdone:
+  if ( found ) {
+    r->session_id = sbuf;
+    r->session_id_sz = buf-sbuf;
+    //printf( " sesdone >%.*s<\n", buf-sbuf, sbuf );  
   }
 }
+
 
 static inline PyObject* Request_decode_cookies(Request* self)
 {
@@ -492,67 +653,6 @@ PyObject* Request_get_body(Request* self, void* closure)
   return self->py_body;
 }
 
-static inline PyObject* parse_query_args( char *buf, size_t buflen ) {
-  char *end = buf + buflen;
-  char *last = buf;
-  PyObject* args = PyDict_New();
-
-  if ( buflen == 0 ) return args;
-
-  PyObject* key = NULL; PyObject* value = NULL;
-
-  static char ALIGNED(16) ranges1[] = "==" "&&";
-  int found;
-  int state = 0;
-  int grab_session = 0;
-  size_t len;
-  // foo=bar&key=23%28
-  do { 
-    buf = findchar(buf, end, ranges1, sizeof(ranges1) - 1, &found);
-    if ( found ) {
-      if ( *buf == '=' ) {
-        len = sse_decode( last, buf-last, NULL );
-        key = PyUnicode_FromStringAndSize(last, len); //TODO error
-        state = 1;
-        buf+=1;
-        last = buf;
-      } 
-      else if ( *buf == '&' ) {
-        if ( state == 0 ) key  = PyUnicode_FromString("");
-
-        len = sse_decode( last, buf-last, NULL );
-        value = PyUnicode_FromStringAndSize(last, len);
-        state = 0;
-        PyDict_SetItem(args, key, value);  //  == -1) goto loop_error;
-        Py_XDECREF(key);
-        Py_XDECREF(value);
-        buf+=1;
-        while ( *buf == 32 ) buf++;
-        last = buf;
-      }
-      else {
-        printf(" ERR found not = or ; %.*s\n", 5, buf );
-      }
-    }
-  } while( found );
-
-  if ( buf == end ) {
-    if ( state == 0 ) key  = PyUnicode_FromString("");
-    if ( buf == end && *(buf-1) == ' ' ) {
-      len = sse_decode( last, buf-last-1, NULL );
-      value = PyUnicode_FromStringAndSize(last, len); //TODO error
-    } else {
-      len = sse_decode( last, buf-last, NULL );
-      value = PyUnicode_FromStringAndSize(last, len); //TODO error
-    }
-    state = 0;
-    PyDict_SetItem(args, key, value);  //  == -1) goto loop_error;
-    Py_XDECREF(key);
-    Py_XDECREF(value);
-  }
-
-  return args;
-}
 
 
 PyObject* Request_get_path(Request* self, void* closure)
@@ -607,6 +707,7 @@ PyObject* Request_notfound(Request* self)
   //return NULL;
   Py_RETURN_NONE;
 }
+
 
 PyObject* Request_parse_mp_form(Request* self) {
 
@@ -743,7 +844,7 @@ PyObject* Request_parse_mp_form(Request* self) {
           body = name = filename = content_type = NULL;
 
         }
-        if ( p[2+bndlen] == '-' ) break; // Last boundary
+        if ( p[2+bndlen] == '-' ) break; // Last boundary has -- appended
         state = 1;
       }
     }
@@ -805,8 +906,8 @@ PyObject* Request_parse_mp_form(Request* self) {
     
     //if ( state == 2 ) {
     //}
-
-    p = findchar(p, pend, crlf, sizeof(crlf) - 1, &found);
+    //p = findchar(p, pend, crlf, sizeof(crlf) - 1, &found);
+    p = my_get_eol(p, pend);
     p += 2;
   }
 

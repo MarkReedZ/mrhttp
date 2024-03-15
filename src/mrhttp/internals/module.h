@@ -125,7 +125,7 @@ static PyMemberDef Request_members[] = {
     {"_files", T_OBJECT, offsetof(Request, py_files),  0, NULL},
     {"servers_down",T_OBJECT, offsetof(Request, py_mrq_servers_down),0, NULL},
     {"user",   T_OBJECT, offsetof(Request, py_user),   0, NULL},
-    {"ip",     T_OBJECT, offsetof(Request, py_ip),     0, NULL},
+    //{"ip",     T_OBJECT, offsetof(Request, py_ip),     0, NULL},
     {NULL},
 };
 static PyGetSetDef Request_getset[] = {

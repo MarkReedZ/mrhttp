@@ -5,6 +5,8 @@ Updating version:
   internals app.c and response.c
 
 
+sudo sh -c "echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor"
+sudo sh -c "echo powersave | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor"
 
 
 wrk -t4 -c32 -d2s http://localhost:8080/
@@ -49,15 +51,38 @@ User-Agent: curl/7.51.0
 Accept: */*
 
 <<<
+POST /form HTTP/1.1
+Host: localhost:8080
+User-Agent: python-requests/2.31.0
+Accept-Encoding: gzip, deflate
+Accept: */*
+Connection: keep-alive
+Content-Length: 19
+Content-Type: application/x-www-form-urlencoded
 
+p1=v1&param2=value2POST /form HTTP/1.1
+Host: localhost:8080
+User-Agent: python-requests/2.31.0
+Accept-Encoding: gzip, deflate
+Accept: */*
+Connection: keep-alive
+Content-Length: 19
+Content-Type: application/x-www-form-urlencoded
+
+p1=v1&param2=value2
+
+<<<
 curl http://localhost:8080/
 
 Valgrind doesn't work with AVX2 ... 
 valgrind --tool=memcheck --suppressions=valgrind-python.supp python3 -E -tt ./tst.py
 
+Big headers
+curl http://localhost:8080/ -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00' -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' -H 'Accept-Language: en-US,en;q=0.5' -H 'Cookie: mrsession=43709dd361cc443e976b05714581a7fb; foo=fdsfdasdfasdfdsfasdfsdfsdfasdfas; short=fazc;' -H 'Connection: keep-alive'
+
 FORM urlencoded TODO more params.  Can we fix the performance here?
-curl -d "param1=value1&param2=value2" -X POST http://localhost:8080/ -H "Content-Type: application/x-www-form-urlencoded"
-wrk -t4 -c32 -d1s http://localhost:8080/form -s tests/lua/form.lua
+curl -d "param1=value1&param2=value2" -X POST http://localhost:8080/form -H "Content-Type: application/x-www-form-urlencoded"
+wrk -t1 -c1 -d1s http://localhost:8080/form -s tests/lua/form.lua
 
 cookie test:
 curl --cookie "mrsession=bnwg23LQbOmdAtcBELdLwsFcyJkN8iGp" http://localhost:8080/

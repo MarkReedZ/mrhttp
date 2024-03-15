@@ -117,38 +117,6 @@ class Application(mrhttp.CApp):
       self.uses_mrq = True
 
     if not uri.startswith('/'): uri = '/' + uri
-    #params = {}
-    #params["methods"] = methods
-    #params["options"] = options
-    #params["type"] = _type
-    #params["mrq"] = None
-    #for o in options:
-      #if o.startswith("mrq"):
-        #
-        #self.uses_mrq = True
-        #if self._mrq == None:
-          #srvs = self.config.get("mrq", None)
-          #print(srvs)
-          #if type(srvs) != list or type(srvs[0]) != tuple or len(srvs) == 0:
-            #print("When using MrQ app.config['mrq'] must be set to a list of (host,port) tuple pairs. Exiting")
-            #exit(1)
-          #self._mrq = []
-          #if type(srvs) == list and type(srvs[0]) == list:
-            #for s in srvs:
-              #self._mrq.append( MrqClient( s, self.loop) )
-          #else:
-            #self._mrq.append( MrqClient( srvs, self.loop) )
-        #if o == "mrq": 
-          #o = "mrq0"
-        #l = []
-        #try:
-          #for n in o[3:]:
-            #l.append( self._mrq[int(n)] )
-          #params["mrq"] = l
-        #except:
-          #print("Error mrq route specifies a cluster that doesn't exist")
-          #print("uri:", uri, "mrq", o)
-          #exit(1)
 
     def response(func): 
       self.router.add_route( func, uri, methods, options, _type )
@@ -288,29 +256,7 @@ class Application(mrhttp.CApp):
         for r in self.requests:
           r.cleanup()
         self.requests = None
-
     
-        #for ref in gc.get_referrers(self.requests[0]):
-          #if type(ref) == list:
-            #print("list")
-          #else:
-            #print(ref)
-        #print("DELME refcnt ", sys.getrefcount(self.requests[0]))
-        #r = self.requests[0]
-        #print("id requests ", id(self.requests))
-        #rs = self.requests
-        #self.requests = None
-        #gc.collect()
-        #print (gc.get_referrers(rs))
-        #print("DELME refcnt ", sys.getrefcount(r))
-        #for ref in gc.get_referrers(r):
-          #if type(ref) == list:
-            #print("list")
-            #print("id ref ", id(ref))
-          #else:
-            #print(ref)
-
-
   # Update the response date string every few seconds
   def updateDateString(self):
     self.updateDate( format_date_time(None) )

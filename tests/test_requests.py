@@ -43,12 +43,6 @@ def setup():
 
 
 def test_one():
-  data = {}
-  s = "lo(ng"*5000
-  data["long"] = s
-  r = requests.post('http://localhost:8080/form',data) # TODO have this timeout quickly
-  eq(r.status_code, 200)
-  eq(r.text, '{"long":"' + s + '"}')
 
   r = requests.get('http://localhost:8080/foo')
   eq(r.status_code, 200)
@@ -132,8 +126,8 @@ def test_one():
   eq(r.text, '{"":"v","pa{}ram2":"val(ue2"}')
   r = requests.post('http://localhost:8080/form', data={"":"v","英文版本":"val(ue2"})
   eq(r.text, '{"":"v","英文版本":"val(ue2"}')
-  r = requests.post('http://localhost:8080/form', data={"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"","英":"+=&ue2"})
-  eq(r.text, '{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"","英":"+=&ue2"}')
+  r = requests.post('http://localhost:8080/form', data={"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&":"","英":"+=&ue2"})
+  eq(r.text, '{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&":"","英":"+=&ue2"}')
   #data = {}
   #s = "lo(ng"*10000
   #data["long"] = s
@@ -142,6 +136,12 @@ def test_one():
   #eq(r.text, '{"long":"' + s + '"}')
   r = requests.get('http://localhost:8080/form')
   eq(r.text, "No form")
+  data = {}
+  s = "lo(ng"*5000
+  data["long"] = s
+  r = requests.post('http://localhost:8080/form',data) 
+  eq(r.status_code, 200)
+  eq(r.text, '{"long":"' + s + '"}')
 
   # Sessions
   cookie = {'mrsession': '43709dd361cc443e976b05714581a7fb'}
@@ -151,6 +151,15 @@ def test_one():
   # Misc
   r = requests.get('http://localhost:8080/printIP')
   eq(r.text, "None")
+  headers = {'CF-Connecting-IP': '123'}
+  r = requests.get('http://localhost:8080/printIP', headers=headers)
+  eq(r.text, "123")
+  headers = {'X-Real-IP': '1234'}
+  r = requests.get('http://localhost:8080/printIP', headers=headers)
+  eq(r.text, "1234")
+  headers = {'X-Forwarded-For': '12'}
+  r = requests.get('http://localhost:8080/printIP', headers=headers)
+  eq(r.text, "12")
 
   # TODO we can't test bad headers as requests won't send them curl localhost:8080/ -H "ƒtest:ƒart"
 

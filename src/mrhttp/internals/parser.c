@@ -22,6 +22,18 @@ static void print_buffer( char* b, int len ) {
   printf("\n");
 }
 
+static inline bool _isdigit(char c)  { return  c >= '0'  && c <= '9'; }
+static long my_strtol( char* s, int maxlen ) {
+  long l = 0;
+  int n = 0;
+  while (_isdigit(*s)) {
+
+    l = (l * 10) + (*s++ - '0');
+    n += 1;
+    if ( n >= maxlen ) return l;
+  }
+  return l;
+}
 
 static void _reset(Parser* self, bool reset_buffer) {
   self->body_length = 0;
@@ -57,8 +69,6 @@ int parser_data_received(Parser *self, PyObject *py_data, Request *request ) {
   DBG_PARSER printf("parser data\n%.*s\n",(int)datalen, data);
 
   // If we need more space increase the size of the buffer
-  // Can the headers be larger than our buffer size?
-// No, HTTP does not define any limit. However most web servers do limit size of headers they accept. For example in Apache default limit is 8KB, in IIS it's 16K. Server will return 413 Entity Too Large error if headers size exceeds that limit.
   DBG_PARSER printf("parser datalen %zu buflen %ld buffer size %d\n", datalen, (self->end-self->start), self->buf_size);
   if ( unlikely( (datalen+(self->end-self->start)) > self->buf_size) ) {
     while ( (datalen+(self->end-self->start)) > self->buf_size )  self->buf_size *= 2;
@@ -80,12 +90,11 @@ parse_headers:
 
   char *method, *path;
   int rc, minor_version;
-  //struct phr_header headers[100];
-  size_t method_len, path_len;//, num_headers;
+  size_t method_len, path_len;
 
   request->num_headers = 100; // Max allowed headers
   DBG_PARSER printf("before parser requests\n");
-  request->hreq.flags = 0; // TODO clear the mr_request struct
+  //request->hreq.flags = 0; // TODO This isn't currently used in the parser
   rc = mr_parse_request(self->start, self->end-self->start, (const char**)&method, &method_len, (const char**)&path, &path_len, &minor_version, request->headers, &(request->num_headers), &(request->hreq));
 
   DBG_PARSER printf("parser requests rc %d\n",rc);
@@ -107,41 +116,32 @@ parse_headers:
  
   //self->body_length = request->hreq.body_length;
 
-#define header_name_equal(val) \
+#define name_compare(val) \
   header->name_len == strlen(val) && fast_compare(header->name, val, header->name_len) == 0
-#define header_value_equal(val) \
+#define value_compare(val) \
   header->value_len == strlen(val) && fast_compare(header->value, val, header->value_len) == 0
 
  for(struct mr_header* header = request->headers;
       header < request->headers + request->num_headers;
       header++) {
 
-    if(header_name_equal("Content-Type")) {
-      if ( header->value[0] == 'a' && header->value[13] == 'r' ) { //"application/mrpacker"
+    if(name_compare("Content-Type")) {
+      if ( header->value[0] == 'a' && header->value_len == 20 ) { //"application/mrpacker"
         request->hreq.flags = 2;
       } 
     }
-    if(header_name_equal("Content-Length")) {
-      char * endptr = (char *)header->value + header->value_len;
-      self->body_length = strtol(header->value, &endptr, 10);
+    if(name_compare("Content-Length")) {
+      self->body_length = my_strtol(header->value, header->value_len);
 
-      // TODO If the request is too large       
+      // TODO If the request is too large.  I think we already checked
 
-      // 0 means error from strtol, but it is also a valid value
+      // Check for a bad 0 length - ie non digits for the length
       if ( self->body_length == 0 && !( header->value_len == 1 && *(header->value) == '0') ) { 
-        //TODO ERROR
-        //error = invalid_headers;
-        goto error;
-      }
-      // If the value was not all digits we'll error here
-      if(endptr != (char*)header->value + header->value_len) {
-        //TODO ERROR
-        //error = invalid_headers;
         goto error;
       }
 
-    } else if(header_name_equal("Connection")) {
-      if      (header_value_equal("close"))      request->keep_alive = false;
+    } else if(name_compare("Connection")) {
+      if      (value_compare("close"))      request->keep_alive = false;
     }
   } 
 
@@ -150,9 +150,6 @@ parse_headers:
 //body:
 
   DBG_PARSER printf("body:\n%.*s\n", (int)(self->end-self->start),self->start);
-
-  // No body
-  //if ( self->body_length == 0 ) { }
 
   // Need more data
   if ( self->body_length > ( self->end - self->start ) ) {
@@ -175,9 +172,6 @@ parse_headers:
       return -1;
     }
 
-  }
-  if ( request->hreq.ip != NULL ) {
-    request->py_ip = PyUnicode_FromStringAndSize(request->hreq.ip, request->hreq.ip_len);
   }
 
   if(!Protocol_on_body(self->protocol, self->start, self->body_length)) return -1;
