@@ -79,6 +79,7 @@ static unsigned long TZCNT(unsigned long long in) {
   asm("tzcnt %1, %0\n\t" : "=r"(res) : "r"(in));
   return res;
 }
+// TODO just len
 static int get_len_to_space(const char *buf, const char *buf_end) {
   const char *orig = buf;
   __m256i m32 = _mm256_set1_epi8(32);
