@@ -163,74 +163,6 @@ PyObject* Request_get_transport(Request* self, void* closure) {
   Py_RETURN_NONE;
 }
 
-//#ifdef __SSE4_2__
-
-// /spanish/objetos%20voladores%20no%20identificados?foo=bar
-static inline size_t sse_decode(char* path, ssize_t length, size_t *qs_len) {
-  //DBG printf("sse_decode >%.*s<\n", (int)length, path);
-  if (length == 0) return length;
-  char *pat = path;
-  static char ranges1[] = "%%" "??";
-  char *end = path + length;
-  int found;
-
-  // We only findchar once - benchmark one or more % encodings with continuing to use findchar ( Spanish / Chinese )
-  do {
-    //DBG printf("sse_decode >%.*s<\n", (int)length, path);
-    pat = findchar(pat, end, ranges1, sizeof(ranges1) - 1, &found);
-    if ( found ) {
-      if(*pat == '%' && is_hex(*(pat + 1)) && is_hex(*(pat + 2))) {
-        *pat = (hex_to_dec(*(pat + 1)) << 4) + hex_to_dec(*(pat + 2));
-        pat+=3;
-        length -= 2;
-      } else {
-        *qs_len = end-pat;
-        length -= end-pat;
-        break;
-      }
-    }
-  } while (0);
-
-  if( !found || *pat == '?') return length;
-
-  char *write = pat;
-  if ( found ) write -= 2;
-  char *read = pat;
-  for (;read < end;) {
-    if (read[0] == '?') {
-      length -= end-read;
-      *qs_len  = end-pat;
-      break;
-    }
-    if ( read[0] == '%' ) {
-      if( is_hex(read[1]) && is_hex(read[2]) ) {
-        *write = (hex_to_dec(read[1]) << 4) + hex_to_dec(read[2]);
-        write+=1;
-        read += 3;
-        length-=2;
-      } else {
-        if (read > write) {
-          write[0] = read[0];
-          write[1] = read[1];
-        }
-        read += 2;
-        write += 2;
-      }
-
-    } else {
-      if (read > write) {
-        write[0] = read[0];
-      }
-      read++;
-      write++;
-    }
-  }
-  DBG printf("sse_decode len %d path >%.*s<\n", (int)length, (int)length, path);
-
-  return length;
-}
-//#endif
-
 static inline int path_decode(char* buf, int len, int *qs_len) {
   unsigned long msk;
   int i=0,tz; // 32B index
@@ -550,6 +482,7 @@ sesdone:
   return cookies;
 }
 
+// We can probably create a separate 1 and 2 reg avx2 find func to share
 static inline void getSession( Request* r, char *buf, size_t buflen ) {
   unsigned int msk;
   int i=0,tz; // 32B index
