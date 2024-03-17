@@ -15,6 +15,7 @@ typedef struct {
   bool iscoro;
   bool session;
   bool mrq;
+  bool mrq2;
   bool append_user;
   char mtype;
   int max_byte_size;

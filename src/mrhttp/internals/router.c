@@ -69,7 +69,7 @@ PyObject *Router_setupRoutes (Router* self) {
     r = PyList_GetItem(sroutes, i);
     rte->iscoro  = false;
     rte->session = false;
-    rte->mrq = false; rte->append_user = false;
+    rte->mrq = false; rte->mrq2 = false; rte->append_user = false;
 
     PyObject *handler = PyLong_AsVoidPtr(PyDict_GetItemString( r, "handler" ));
     rte->func = handler;
@@ -78,6 +78,7 @@ PyObject *Router_setupRoutes (Router* self) {
     if ( Py_True == PyDict_GetItemString( r, "iscoro"  ) ) rte->iscoro  = true;
     if ( Py_True == PyDict_GetItemString( r, "session" ) ) rte->session = true;
     if ( Py_True == PyDict_GetItemString( r, "mrq" ) ) rte->mrq = true;
+    if ( Py_True == PyDict_GetItemString( r, "mrq2" ) ) rte->mrq2 = true;
     if ( Py_True == PyDict_GetItemString( r, "append_user" ) ) rte->append_user = true;
     //if ( Py_True == PyDict_GetItemString( r, "append_user" ) ) printf("mrq append user set\n");
     o = PyDict_GetItemString( r, "type"  );
@@ -111,10 +112,11 @@ PyObject *Router_setupRoutes (Router* self) {
     rte->path = PyUnicode_AsUTF8AndSize( o, &(rte->len) );
     DBG printf( " path len %ld str %.*s\n", rte->len, (int)rte->len, rte->path );
 
-    rte->iscoro  = false; rte->session = false; rte->mrq = false;
+    rte->iscoro  = false; rte->session = false; rte->mrq = false; rte->mrq2 = false;
     if ( Py_True == PyDict_GetItemString( r, "iscoro"      ) ) rte->iscoro = true;
     if ( Py_True == PyDict_GetItemString( r, "session"     ) ) rte->session = true;
     if ( Py_True == PyDict_GetItemString( r, "mrq"         ) ) rte->mrq = true;
+    if ( Py_True == PyDict_GetItemString( r, "mrq2"         ) ) rte->mrq2 = true;
     if ( Py_True == PyDict_GetItemString( r, "append_user" ) ) rte->append_user = true;
     o = PyDict_GetItemString( r, "type"  );
     if (o) rte->mtype = PyLong_AsLong(o);

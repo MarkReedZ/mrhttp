@@ -3,6 +3,7 @@ import mrworkserver
 
 async def callback(ws, msgs):
   for m in msgs:
+    print(m)
     pass
 
 ws = mrworkserver.WorkServer(callback=callback)

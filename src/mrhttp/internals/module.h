@@ -85,6 +85,7 @@ static PyMethodDef MrhttpApp_methods[] = {
 static PyMemberDef MrhttpApp_members[] = {
     {"_mc", T_OBJECT, offsetof(MrhttpApp, py_mc), 0, NULL},
     {"_mrq", T_OBJECT, offsetof(MrhttpApp, py_mrq), 0, NULL},
+    {"_mrq2", T_OBJECT, offsetof(MrhttpApp, py_mrq2), 0, NULL},
     {"_redis", T_OBJECT, offsetof(MrhttpApp, py_redis), 0, NULL},
     {"_session_client", T_OBJECT, offsetof(MrhttpApp, py_session), 0, NULL},
     {"session_backend_type", T_OBJECT, offsetof(MrhttpApp, py_session_backend_type), 0, NULL},

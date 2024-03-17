@@ -47,6 +47,7 @@ class Router(mrhttp.CRouter):
     #r["user_key"] = optiondict.get("append_user_key",None)
     if "session" in options: r["session"] = True
     if "mrq" in options: r["mrq"] = True
+    if "mrq2" in options: r["mrq2"] = True
     if "append_user" in options: r["append_user"] = True
     # Static routes
     if not "{" in uri:

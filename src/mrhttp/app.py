@@ -68,10 +68,12 @@ class Application(mrhttp.CApp):
     self.listeners = { "at_start":[], "at_end":[], "after_start":[]}
     self._mc = None
     self._mrq = None
+    self._mrq2 = None
     self._mrc = None
     self.session_backend = "memcached"
     self.uses_session = False
     self.uses_mrq = False
+    self.uses_mrq2 = False
     self.err404 = "<html><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested page was not found</p></body></html>"
     self.err400 = "<html><head><title>400 Bad Request</title></head><body><p>Invalid Request</p></body></html>"
    
@@ -115,6 +117,8 @@ class Application(mrhttp.CApp):
       self.uses_session = True
     if "mrq" in options:
       self.uses_mrq = True
+    if "mrq2" in options:
+      self.uses_mrq2 = True
 
     if not uri.startswith('/'): uri = '/' + uri
 
@@ -209,15 +213,23 @@ class Application(mrhttp.CApp):
       self._appStart() 
 
       if self.uses_mrq:
-        mrqconf = self.config.get("mrq", None)
-        if not mrqconf:
+        srvs = self.config.get("mrq", None)
+        if not srvs:
           print("When using MrQ app.config['mrq'] must be set. Exiting")
           exit(1)
-        srvs = self.config.get("mrq", None)
         if type(srvs) != list or len(srvs) == 0 or type(srvs[0]) != tuple:
           print("When using MrQ app.config['mrq'] must be set to a list of (host,port) tuple pairs. Exiting")
           exit(1)
         self._mrq = MrqClient( srvs, self.loop) 
+      if self.uses_mrq2:
+        srvs = self.config.get("mrq2", None)
+        if not srvs:
+          print("When using mrq2 app.config['mrq2'] must be set. Exiting")
+          exit(1)
+        if type(srvs) != list or len(srvs) == 0 or type(srvs[0]) != tuple:
+          print("When using MrQ app.config['mrq'] must be set to a list of (host,port) tuple pairs. Exiting")
+          exit(1)
+        self._mrq2 = MrqClient( srvs, self.loop) 
 
       if self.uses_session:
 
