@@ -192,7 +192,7 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
       case CHAR8_TO_LONG('H', 'T', 'T', 'P','/','1','.','1'):
         *minor_version = 1; buf += 8; break;
       default:
-        *ret = -2;
+        *ret = -2; //  TODO should be -1??
         return NULL;
     }
     
