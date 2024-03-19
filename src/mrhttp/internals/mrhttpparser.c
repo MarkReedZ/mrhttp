@@ -79,6 +79,7 @@ static unsigned long TZCNT(unsigned long long in) {
   asm("tzcnt %1, %0\n\t" : "=r"(res) : "r"(in));
   return res;
 }
+// TODO just len
 static int get_len_to_space(const char *buf, const char *buf_end) {
   const char *orig = buf;
   __m256i m32 = _mm256_set1_epi8(32);
@@ -191,7 +192,7 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
       case CHAR8_TO_LONG('H', 'T', 'T', 'P','/','1','.','1'):
         *minor_version = 1; buf += 8; break;
       default:
-        *ret = -2;
+        *ret = -2; //  TODO should be -1??
         return NULL;
     }
     
