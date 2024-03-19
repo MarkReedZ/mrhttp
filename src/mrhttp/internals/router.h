@@ -40,5 +40,6 @@ PyObject *Router_new    (PyTypeObject* self, PyObject *args, PyObject *kwargs);
 int       Router_init   (Router* self, PyObject *args, PyObject *kwargs);
 void      Router_dealloc(Router* self);
 PyObject *Router_setupRoutes(Router* self);
+PyObject* Router_update_cached_route(Router* self, PyObject* item);
 
 Route* router_getRoute(Router* self, Request* request);

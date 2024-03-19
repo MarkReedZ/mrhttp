@@ -51,6 +51,25 @@ static int numInString( char c, char* s, int len ) {
   return ret;
 }
 
+PyObject* Router_update_cached_route(Router* self, PyObject* item) {
+
+  PyObject *path = PyList_GET_ITEM( item, 0 );
+  PyObject *b    = PyList_GET_ITEM( item, 1 );
+
+  Py_ssize_t plen;
+  char *p = PyUnicode_AsUTF8AndSize( path, &plen );
+
+  Route *r = self->staticRoutes;
+  for (int i = 0; i<self->numStaticRoutes; i++,r++ ) {
+    //DBG printf("request path len %d - %.*s\n", (int)request->path_len, (int)request->path_len, request->path);
+    //DBG printf("route path %.*s \n", (int)r->len, r->path);
+    if ( plen == r->len && !memcmp(r->path, p, plen) ) {
+      r->cached = b;
+      Py_RETURN_NONE; 
+    }
+  }
+  Py_RETURN_NONE; 
+}
 
 PyObject *Router_setupRoutes (Router* self) {
   //PyObject *sroutes = self->pyStaticRoutes; //PyObject_GetAttrString((PyObject*)self, "static_routes");    

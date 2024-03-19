@@ -8,7 +8,7 @@ import signal
 import asyncio
 import traceback
 import socket
-import os, sys, random, mrpacker
+import os, sys, random, mrpacker, time
 from glob import glob
 import multiprocessing
 import faulthandler
@@ -71,6 +71,7 @@ class Application(mrhttp.CApp):
     self._mrq = None
     self._mrq2 = None
     self._mrc = None
+    self.static_cached_files = []
     self.session_backend = "memcached"
     self.uses_session = False
     self.uses_mrq = False
@@ -137,19 +138,39 @@ class Application(mrhttp.CApp):
       params["type"]    = r[4]
       self.router.add_route( r[0], r[1], params )
 
+  #TODO Size limit on files?
+  def static_cached_timer(self):
+    ts = time.time() # Avoid race 
+    for item in self.static_cached_files:
+      fn = item[1]
+      if os.path.getmtime(fn) > self.static_cached_timestamp:
+        with open(fn, 'rb') as f:
+          b = f.read()
+          self.router.update_cached_route( [item[0], b] )
+    self.static_cached_timestamp = ts
+    self.loop.call_later(10, self.static_cached_timer) 
+        
+       
+  #TODO Use brotli'd files - if [path].br exists use that instead
   def static_cached(self, root, directory):
     def removeprefix( prefix, text ):
       if text.startswith(prefix):
           return text[len(prefix):]
 
+    if not os.path.isdir(directory):
+      print("WARNING: app.static_cached root dir does not exist")
+      return
     files = glob(os.path.join(directory, '**', '*'), recursive=True)
+    self.static_cached_timestamp = time.time()
     for fn in files:
       if os.path.isdir(fn): continue
       with open(fn, 'rb') as f:
         b = f.read()
+      
 
       if not root.startswith('/'): root = '/'+root
       uri = root+removeprefix(directory, fn)
+      self.static_cached_files.append( [uri,fn] )
       self.router.add_cached_route( uri, b )
 
   def _get_idle_and_busy_connections(self):
@@ -292,6 +313,7 @@ class Application(mrhttp.CApp):
 
   def _appStart(self):
     self.loop.call_soon(self.updateDateString)
+    self.loop.call_soon(self.static_cached_timer)
 
 
   def _run(self, *, host, port, num_workers=None, debug=None):

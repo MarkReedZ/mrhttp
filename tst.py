@@ -4,7 +4,7 @@ from mrhttp import app
 #import asyncmrq, mrpacker
 
 app.config["memcache"] = [ ("127.0.0.1", 11211) ]
-app.static_cached("www","/home/ch/code/web/chatter/www")
+#app.static_cached("www","/path/to/www")
 
 #@app.on('at_start')
 #async def setup():

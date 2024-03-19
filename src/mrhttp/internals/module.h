@@ -74,6 +74,7 @@ static PyGetSetDef Protocol_getset[] = {
 
 static PyMethodDef Router_methods[] = {
   {"setupRoutes", (PyCFunction)Router_setupRoutes, METH_NOARGS,   ""},
+  {"update_cached_route", (PyCFunction)Router_update_cached_route, METH_O,   ""},
   {NULL}
 };
 static PyMethodDef MrhttpApp_methods[] = {

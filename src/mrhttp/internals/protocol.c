@@ -896,6 +896,7 @@ PyObject* protocol_task_done(Protocol* self, PyObject* task)
   PyObject* result = Py_True;
   PipelineRequest *r;
 
+  // TODO?
   // task is the task that just finished.  
   //   If task is at the head of the Q then return the response.
   //     then continue looping through the Q and return a response for anything that is already done
