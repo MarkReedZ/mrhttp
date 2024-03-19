@@ -20,6 +20,7 @@ typedef struct {
   char mtype;
   int max_byte_size;
 
+  PyObject *cached;
   PyObject *user_key;
   //char *user_key;
   //long user_key_len;

@@ -9,6 +9,7 @@ import asyncio
 import traceback
 import socket
 import os, sys, random, mrpacker
+from glob import glob
 import multiprocessing
 import faulthandler
 import functools
@@ -16,7 +17,7 @@ from wsgiref.handlers import format_date_time
 import inspect, copy
 #from inspect import signature #getmodulename, isawaitable, signature, stack
 #from prof import profiler_start,profiler_stop
-import uuid, http.cookies
+import http.cookies
 
 import mrhttp
 from mrhttp import Protocol
@@ -136,6 +137,20 @@ class Application(mrhttp.CApp):
       params["type"]    = r[4]
       self.router.add_route( r[0], r[1], params )
 
+  def static_cached(self, root, directory):
+    def removeprefix( prefix, text ):
+      if text.startswith(prefix):
+          return text[len(prefix):]
+
+    files = glob(os.path.join(directory, '**', '*'), recursive=True)
+    for fn in files:
+      if os.path.isdir(fn): continue
+      with open(fn, 'rb') as f:
+        b = f.read()
+
+      if not root.startswith('/'): root = '/'+root
+      uri = root+removeprefix(directory, fn)
+      self.router.add_cached_route( uri, b )
 
   def _get_idle_and_busy_connections(self):
     return \
@@ -392,9 +407,6 @@ class Application(mrhttp.CApp):
     userk = userk + mrhttp.to64( 0x20 | random.getrandbits(5) ) 
 
     skey = userk + k[len(userk):]
-
-    # TODO We could have user id be optional and do this if not given
-    #skey = uuid.uuid4().hex
 
     # Send the session cookie back to the user  
     c = cookies

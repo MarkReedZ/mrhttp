@@ -16,6 +16,7 @@ class Router(mrhttp.CRouter):
   def finalize_routes(self):
     self.routes.sort(key=lambda x: x["sortlen"],reverse=True)
 
+
   def add_route(self, handler, uri, methods=['GET'], options=[],_type="html"):
 
     if handler.__name__ in self.func_namemap:
@@ -48,6 +49,7 @@ class Router(mrhttp.CRouter):
     if "session" in options: r["session"] = True
     if "mrq" in options: r["mrq"] = True
     if "mrq2" in options: r["mrq2"] = True
+    if "cache" in options: r["cache"] = True
     if "append_user" in options: r["append_user"] = True
     # Static routes
     if not "{" in uri:
@@ -65,4 +67,14 @@ class Router(mrhttp.CRouter):
       r["num_segs"] = len(segs)
       self.routes.append( r )
 
+  def add_cached_route(self, uri, byts, _type="html"):
+    def fake_handler():
+      print("ERROR fake_handler called")
+    r = {}
+    r["path"]    = uri
+    r["methods"] = ["GET"]
+    r["handler"] = id(fake_handler)
+    r["cached"] = byts
+    r["type"] = 0
+    self.static_routes.append( r )
 

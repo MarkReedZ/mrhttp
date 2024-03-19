@@ -84,6 +84,10 @@ PyObject *Router_setupRoutes (Router* self) {
     o = PyDict_GetItemString( r, "type"  );
     if (o) rte->mtype = PyLong_AsLong(o);
     rte->user_key = PyDict_GetItemString( r, "user_key" );
+    rte->cached   = PyDict_GetItemString( r, "cached" );
+    if ( Py_True == PyDict_GetItemString( r, "cache" ) ) {
+      rte->cached = PyObject_CallFunctionObjArgs(handler, r, NULL);
+    }
 
     DBG printf(" path %.*s func ptr %p\n", (int)rte->len, rte->path, rte->func);
   }

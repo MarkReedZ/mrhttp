@@ -562,6 +562,10 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
     if ( self->request == request ) self->request = (Request*)MrhttpApp_get_request( self->app );
   }
 
+  // If we have cached bytes 
+  if ( r->cached ) {
+    if(!protocol_write_response(self, request, r->cached)) goto error;
+  }
   
   if(!(result = protocol_callPageHandler(self, r->func, request)) ) {
 
@@ -661,7 +665,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
 
   if(!protocol_write_response(self, request, result)) goto error;
 
-  // TODO We aren't closing the connection if issued a connection: close header.  This is okay behind nginx
+  // TODO We aren't closing the connection if issued a connection: close header.  
   //if ( !request->keep_alive ) Protocol_close(self);
 
   Py_DECREF(result);
