@@ -1,7 +1,8 @@
 
 import traceback, mrjson
 from mrhttp import app
-#import asyncmrq, mrpacker
+import mrpacker
+
 
 app.config["memcache"] = [ ("127.0.0.1", 11211) ]
 #app.static_cached("www","/path/to/www")
@@ -11,8 +12,8 @@ app.config["memcache"] = [ ("127.0.0.1", 11211) ]
   #app.c = asyncmrq.Client()
   #await app.c.connect(servers=[("127.0.0.1",7100)])
 
-#@app.route('/')
-@app.route('/',options=['cache'])
+#@app.route('/',options=['cache'])
+@app.route('/')
 def index(r):
   return "hello world"  
 
@@ -24,9 +25,9 @@ async def long(r):
 def json(r):
   return mrjson.dumps({'message': 'Hello, world!'})
 
-@app.route('/mrpacker')
-def mrpacker(r):
-  return r.mrpack["name"]
+@app.route('/mrp',_type="mrp")
+def mrp(r):
+  return mrpacker.pack("hello")
 
 @app.route('/{}/tst')
 def firstarg(r,a):
@@ -34,7 +35,7 @@ def firstarg(r,a):
 
 
 try:
-  app.run(cores=4)
+  app.run(cores=1)
 except Exception as e:
   print("YAY",e)
 

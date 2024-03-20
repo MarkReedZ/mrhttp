@@ -520,7 +520,7 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
       return Protocol_handle_request( self, self->request, r );
     }
 
-    //?  PyObject *ret = pipeline_queue(self, (PipelineRequest){true, self->request, task});
+    //?  PyObject *ret = pipeline_queue(self, (PipelineRequest){true, 0, self->request, task});
   }
   if ( r->mrq || r->mrq2 ) { 
     MrqClient *py_mrq;
@@ -612,7 +612,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
         return self;
       }
     }
-    printf("Unhandled exception :\n");
+    printf("Unhandled exception in the page handler :\n");
     PyObject_Print( type, stdout, 0 ); printf("\n");
     if ( value ) { PyObject_Print( value, stdout, 0 ); printf("\n"); }
     PyErr_Clear();
@@ -628,10 +628,11 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
 
 
   if ( r->iscoro ) {
+
     DBG printf("protocol - Request is a coroutine\n");
     PyObject *task;
     if(!(task = PyObject_CallFunctionObjArgs(self->create_task, result, NULL))) return NULL;
-    PyObject *ret = pipeline_queue(self, (PipelineRequest){true, request, task});
+    PyObject *ret = pipeline_queue(self, (PipelineRequest){true, r->mtype, request, task});
     Py_XDECREF(task);
     Py_DECREF(result);
     if ( !ret ) return NULL;
@@ -640,7 +641,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
 
   if(!PIPELINE_EMPTY(self))
   {
-    if(!pipeline_queue(self, (PipelineRequest){false, request, result})) goto error;
+    if(!pipeline_queue(self, (PipelineRequest){false, r->mtype, request, result})) goto error;
     Py_DECREF(result);
     return self;
   }
@@ -661,7 +662,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
     return NULL;
   }
 
-  request->response->mtype = r->mtype;
+  response_setMimeType(r->mtype);
 
   if(!protocol_write_response(self, request, result)) goto error;
 
@@ -737,9 +738,6 @@ static inline Protocol* protocol_write_response(Protocol* self, Request *req, Py
   if(!(o = PyObject_CallFunctionObjArgs(self->write, bytes, NULL))) return NULL;
   Py_DECREF(o);
   Py_DECREF(bytes);
-
-  // If we modified the header in the response buffer return it to default TODO
-  if ( req->response->mtype ) response_setHtmlHeader();
 
   if ( req != self->request ) MrhttpApp_release_request( self->app, req );
   else                        Request_reset(req);
@@ -834,7 +832,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
       }
       PyErr_Clear();
 
-      printf("Unhandled exception:\n");
+      printf("Unhandled exception in coro page handler:\n");
       PyObject_Print( type, stdout, 0 ); printf("\n");
       PyObject_Print( value, stdout, 0 ); printf("\n");
  
@@ -854,6 +852,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
     //response = PyUnicode_FromEncodedObject( response, "utf-8", "strict" );
     //printf("WARNING: Page handler should return a string. Bytes object returned from the page handler is being converted to unicode using utf-8\n");
   //}
+  response_setMimeType(r.mtype); 
 
   //if ( !PyUnicode_Check( response ) ) {
   if ( !( PyUnicode_Check( response ) || PyBytes_Check( response ) ) ) {
@@ -867,6 +866,7 @@ static void* protocol_pipeline_ready(Protocol* self, PipelineRequest r)
     }
     return NULL;
   }
+
 
   if(!self->closed) {
     if(!protocol_write_response(self, request, response)) goto error;

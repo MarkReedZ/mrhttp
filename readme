@@ -19,7 +19,8 @@ wrk -t4 -c32 -d2s http://localhost:8080/
 ctest/blog/fast_str -- try AVX2 or tfw's
 
 CFLAGS='-Wall -O0 -g' sudo python setup.py build
-
+CFLAGS='-Wall -O0 -g' python setup.py install --force
+ PYTHONMALLOC=malloc heapusage -o ~/z python3-dbg site.py
 
 
 
