@@ -1,4 +1,7 @@
 
+Handle static files - static root route and path. 
+Connection buffer size - after a file upload shrink the buffer back down.  Behind cloudflare connections will remain open forever. Behind nginx its just one connection so who cares.  Out front client connections will close so it doesn't matter?
+
 
 support HEAD 
 

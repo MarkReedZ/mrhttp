@@ -33,23 +33,13 @@ PyObject* myrandint(PyObject* self, PyObject* args)
 #define unlikely(x) (x)
 #endif
 
-// Valgrind doesn't support mm_cmpestri so replace findchar
-char *valgrind_zfindchar(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
-{
-    //printf("DELME ranges sz %d\n", ranges_size);
-  *found = 0;
-  char *p = buf;
-  while ( p < buf_end ) {
-    for ( int i = 0; i < ranges_size; i += 2 ) {
-      if ( p >= ranges[i] && p <= ranges[i+1] ) {
-        *found = 1;
-        return p;
-    	}
-    }
-    p++;
-  }
-  return p;    
+unsigned long TZCNT(unsigned long long in) {
+  unsigned long res;
+  asm("tzcnt %1, %0\n\t" : "=r"(res) : "r"(in));
+  return res;
 }
+
+
 // Search for a range of characters and return a pointer to the location or buf_end if none are found
 char *findchar(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *found)
 {
@@ -90,6 +80,26 @@ char *findchar(char *buf, char *buf_end, char *ranges, size_t ranges_size, int *
     *found = 0;
     return buf;
 }
+
+char *my_get_eol(char *buf, char *buf_end) {
+  const char *start = buf;
+  __m256i m13 = _mm256_set1_epi8(13);
+  while (1)
+  {
+    __m256i v0 = _mm256_loadu_si256((const __m256i *)buf);
+    __m256i v1 = _mm256_cmpeq_epi8(v0, m13);
+    unsigned long vmask = _mm256_movemask_epi8(v1);
+    if (vmask != 0) {
+        buf += TZCNT(vmask);
+        if ( buf > buf_end ) return buf_end;
+        break;
+    }
+    buf += 32; //pSrc1++;                 
+    if ( buf >= buf_end ) return buf_end;
+  }
+  return buf;
+}
+
 
 static char escbuf[16*1024];
 

@@ -35,6 +35,12 @@
 extern "C" {
 #endif
 
+#define CHAR4_TO_INT(a, b, c, d)         \
+   (unsigned int)((d << 24) | (c << 16) | (b << 8) | a)
+#define CHAR8_TO_LONG(a, b, c, d, e, f, g, h)       \
+   (((long)h << 56) | ((long)g << 48) | ((long)f << 40)   \
+    | ((long)e << 32) | (d << 24) | (c << 16) | (b << 8) | a)
+
 // Table for converting to lower case
 #define TOLC(c) __lct[(unsigned char)c]
 static const unsigned char __lct[] __attribute__((aligned(64))) = {
@@ -87,7 +93,7 @@ struct mr_request {
 
 // These functions return -2 if partial request, -1 if parsing failed, and the number of bytes parsed otherwise
 int mr_parse_request(const char *buf, size_t len, const char **method, size_t *method_len, const char **path, size_t *path_len,
-                      int *minor_version, struct mr_header *headers, size_t *num_headers, size_t last_len, struct mr_request *mrr);
+                      int *minor_version, struct mr_header *headers, size_t *num_headers, struct mr_request *mrr);
 
 struct mr_chunked_decoder {
     size_t bytes_left_in_chunk; 

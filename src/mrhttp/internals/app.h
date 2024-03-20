@@ -41,6 +41,7 @@ typedef struct {
   // Clients
   PyObject *py_mc;
   PyObject *py_mrq;
+  PyObject *py_mrq2;
   PyObject *py_mrc;
   PyObject *py_redis;
   PyObject *py_session_backend_type; // int 1,2,3 ( memcached, mrworkserver, mrcache )

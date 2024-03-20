@@ -51,6 +51,25 @@ static int numInString( char c, char* s, int len ) {
   return ret;
 }
 
+PyObject* Router_update_cached_route(Router* self, PyObject* item) {
+
+  PyObject *path = PyList_GET_ITEM( item, 0 );
+  PyObject *b    = PyList_GET_ITEM( item, 1 );
+
+  Py_ssize_t plen;
+  char *p = PyUnicode_AsUTF8AndSize( path, &plen );
+
+  Route *r = self->staticRoutes;
+  for (int i = 0; i<self->numStaticRoutes; i++,r++ ) {
+    //DBG printf("request path len %d - %.*s\n", (int)request->path_len, (int)request->path_len, request->path);
+    //DBG printf("route path %.*s \n", (int)r->len, r->path);
+    if ( plen == r->len && !memcmp(r->path, p, plen) ) {
+      r->cached = b;
+      Py_RETURN_NONE; 
+    }
+  }
+  Py_RETURN_NONE; 
+}
 
 PyObject *Router_setupRoutes (Router* self) {
   //PyObject *sroutes = self->pyStaticRoutes; //PyObject_GetAttrString((PyObject*)self, "static_routes");    
@@ -69,7 +88,7 @@ PyObject *Router_setupRoutes (Router* self) {
     r = PyList_GetItem(sroutes, i);
     rte->iscoro  = false;
     rte->session = false;
-    rte->mrq = false; rte->append_user = false;
+    rte->mrq = false; rte->mrq2 = false; rte->append_user = false;
 
     PyObject *handler = PyLong_AsVoidPtr(PyDict_GetItemString( r, "handler" ));
     rte->func = handler;
@@ -78,11 +97,16 @@ PyObject *Router_setupRoutes (Router* self) {
     if ( Py_True == PyDict_GetItemString( r, "iscoro"  ) ) rte->iscoro  = true;
     if ( Py_True == PyDict_GetItemString( r, "session" ) ) rte->session = true;
     if ( Py_True == PyDict_GetItemString( r, "mrq" ) ) rte->mrq = true;
+    if ( Py_True == PyDict_GetItemString( r, "mrq2" ) ) rte->mrq2 = true;
     if ( Py_True == PyDict_GetItemString( r, "append_user" ) ) rte->append_user = true;
     //if ( Py_True == PyDict_GetItemString( r, "append_user" ) ) printf("mrq append user set\n");
     o = PyDict_GetItemString( r, "type"  );
     if (o) rte->mtype = PyLong_AsLong(o);
     rte->user_key = PyDict_GetItemString( r, "user_key" );
+    rte->cached   = PyDict_GetItemString( r, "cached" );
+    if ( Py_True == PyDict_GetItemString( r, "cache" ) ) {
+      rte->cached = PyObject_CallFunctionObjArgs(handler, r, NULL);
+    }
 
     DBG printf(" path %.*s func ptr %p\n", (int)rte->len, rte->path, rte->func);
   }
@@ -111,10 +135,11 @@ PyObject *Router_setupRoutes (Router* self) {
     rte->path = PyUnicode_AsUTF8AndSize( o, &(rte->len) );
     DBG printf( " path len %ld str %.*s\n", rte->len, (int)rte->len, rte->path );
 
-    rte->iscoro  = false; rte->session = false; rte->mrq = false;
+    rte->iscoro  = false; rte->session = false; rte->mrq = false; rte->mrq2 = false;
     if ( Py_True == PyDict_GetItemString( r, "iscoro"      ) ) rte->iscoro = true;
     if ( Py_True == PyDict_GetItemString( r, "session"     ) ) rte->session = true;
     if ( Py_True == PyDict_GetItemString( r, "mrq"         ) ) rte->mrq = true;
+    if ( Py_True == PyDict_GetItemString( r, "mrq2"         ) ) rte->mrq2 = true;
     if ( Py_True == PyDict_GetItemString( r, "append_user" ) ) rte->append_user = true;
     o = PyDict_GetItemString( r, "type"  );
     if (o) rte->mtype = PyLong_AsLong(o);
@@ -178,8 +203,8 @@ Route* router_getRoute(Router* self, Request* request) {
 
   Route *r = self->staticRoutes;
   for (int i = 0; i<self->numStaticRoutes; i++,r++ ) {
-    DBG printf("request path len %d - %.*s\n", (int)request->path_len, (int)request->path_len, request->path);
-    DBG printf("route path %.*s \n", (int)r->len, r->path);
+    //DBG printf("request path len %d - %.*s\n", (int)request->path_len, (int)request->path_len, request->path);
+    //DBG printf("route path %.*s \n", (int)r->len, r->path);
     if ( plen == r->len && !memcmp(r->path, request->path, plen) ) {
       DBG printf("router found path %.*s == %.*s\n", (int)r->len, r->path, (int)request->path_len, request->path);
       return r;

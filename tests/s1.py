@@ -102,7 +102,6 @@ def mrp(r):
 
 @app.route('/form')
 def parseForm(r):
-  print(r)
   if r.form == None: return "No form"
   return json.dumps(r.form)
 
@@ -114,7 +113,7 @@ def parseFiles(r):
 @app.route('/s',options=['session'])
 def session(r):
   if r.user:
-    return r.user["user"]
+    return "session"
   return "session"
 
 @app.route('/noreturn')

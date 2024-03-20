@@ -74,6 +74,7 @@ static PyGetSetDef Protocol_getset[] = {
 
 static PyMethodDef Router_methods[] = {
   {"setupRoutes", (PyCFunction)Router_setupRoutes, METH_NOARGS,   ""},
+  {"update_cached_route", (PyCFunction)Router_update_cached_route, METH_O,   ""},
   {NULL}
 };
 static PyMethodDef MrhttpApp_methods[] = {
@@ -85,6 +86,7 @@ static PyMethodDef MrhttpApp_methods[] = {
 static PyMemberDef MrhttpApp_members[] = {
     {"_mc", T_OBJECT, offsetof(MrhttpApp, py_mc), 0, NULL},
     {"_mrq", T_OBJECT, offsetof(MrhttpApp, py_mrq), 0, NULL},
+    {"_mrq2", T_OBJECT, offsetof(MrhttpApp, py_mrq2), 0, NULL},
     {"_redis", T_OBJECT, offsetof(MrhttpApp, py_redis), 0, NULL},
     {"_session_client", T_OBJECT, offsetof(MrhttpApp, py_session), 0, NULL},
     {"session_backend_type", T_OBJECT, offsetof(MrhttpApp, py_session_backend_type), 0, NULL},
@@ -125,7 +127,7 @@ static PyMemberDef Request_members[] = {
     {"_files", T_OBJECT, offsetof(Request, py_files),  0, NULL},
     {"servers_down",T_OBJECT, offsetof(Request, py_mrq_servers_down),0, NULL},
     {"user",   T_OBJECT, offsetof(Request, py_user),   0, NULL},
-    {"ip",     T_OBJECT, offsetof(Request, py_ip),     0, NULL},
+    //{"ip",     T_OBJECT, offsetof(Request, py_ip),     0, NULL},
     {NULL},
 };
 static PyGetSetDef Request_getset[] = {

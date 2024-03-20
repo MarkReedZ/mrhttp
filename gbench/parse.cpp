@@ -1,8 +1,8 @@
 
-
 #include <stdlib.h>
 #include <stdint.h>
 #include <string>
+#include <cstring>
 #include <x86intrin.h>
 #ifdef __AVX2__
 #include <immintrin.h>
@@ -18,7 +18,25 @@
 #define unlikely(x) (x)
 #endif
 
+#ifdef _MSC_VER
+#define ALIGNED(n) _declspec(align(n))
+#else
+#define ALIGNED(n) __attribute__((aligned(n)))
+#endif
+
+
 #define IS_PRINTABLE_ASCII(c) ((unsigned char)(c)-040u < 0137u)
+
+#define CHAR4_TO_INT(a, b, c, d)         \
+   (unsigned int)((d << 24) | (c << 16) | (b << 8) | a)
+
+
+#define CHECK_END()                                                                                                                \
+    if (buf == buf_end) {                                                                                                          \
+        *ret = -2;                                                                                                                 \
+        return NULL;                                                                                                               \
+    }
+
 
 #define CHECK_EOF()                                                                                                                \
     if (buf == buf_end) {                                                                                                          \
@@ -35,6 +53,7 @@
 #define EXPECT_CHAR(ch)                                                                                                            \
     CHECK_EOF();                                                                                                                   \
     EXPECT_CHAR_NO_CHECK(ch);
+
 
 // Table for converting to lower case
 #define TOLC(c) __lct[(unsigned char)c]
@@ -133,6 +152,33 @@ static const char *findchar(const char *buf, const char *buf_end, const char *ra
     }
     return buf;
 }
+static const char *adv_token(const char *buf, int *ret) {
+        const char *tok_start = buf;                                                                                               
+        const char *buf_end = buf+512;
+        static const char ranges2[] = "\000\042\177\177";                                                              
+        int found2;                                                                                                               
+        buf = findchar(buf, buf+512, ranges2, sizeof(ranges2) - 1, &found2);                                                       
+        if (!found2) {                                                                                                             
+            CHECK_END();                                                                                                           
+        } else if ( unlikely(*buf != ' ' )) {                                                                                      
+            *ret = -1;                                                                                                             
+            return NULL;                                                                                                           
+        }                                                                                                                          
+        while (1) {                                                                                                                
+            if (*buf == ' ') {                                                                                                    
+                return buf;                                                                                                             
+            } else if (unlikely(!IS_PRINTABLE_ASCII(*buf))) {                                                                      
+                if ((unsigned char)*buf < '\040' || *buf == '\177') {                                                          
+                    *ret = -1;                                                                                                     
+                    return NULL;
+                }                                                                                                             
+            }                                                                                                                
+            ++buf;                                                                                                         
+            CHECK_END();                                                                                                  
+        }                                                                                                                
+        *ret = buf - tok_start;                                                                                      
+        return tok_start;
+}
 
 static const char *get_token_to_eol(const char *buf, const char *buf_end, int *ret)
 {
@@ -169,6 +215,164 @@ FOUND_CTL:
 
     return buf;
 }
+static inline int getSession( const char *buf, size_t buflen ) {
+  const char *end = buf + buflen;
+  const char *last = buf;
+  const char *ses;
+  int len;
+
+  static char ALIGNED(16) ranges1[] = "==" ";;";
+  int found;
+  int state = 0;
+  do {
+    last = buf;
+    buf = findchar(buf, end, ranges1, sizeof(ranges1) - 1, &found);
+    if ( found ) {
+      if ( *buf == '=' ) {
+        //printf( " fnd >%.*s<\n", buf-last, last );  
+        if ( state == 0 ) {
+          // Save out the mrsession id 
+          if ( buf-last == 9 && ( *((unsigned int *)(last)) == CHAR4_TO_INT('m', 'r', 's','e') ) ) {
+            state = 1;
+          }
+          buf+=1;
+        }
+      }
+      else if ( *buf == ';' ) {
+        //printf( " fnd >%.*s<\n", buf-last, last );  
+        if (state == 1 ) {
+          ses = last;
+          len = buf-last;
+          return len;
+        }
+        state = 0;
+        buf+=1;
+        while ( *buf == 32 ) buf++;
+      }
+    }
+  } while( found );
+  if (state) {
+    ses = last;
+    len = buf-last;
+    return len;
+  }
+  return -1;
+}
+static const char *my_get_eol128(const char *buf) {
+  //__m128i* pSrc1 = (__m128i *)string;         // init pointer to start of string
+  __m128i m0 = _mm_set1_epi8(13);              // vector of 16 `\0` characters
+
+  while (1)
+  {
+    __m128i v0 = _mm_loadu_si128((const __m128i *)buf);
+    __m128i v1 = _mm_cmpeq_epi8(v0, m0);    // compare all 16 chars
+    unsigned int vmask = _mm_movemask_epi8(v1);      // get 16 comparison result bits
+    if (vmask != 0) {
+        buf += TZCNT(vmask) + 2;
+        break;                              // we found a `\0`, break out of loop
+    }
+    buf += 16; //pSrc1++;                                // next 16 characters...
+  }
+  return buf;
+}
+
+ //64bits  256bits  bytes 8 * 32 
+static const char *my_get_eol(const char *buf, const char *buf_end) {
+
+  __m256i m13 = _mm256_set1_epi8(13);             
+  while (1)
+  {
+    __m256i v0 = _mm256_loadu_si256((const __m256i *)buf);
+    __m256i v1 = _mm256_cmpeq_epi8(v0, m13);     
+    unsigned long vmask = _mm256_movemask_epi8(v1);  
+    if (vmask != 0) {
+        buf += TZCNT(vmask) + 2;
+        if ( buf > buf_end ) return NULL;
+        break;                             
+    }
+    buf += 32; //pSrc1++;                 
+    if ( buf > buf_end ) return NULL;
+  }
+  return buf;
+}
+  __m256i m32 = _mm256_set1_epi8(32);             
+static const char *get_to_space(const char *buf, int *len) {
+  const char *orig = buf;
+  while (1)
+  {
+    __m256i v0 = _mm256_loadu_si256((const __m256i *)buf);
+    __m256i v1 = _mm256_cmpeq_epi8(v0, m32);     
+    unsigned long vmask = _mm256_movemask_epi8(v1);  
+    if (vmask != 0) {
+        buf += TZCNT(vmask) + 1;
+        break;                             
+    }
+    buf += 32; 
+  }
+  *len = buf-orig-1;
+  return buf;
+}
+
+__m256i m59 = _mm256_set1_epi8(59);
+__m256i m61 = _mm256_set1_epi8(61);
+static int getSession_avx2( const char* buf, const char* buf_end ) {
+  unsigned int msk;
+  int i=0,tz; // 32B index
+  int cnt = 0;
+  unsigned int shifted;
+  const char *sbuf = buf;
+  const char *obuf = buf;
+  int name_or_value = 0;
+  int found = 0;
+
+  do {
+    const char *block_start = obuf+32*i;
+    __m256i b0 = _mm256_loadu_si256((const __m256i *) block_start);
+    msk = _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m59), _mm256_cmpeq_epi8(b0, m61) ) );
+    while (1) {
+
+      //if ( buf >= buf_end ) { goto sesdone; }
+      shifted = buf-block_start;
+      if ( shifted >= 32 ) break;
+      tz = TZCNT((msk >> shifted));
+      if ( tz < 32 ) {
+        buf += tz;
+        //printf( " fnd >%.*s<\n", buf-sbuf, sbuf );  
+        if ( buf >= buf_end ) { goto sesdone; }
+        if ( name_or_value == 1 ) {
+          if ( *buf == '=' ) { buf += 1; continue; } // = in value field
+          if ( found ) {
+            //printf( " done >%.*s<\n", buf-sbuf, sbuf );  
+            return buf-sbuf;
+          }
+          buf+=1;
+          name_or_value = 0;
+        } else {
+          if ( buf-sbuf == 9 && ( *((unsigned int *)(sbuf)) == CHAR4_TO_INT('m', 'r', 's','e') ) ) {
+            found = 1;
+          }
+          name_or_value = 1;
+        }
+        buf += 1;
+        sbuf = buf;
+      } else {
+        buf += 32 - shifted;
+        break;
+      }
+
+    }
+    i+=1;
+    if ( buf >= buf_end ) { goto sesdone; }
+  } while ( buf-obuf < buf_end-obuf );
+
+sesdone:
+  if ( found ) {
+    //printf( " sesdone >%.*s<\n", buf-sbuf, sbuf );  
+    return buf-sbuf;
+  }
+  return 0;
+}
+
 
 static const char *parse_headers(const char *buf, const char *buf_end, int *ret)
 {
@@ -227,7 +431,8 @@ static const char *parse_headers(const char *buf, const char *buf_end, int *ret)
               //if ( buf[0] == 'a' && buf[13] == 'r' ) { //"application/mrpacker"
                 //mrr->flags = 2;
               //} 
-              buf = get_token_to_eol(buf, buf_end, ret); 
+              //buf = get_token_to_eol(buf, buf_end, ret); 
+              buf = my_get_eol(buf, buf_end);
               goto skipvalue;
             }
             if ( buf[13] == ':' ) { // Cache-Control:
@@ -247,7 +452,8 @@ static const char *parse_headers(const char *buf, const char *buf_end, int *ret)
               //headers[*num_headers].name_len = 16;
               buf += 18;
               //mrr->ip = buf;
-              buf = get_token_to_eol(buf, buf_end, ret); 
+              //buf = get_token_to_eol(buf, buf_end, ret); 
+              buf = my_get_eol(buf, buf_end);
               //mrr->ip_len = headers[*num_headers].value_len;
               goto skipvalue;
             }
@@ -274,7 +480,8 @@ static const char *parse_headers(const char *buf, const char *buf_end, int *ret)
               //headers[*num_headers].name_len = 9;
               buf += 11;
               //mrr->ip = buf;
-              buf = get_token_to_eol(buf, buf_end, ret); 
+              //buf = get_token_to_eol(buf, buf_end, ret); 
+              buf = my_get_eol(buf, buf_end);
               //mrr->ip_len = headers[*num_headers].value_len;
               goto skipvalue;
             }
@@ -441,7 +648,8 @@ static const char *parse_headers(const char *buf, const char *buf_end, int *ret)
             //headers[*num_headers].name_len = 0;
         }
 hvalue:
-        if ((buf = get_token_to_eol(buf, buf_end, ret)) == NULL) {
+        //if ((buf = get_token_to_eol(buf, buf_end, ret)) == NULL) {
+        if ((buf = my_get_eol(buf, buf_end)) == NULL) {
             return NULL;
         }
 skipvalue:
@@ -589,202 +797,79 @@ static void find_ranges(const char* buf, const char* buf_end, unsigned long *ran
 
 static const char* parse_headers_avx2(const char* buf, const char* buf_end, int* ret)
 {
-  int num_headers = 0;
-  int max_headers = 20;
-  /* Bitmap for the first type of tokens */
-  unsigned long rr0[2] = {0};
-  /* Bitmap for the second type of tokens */
-  unsigned long rr1[2] = {0};
-  /* Pointer to the start of the currently parsed block of 128 bytes */
-  const char* prep_start = NULL;
-  int found;
-  int n_headers = num_headers;
+  // 128 bit token mask
+  unsigned long bm[8] = {0};
+  // Pointer to the start of the currently parsed block of 128 bytes
+  const char* prep_start = buf;
+  const char *p = buf;
 
-  for (; ; ++n_headers) {
-    CHECK_EOF();
-    if (*buf == '\015') {
-      ++buf;
-      EXPECT_CHAR('\012');
-      break;
-    } else if (*buf == '\012') {
-      ++buf;
-      break;
+  // Load the \r and : mask into rr13 and rr58
+  // Load 512 bytes at a time into the bit mask bm[8]
+  //   Load 32 bytes from the buffer into each register and compare against the mask registers
+
+  __m256i b0, b1, b2, b3;
+  const __m256i rr13    = _mm256_set1_epi8(13);
+  const __m256i rr58    = _mm256_set1_epi8(58);
+  int state = 0;
+
+  // Process 512b per loop
+  while(1) {
+    int i = 0;
+    // Load 512b into bm[0-7]
+    while ( i < 8 ) {
+      b0 = _mm256_loadu_si256((__m256i *)(buf + (64*i)+ 0));
+      b1 = _mm256_loadu_si256((__m256i *)(buf + (64*i)+32));
+      b2 = _mm256_loadu_si256((__m256i *)(buf + (64*i)+64));
+      b3 = _mm256_loadu_si256((__m256i *)(buf + (64*i)+96));
+      bm[i++]   =       _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(rr13, b0),_mm256_cmpeq_epi8(rr58, b0)) ) |
+        ((unsigned long)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(rr13, b1),_mm256_cmpeq_epi8(rr58, b1)) ) << 32);
+      bm[i++] =         _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(rr13, b2),_mm256_cmpeq_epi8(rr58, b2)) ) |
+        ((unsigned long)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(rr13, b3),_mm256_cmpeq_epi8(rr58, b3)) ) << 32);
     }
-    if (n_headers == max_headers) {
-      *ret = -1;
-      num_headers = n_headers;
-      return NULL;
-    }
 
-    if (! (n_headers != 0 && (*buf == ' ' || *buf == '\t')) && !(*buf >= 65 && * buf <= 90)) {
-      if (! token_char_map[(unsigned char)*buf]) {
-        *ret = -1;
-        num_headers = n_headers;
-        return NULL;
-      }
-      //headers[n_headers].name = buf;
-
-      /* Attempt to find a match in the index */
-      found = 0;
-      do {
-        unsigned long distance = buf - prep_start;
-        /* Check if the bitmaps are still valid. An assumption I make is that 
-           buf > 128 (i.e. the os will never allocate memory at address 0-128 */
-        if(unlikely(distance >= 128)) {   /* Bitmaps are too old, make new ones */
-          prep_start = buf;
-          distance = 0;
-          find_ranges(buf, buf_end, rr0, rr1);
-        } else if(distance >= 64) {          /* In the second half of the bitmap */
-          unsigned long index = rr0[1] >> (distance - 64);  /* Correct offset of the bitmap */
-          unsigned long find = TZCNT(index); /* Fine next set bit */
-          if((find < 64)) {                  /* Yey, we found a token */
-            buf += find;
-            found = 1;
-            break;
-          }
-          buf = prep_start + 128;            /* No token was found in the current bitmap */
-          continue;
-        }
-        unsigned long index = rr0[0]  >> (distance); /* In the first half of the bitmap */
-        unsigned long find = TZCNT(index);           /* Find next set bit */
-        if((find < 64)){                             /* Token found */
-          buf += find;
-          found = 1;
-          break;
-        }                                            /* Token not found, look at second half of bitmap */
-        index = rr0[1];
-        find = TZCNT(index);
-        if((find < 64)){
-          buf += 64+find - distance;
-          found = 1;
-          break;
-        }     
-
-        buf = prep_start + 128;
-      } while (buf < buf_end);
-
-      if(!found)
-        if(buf >= buf_end) {
-          *ret = -2;
-          //*num_headers = n_headers;
-          return NULL;
-        }
-      //headers[n_headers].name_len = buf - headers[n_headers].name;
-      ++buf;
-      CHECK_EOF();
-      while( (*buf == ' ' || *buf == '\t') ) {
-        ++buf;
-        CHECK_EOF();
-      }
-    } else {
-      //headers[n_headers].name = NULL;
-      //headers[n_headers].name_len = 0;
-    }
-    const char* token_start = buf;
-
-    found = 0;
+    // Each bit in the mask is either a : or a \r
+    int off = 0;
+    int shft = 0;
+    int bmOff = 0;
+    unsigned long bitmap, tz;
+    int slen = 0; //DELME
 
     do {
-      /* Too far */
-      unsigned long distance = buf - prep_start; /* Same algorithm as above */
-      if(unlikely(distance >= 128)) {
-        prep_start = buf;
-        distance = 0;
-        find_ranges(buf, buf_end, rr0, rr1);
-      } else if(distance >= 64) {
-        unsigned long index = rr1[1] >> (distance - 64);
-        unsigned long find = TZCNT(index);
-        if((find < 64)) {
-          buf += find;
-          found = 1;
-          break;
+      bitmap = bm[ bmOff ] >> shft;
+      tz = TZCNT(bitmap);
+      if ( tz < 64 ) { // tz is 64 if not found
+        p += tz;
+        //printf( " fnd >%.*s<\n", p-buf, buf );  
+        if ( state == 0 ) { // :
+          state = 1;
+          p += 2; buf = p;
+        } else { // \r
+          state = 0;
+          p += 2; buf = p;
+          if ( *p == '\r' ) goto wedone;
         }
-        buf = prep_start + 128;
-        continue;
+      } else {
+        p += 64 - shft;
+        //printf("DELMEZ %.*s\n", 3, p) ;
       }
-      unsigned long index = rr1[0]  >> (distance);
-      unsigned long find = TZCNT(index);
-      if((find < 64)){
-        buf += find;
-        found = 1;
-        break;
-      }
-      index = rr1[1];
-      find = TZCNT(index);
-      if((find < 64)){
-        buf += 64+find - distance;
-        found = 1;
-        break;
-      }
-
-      buf = prep_start + 128;
-    } while (buf < buf_end);
-
-    if(!found)
-      if(buf >= buf_end) {
-        *ret = -2;
-        num_headers = n_headers;
-        return NULL;
-      }
-
-    unsigned short two_char = *(unsigned short*)buf;
-
-    if( likely(two_char == 0x0a0d) ) {
-      //headers[n_headers].value_len = buf - token_start;
-      buf += 2;
-    } else if (unlikely(two_char & 0x0a == 0x0a)) {
-      //headers[n_headers].value_len = buf - token_start;
-      ++buf;
-    } else {
-      *ret = -1;
-      num_headers = n_headers;
-      return NULL;
-    }
-    //headers[n_headers].value = token_start;
+      off = p-prep_start;
+      //printf("DELME off=%d\n",off);
+      shft = off&0x3F;
+      bmOff = off/64;
+    } while ( bmOff < 8 ) ;
+    prep_start += 512;
+    buf = prep_start;
   }
-  num_headers = n_headers;
+
+wedone:
+// Host: server\r\n
+// User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\r\n
+  //printf("%.*s\n", p - prep_start, prep_start);
   return buf;
 }
 
 
-static const char *my_get_eol128(const char *buf) {
-  //__m128i* pSrc1 = (__m128i *)string;         // init pointer to start of string
-  __m128i m0 = _mm_set1_epi8(13);              // vector of 16 `\0` characters
 
-  while (1)
-  {
-    __m128i v0 = _mm_loadu_si128((const __m128i *)buf);
-    __m128i v1 = _mm_cmpeq_epi8(v0, m0);    // compare all 16 chars
-    unsigned int vmask = _mm_movemask_epi8(v1);      // get 16 comparison result bits
-    if (vmask != 0) {
-        buf += TZCNT(vmask) + 2;
-        break;                              // we found a `\0`, break out of loop
-    }
-    buf += 16; //pSrc1++;                                // next 16 characters...
-  }
-  return buf;
-}
-
- //64bits  256bits  bytes 8 * 32 
-__m256i m13 = _mm256_set1_epi8(13);             
-
-static const char *my_get_eol(const char *buf) {
-
-  while (1)
-  {
-    __m256i v0 = _mm256_loadu_si256((const __m256i *)buf);
-    __m256i v1 = _mm256_cmpeq_epi8(v0, m13);     //  
-    unsigned long vmask = _mm256_movemask_epi8(v1);  
-    if (vmask != 0) {
-        buf += TZCNT(vmask) + 2;
-        break;                             
-    }
-    buf += 32; //pSrc1++;                 
-  }
-  return buf;
-}
-
-//__m256i m13 = _mm256_set1_epi8(13);
 __m256i m58 = _mm256_set1_epi8(58);   //  0x1313131313131313...
                                       //  0x32333435363713   //  abcdef\r
                                       //  32 bit number 0x40
@@ -794,6 +879,7 @@ static void parse_mine( const char* buf ) {
 
   //__m256i b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11,b12,b13,b14,b15;
   __m256i b0,b1,b2,b3,b4,b5,b6,b7;
+  __m256i m13 = _mm256_set1_epi8(13);
 
   b0 = _mm256_loadu_si256((const __m256i *) (buf + 32*0)); // buf[0]
   b1 = _mm256_loadu_si256((const __m256i *) (buf + 32*1)); // buf[32]
@@ -889,6 +975,21 @@ static void parse_mine3( const char* buf ) {
 
   //__m256i b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11,b12,b13,b14,b15;
   __m256i b0,b1,b2,b3,b4,b5,b6,b7;
+  __m256i m13 = _mm256_set1_epi8(13);
+
+  const char *obuf = buf;
+  const char *sbuf = buf;
+
+  int i;  // msk[i] 
+  int t;
+  unsigned int s = 0;
+  int name_or_value = 0;
+
+  const char *block_start = obuf;
+
+new512:
+  i = 0;
+  buf = obuf;
 
   b0 = _mm256_loadu_si256((const __m256i *) (buf + 32*0)); // buf[0]
   b1 = _mm256_loadu_si256((const __m256i *) (buf + 32*1)); // buf[32]
@@ -899,15 +1000,14 @@ static void parse_mine3( const char* buf ) {
   b6 = _mm256_loadu_si256((const __m256i *) (buf + 32*6));
   b7 = _mm256_loadu_si256((const __m256i *) (buf + 32*7)); // 256 bytes
 
-  msk[0] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) )  |
-     ((unsigned long long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m13), _mm256_cmpeq_epi8(b1, m58) ) ) << 32);
-  msk[1] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b2, m13), _mm256_cmpeq_epi8(b2, m58) ) )  |
-     ((unsigned long long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b3, m13), _mm256_cmpeq_epi8(b3, m58) ) ) << 32);
-  msk[2] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b4, m13), _mm256_cmpeq_epi8(b4, m58) ) )  |
-     ((unsigned long long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b5, m13), _mm256_cmpeq_epi8(b5, m58) ) ) << 32);
-  msk[3] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b6, m13), _mm256_cmpeq_epi8(b6, m58) ) )  |
-     ((unsigned long long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b7, m13), _mm256_cmpeq_epi8(b7, m58) ) ) << 32);
-
+  msk[0] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) )  |
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m13), _mm256_cmpeq_epi8(b1, m58) ) ) << 32);
+  msk[1] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b2, m13), _mm256_cmpeq_epi8(b2, m58) ) )  |
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b3, m13), _mm256_cmpeq_epi8(b3, m58) ) ) << 32);
+  msk[2] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b4, m13), _mm256_cmpeq_epi8(b4, m58) ) )  |
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b5, m13), _mm256_cmpeq_epi8(b5, m58) ) ) << 32);
+  msk[3] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b6, m13), _mm256_cmpeq_epi8(b6, m58) ) )  |
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b7, m13), _mm256_cmpeq_epi8(b7, m58) ) ) << 32);
 
   b0 = _mm256_loadu_si256((const __m256i *) (buf + 32*8));
   b1 = _mm256_loadu_si256((const __m256i *) (buf + 32*9));
@@ -918,28 +1018,36 @@ static void parse_mine3( const char* buf ) {
   b6 = _mm256_loadu_si256((const __m256i *) (buf + 32*14));
   b7 = _mm256_loadu_si256((const __m256i *) (buf + 32*15));
 
-  msk[4] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) )  ^
-     ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m13), _mm256_cmpeq_epi8(b1, m58) ) ) << 32);
-  msk[5] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b2, m13), _mm256_cmpeq_epi8(b2, m58) ) )  ^
-     ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b3, m13), _mm256_cmpeq_epi8(b3, m58) ) ) << 32);
-  msk[6] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b4, m13), _mm256_cmpeq_epi8(b4, m58) ) )  ^
-     ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b5, m13), _mm256_cmpeq_epi8(b5, m58) ) ) << 32);
-  msk[7] =            _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b6, m13), _mm256_cmpeq_epi8(b6, m58) ) )  ^
-     ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b7, m13), _mm256_cmpeq_epi8(b7, m58) ) ) << 32);
+  msk[4] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) )  ^
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m13), _mm256_cmpeq_epi8(b1, m58) ) ) << 32);
+  msk[5] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b2, m13), _mm256_cmpeq_epi8(b2, m58) ) )  ^
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b3, m13), _mm256_cmpeq_epi8(b3, m58) ) ) << 32);
+  msk[6] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b4, m13), _mm256_cmpeq_epi8(b4, m58) ) )  ^
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b5, m13), _mm256_cmpeq_epi8(b5, m58) ) ) << 32);
+  msk[7] = (unsigned int)_mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b6, m13), _mm256_cmpeq_epi8(b6, m58) ) )  ^
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b7, m13), _mm256_cmpeq_epi8(b7, m58) ) ) << 32);
 
-  const char *obuf = buf;
-  const char *sbuf = buf;
+
   // "Host: server\r\n"
-  int i = 0;  // msk[i] 
-  int t;
   do {
 
-    const char *block_start = obuf+64*i;
+    block_start = obuf+64*i;
 
     while(1) {
-      t = TZCNT((msk[i]>>(buf-block_start)));
+      s = buf-block_start;
+      t = TZCNT((msk[i]>>s));
+      //printf("DELME mski %016llx shift %d\n", msk[i], s );
+      //printf("DELME shft %016llx\n", msk[i]>>s );
       if ( t < 64 ) {
-        buf += t+2;
+        buf += t;
+        if ( name_or_value == 1 ) {
+          if ( *buf == ':' ) { buf += 1; continue; } // : in value field
+          name_or_value = 0;
+        } else {
+          name_or_value = 1;
+        }
+        //printf( " fnd >%.*s<\n", buf-sbuf, sbuf );  
+        buf += 2; if ( *buf == '\r' ) break; // \r\n\r\n marks the end
         sbuf = buf;
         if ( (buf-block_start)> 64 ) break; // TODO?
       } else {
@@ -948,42 +1056,61 @@ static void parse_mine3( const char* buf ) {
       }
 
     }
-  
-    i+=1; 
+
+    i+=1;
+    if ( buf[0] == '\r' ) goto done;
   } while ( i < 8 && buf[0] != '\r' );
-  
-  
+
+  obuf += 512; 
+  goto new512;
+done: 
+  i += 1;
 }
 
-static void parse_mine2( const char* buf ) {
+static void parse_mine2( const char* buf, const char *buf_end ) {
   unsigned long msk;
-  int i=0,t; // 32B index
-  int cnt = 0;
+  int i=0, tz; // 32B index
+  unsigned int shifted;
   const char *sbuf = buf;
   const char *obuf = buf;
-  do {
-    int shifted = 0;
-    const char *block_start = obuf+32*i;
-    __m256i b0 = _mm256_loadu_si256((const __m256i *) block_start);
-    msk = _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) );
+  int name_or_value = 0;
+  __m256i m13 = _mm256_set1_epi8(13);
 
+  do {
+    const char *block_start = obuf+64*i;
+    __m256i b0 = _mm256_loadu_si256((const __m256i *) block_start);
+    __m256i b1 = _mm256_loadu_si256((const __m256i *) (block_start+32));
+    msk = (unsigned int) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) )  |
+        ((unsigned long) _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b1, m13), _mm256_cmpeq_epi8(b1, m58) ) ) << 32);
+
+    //const char *block_start = obuf+32*i;
+    //__m256i b0 = _mm256_loadu_si256((const __m256i *) block_start);
+    //msk = _mm256_movemask_epi8( _mm256_or_si256(_mm256_cmpeq_epi8(b0, m13), _mm256_cmpeq_epi8(b0, m58) ) );
     while (1) {
 
       shifted = buf-block_start;
-      t = TZCNT((msk >> shifted));
-      if ( t < 32 ) {
-        if ( t == 0 ) break;
-        buf += t+2;
+      if ( shifted >= 64 ) break;
+      tz = TZCNT((msk >> shifted));
+      if ( tz < 64 ) {
+        buf += tz;
+
+        if ( name_or_value == 1 ) {
+          if ( *buf == ':' ) { buf += 1; continue; } // : in value field
+          name_or_value = 0;
+        } else {
+          name_or_value = 1;
+        }
+        //printf( " fnd >%.*s<\n", buf-sbuf, sbuf );  
+        buf += 2; if ( *buf == '\r' ) return; // \r\n\r\n marks the end
         sbuf = buf;
       } else {
-        buf = block_start + 32;
+        buf += 64 - shifted;
         break;
       }
 
     }
-    i+=1;
-    cnt += 1;
-  } while ( cnt < 20 && buf[0] != '\r' );
+  } while ( buf < buf_end);
+  //} while ( *buf != '\r' );
 }
 
 static void parse_sse4( const char* buf ) {
@@ -995,16 +1122,30 @@ static void parse_sse4( const char* buf ) {
 static void parse_mysse4( const char* buf ) {
   int ret = 0;
   while ( ret == 0 && buf != NULL && buf[0] != '\r' ) {
-    buf = my_get_eol( buf );
+    buf = my_get_eol( buf, buf+512 );
   }
 }
+static char buf[8096] = "Host: server\r\n"
+"User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,* /*;q=0.8\r\n"
+"Accept-Language: en-US,en;q=0.5\r\n"
+"Connection: keep-alive\r\n\r\n";
+static char buf2[8096] = "Host: localhost:8080\r\nUser-Agent: python-requests/2.31.0\r\nAccept-Encoding: gzip, deflate\r\nAccept: * /*\r\nConnection: keep-alive\r\nCookie: foo=b=ar\r\nContent-Length: 0\r\n\r\n";
+static char path[8096] = "/foo/bar/bazfdasfffffffffffffffffffffffffffffffffffffffdfffffffffffffffffffffffffffffffffffffffffffffffffff ";
+
+//static  char cbuf[8096] = "uid=123456781234567890; mrsession=1234567890.1234567890.12; wd=2560x1600";
+//static  int  clen= strlen("uid=123456781234567890; mrsession=1234567890.1234567890.12; wd=2560x1600");
+static  char cbuf[8096] = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; mrsession=1234567890.1234567890.12; xxxxxxxxxxxxxxxxxxxxxxxxx=zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
+static  int  clen= strlen("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; mrsession=1234567890.1234567890.12; xxxxxxxxxxxxxxxxxxxxxxxxx=zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz");
+static  const char *cend = cbuf + clen;
 
 static void BM_SlowParse(benchmark::State& state) {
   // Perform setup here
   std::string text = "Host: server\n"
 "User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\n"
 "Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\n"
-"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\n"
+"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,* /*;q=0.8\n"
 "Accept-Language: en-US,en;q=0.5\n"
 "Connection: keep-alive\n";
 
@@ -1015,13 +1156,6 @@ static void BM_SlowParse(benchmark::State& state) {
 }
 static void BM_sse4_get_eol(benchmark::State& state) {
   // Perform setup here
-  char buf[8096] = "Host: server\r\n"
-"User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\r\n"
-"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
-"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-"Accept-Language: en-US,en;q=0.5\r\n"
-"Connection: keep-alive\r\n\r\n\r\n\r\n\r\n";
-
   for (auto _ : state) {
     // This code gets timed
     parse_sse4(buf);
@@ -1029,13 +1163,6 @@ static void BM_sse4_get_eol(benchmark::State& state) {
 }
 static void BM_my_get_eol(benchmark::State& state) {
   // Perform setup here
-  char buf[8096] = "Host: server\r\n"
-"User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\r\n"
-"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
-"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-"Accept-Language: en-US,en;q=0.5\r\n"
-"Connection: keep-alive\r\n\r\n\r\n\r\n\r\n";
-
   for (auto _ : state) {
     // This code gets timed
     parse_mysse4(buf);
@@ -1043,99 +1170,116 @@ static void BM_my_get_eol(benchmark::State& state) {
 }
 
 static void BM_my_header_parse(benchmark::State& state) {
-  // Perform setup here
-  char buf[8096] = "Host: server\r\n"
-"User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\r\n"
-"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
-"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-"Accept-Language: en-US,en;q=0.5\r\n"
-"Connection: keep-alive\r\n\r\nzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz           "
-"                                                                         "
-"                                                                         ";
-
   for (auto _ : state) {
-    // This code gets timed
     parse_mine(buf);
   }
 }
 static void BM_my2_header_parse(benchmark::State& state) {
-  // Perform setup here
-  char buf[8096] = "Host: server\r\n"
-"User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\r\n"
-"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
-"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-"Accept-Language: en-US,en;q=0.5\r\n"
-"Connection: keep-alive\r\n\r\nzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz           "
-"                                                                         "
-"                                                                         ";
-
   for (auto _ : state) {
-    // This code gets timed
-    parse_mine2(buf);
+    parse_mine2(buf,buf+2048);
   }
 }
 static void BM_my3_header_parse(benchmark::State& state) {
-  // Perform setup here
-  char buf[8096] = "Host: server\r\n"
-"User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\r\n"
-"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
-"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-"Accept-Language: en-US,en;q=0.5\r\n"
-"Connection: keep-alive\r\n\r\nzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz           "
-"                                                                         "
-"                                                                         ";
-
   for (auto _ : state) {
-    // This code gets timed
     parse_mine3(buf);
   }
 }
 
 
 static void BM_old_header_parse(benchmark::State& state) {
-  // Perform setup here
-  char buf[8096] = "Host: server\r\n"
-"User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\r\n"
-"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
-"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-"Accept-Language: en-US,en;q=0.5\r\n"
-"Connection: keep-alive\r\n\r\nzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz           "
-"                                                                         "
-"                                                                         ";
   int ret = 0;
   for (auto _ : state) {
-    // This code gets timed
-    parse_headers(buf,buf+512,&ret);
+    parse_headers(buf,buf+2048,&ret);
   }
 }
 
 static void BM_avx2_header_parse(benchmark::State& state) {
-  // Perform setup here
-  char buf[8096] = "Host: server\r\n"
-"User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\r\n"
-"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
-"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-"Accept-Language: en-US,en;q=0.5\r\n"
-"Connection: keep-alive\r\n\r\nzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz           "
-"                                                                         "
-"                                                                         ";
   int ret = 0;
   for (auto _ : state) {
-    // This code gets timed
-    parse_headers_avx2(buf,buf+512,&ret);
+    parse_headers_avx2(buf,buf+2048,&ret);
   }
 }
+
+static void BM_adv_token(benchmark::State& state) {
+  int ret = 0;
+  int path_len = 0;
+  for (auto _ : state) {
+    adv_token(path, &path_len);
+  }
+}
+static void BM_adv_token_avx2(benchmark::State& state) {
+  int ret = 0;
+  int path_len = 0;
+  for (auto _ : state) {
+    get_to_space(path, &path_len);
+  }
+}
+static void BM_get_session(benchmark::State& state) {
+  int ret = 0;
+  for (auto _ : state) {
+    getSession(cbuf, clen);
+  }
+}
+static void BM_get_session_avx2(benchmark::State& state) {
+  int ret = 0;
+  for (auto _ : state) {
+    getSession_avx2(cbuf, cend);
+  }
+}
+
+
+
 
 
 
 
 //BENCHMARK(BM_SlowParse);
-//BENCHMARK(BM_sse4_get_eol);
-//BENCHMARK(BM_my_get_eol);
-BENCHMARK(BM_my3_header_parse);
-BENCHMARK(BM_my2_header_parse);
+BENCHMARK(BM_sse4_get_eol);
+BENCHMARK(BM_my_get_eol);
+//BENCHMARK(BM_my3_header_parse);
+//BENCHMARK(BM_my2_header_parse);
 //BENCHMARK(BM_my_header_parse);
-BENCHMARK(BM_old_header_parse);
-BENCHMARK(BM_avx2_header_parse);
+//BENCHMARK(BM_old_header_parse);
+//BENCHMARK(BM_avx2_header_parse);
+//BENCHMARK(BM_adv_token);
+//BENCHMARK(BM_adv_token_avx2);
+//BENCHMARK(BM_get_session);
+//BENCHMARK(BM_get_session_avx2);
 BENCHMARK_MAIN();
 
+/*
+
+int main() {
+  char buf[8096] = "Host: server\r\n"
+"User-Agent: Mozilla/5.0 (X11; Linux x86_64) Gecko/20130501 Firefox/30.0 AppleWebKit/600.00 Chrome/30.0.0000.0 Trident/10.0 Safari/600.00\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Cookie: uid=12345678901234567890; __utma=1.1234567890.1234567890.1234567890.1234567890.12; wd=2560x1600\r\n"
+"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,* /*;q=0.8\r\n"
+"Accept-Language: en-US,en;q=0.5\r\n"
+"Connection: keep-alive\r\n\r\n";
+  //strcpy(buf,"Host: localhost:8080\r\nUser-Agent: curl/7.68.0\r\nAccept: * /*\r\n\r\n");
+  //strcpy(buf,"Host: localhost:8080\r\nUser-Agent: python-requests/2.31.0\r\nAccept-Encoding: gzip, deflate\r\nAccept: * /*\r\nConnection: keep-alive\r\nCookie: foo=b=ar\r\nContent-Length: 0\r\n\r\n");
+
+  char cbuf[8096] = "uid=123456781234567890; mrsession=1234567890.1234567890.12; wd=2560x1600";
+  int len = strlen("uid=123456781234567890; mrsession=1234567890.1234567890.12; wd=2560x1600");
+  const char *cend = cbuf + len;
+
+  getSession_avx2(cbuf,cend);
+
+  int ret = 0;
+  //parse_headers_avx2(buf,buf+512,&ret);
+  //parse_headers(buf,buf+2048,&ret);
+  //parse_mine3(buf);
+  //printf(" ret=%d\n",ret);
+
+  //unsigned long long l = 0x80008020ull;
+  //unsigned int s = 7;
+  //printf(" WTF %08x\n", l >> s );
+
+}
+
+*/

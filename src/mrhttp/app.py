@@ -8,7 +8,8 @@ import signal
 import asyncio
 import traceback
 import socket
-import os, sys, random, mrpacker
+import os, sys, random, mrpacker, time
+from glob import glob
 import multiprocessing
 import faulthandler
 import functools
@@ -16,7 +17,7 @@ from wsgiref.handlers import format_date_time
 import inspect, copy
 #from inspect import signature #getmodulename, isawaitable, signature, stack
 #from prof import profiler_start,profiler_stop
-import uuid, http.cookies
+import http.cookies
 
 import mrhttp
 from mrhttp import Protocol
@@ -68,10 +69,13 @@ class Application(mrhttp.CApp):
     self.listeners = { "at_start":[], "at_end":[], "after_start":[]}
     self._mc = None
     self._mrq = None
+    self._mrq2 = None
     self._mrc = None
+    self.static_cached_files = []
     self.session_backend = "memcached"
     self.uses_session = False
     self.uses_mrq = False
+    self.uses_mrq2 = False
     self.err404 = "<html><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested page was not found</p></body></html>"
     self.err400 = "<html><head><title>400 Bad Request</title></head><body><p>Invalid Request</p></body></html>"
    
@@ -115,40 +119,10 @@ class Application(mrhttp.CApp):
       self.uses_session = True
     if "mrq" in options:
       self.uses_mrq = True
+    if "mrq2" in options:
+      self.uses_mrq2 = True
 
     if not uri.startswith('/'): uri = '/' + uri
-    #params = {}
-    #params["methods"] = methods
-    #params["options"] = options
-    #params["type"] = _type
-    #params["mrq"] = None
-    #for o in options:
-      #if o.startswith("mrq"):
-        #
-        #self.uses_mrq = True
-        #if self._mrq == None:
-          #srvs = self.config.get("mrq", None)
-          #print(srvs)
-          #if type(srvs) != list or type(srvs[0]) != tuple or len(srvs) == 0:
-            #print("When using MrQ app.config['mrq'] must be set to a list of (host,port) tuple pairs. Exiting")
-            #exit(1)
-          #self._mrq = []
-          #if type(srvs) == list and type(srvs[0]) == list:
-            #for s in srvs:
-              #self._mrq.append( MrqClient( s, self.loop) )
-          #else:
-            #self._mrq.append( MrqClient( srvs, self.loop) )
-        #if o == "mrq": 
-          #o = "mrq0"
-        #l = []
-        #try:
-          #for n in o[3:]:
-            #l.append( self._mrq[int(n)] )
-          #params["mrq"] = l
-        #except:
-          #print("Error mrq route specifies a cluster that doesn't exist")
-          #print("uri:", uri, "mrq", o)
-          #exit(1)
 
     def response(func): 
       self.router.add_route( func, uri, methods, options, _type )
@@ -164,6 +138,40 @@ class Application(mrhttp.CApp):
       params["type"]    = r[4]
       self.router.add_route( r[0], r[1], params )
 
+  #TODO Size limit on files?
+  def static_cached_timer(self):
+    ts = time.time() # Avoid race 
+    for item in self.static_cached_files:
+      fn = item[1]
+      if os.path.getmtime(fn) > self.static_cached_timestamp:
+        with open(fn, 'rb') as f:
+          b = f.read()
+          self.router.update_cached_route( [item[0], b] )
+    self.static_cached_timestamp = ts
+    self.loop.call_later(10, self.static_cached_timer) 
+        
+       
+  #TODO Use brotli'd files - if [path].br exists use that instead
+  def static_cached(self, root, directory):
+    def removeprefix( prefix, text ):
+      if text.startswith(prefix):
+          return text[len(prefix):]
+
+    if not os.path.isdir(directory):
+      print("WARNING: app.static_cached root dir does not exist")
+      return
+    files = glob(os.path.join(directory, '**', '*'), recursive=True)
+    self.static_cached_timestamp = time.time()
+    for fn in files:
+      if os.path.isdir(fn): continue
+      with open(fn, 'rb') as f:
+        b = f.read()
+      
+
+      if not root.startswith('/'): root = '/'+root
+      uri = root+removeprefix(directory, fn)
+      self.static_cached_files.append( [uri,fn] )
+      self.router.add_cached_route( uri, b )
 
   def _get_idle_and_busy_connections(self):
     return \
@@ -241,15 +249,23 @@ class Application(mrhttp.CApp):
       self._appStart() 
 
       if self.uses_mrq:
-        mrqconf = self.config.get("mrq", None)
-        if not mrqconf:
+        srvs = self.config.get("mrq", None)
+        if not srvs:
           print("When using MrQ app.config['mrq'] must be set. Exiting")
           exit(1)
-        srvs = self.config.get("mrq", None)
         if type(srvs) != list or len(srvs) == 0 or type(srvs[0]) != tuple:
           print("When using MrQ app.config['mrq'] must be set to a list of (host,port) tuple pairs. Exiting")
           exit(1)
         self._mrq = MrqClient( srvs, self.loop) 
+      if self.uses_mrq2:
+        srvs = self.config.get("mrq2", None)
+        if not srvs:
+          print("When using mrq2 app.config['mrq2'] must be set. Exiting")
+          exit(1)
+        if type(srvs) != list or len(srvs) == 0 or type(srvs[0]) != tuple:
+          print("When using MrQ app.config['mrq'] must be set to a list of (host,port) tuple pairs. Exiting")
+          exit(1)
+        self._mrq2 = MrqClient( srvs, self.loop) 
 
       if self.uses_session:
 
@@ -288,29 +304,7 @@ class Application(mrhttp.CApp):
         for r in self.requests:
           r.cleanup()
         self.requests = None
-
     
-        #for ref in gc.get_referrers(self.requests[0]):
-          #if type(ref) == list:
-            #print("list")
-          #else:
-            #print(ref)
-        #print("DELME refcnt ", sys.getrefcount(self.requests[0]))
-        #r = self.requests[0]
-        #print("id requests ", id(self.requests))
-        #rs = self.requests
-        #self.requests = None
-        #gc.collect()
-        #print (gc.get_referrers(rs))
-        #print("DELME refcnt ", sys.getrefcount(r))
-        #for ref in gc.get_referrers(r):
-          #if type(ref) == list:
-            #print("list")
-            #print("id ref ", id(ref))
-          #else:
-            #print(ref)
-
-
   # Update the response date string every few seconds
   def updateDateString(self):
     self.updateDate( format_date_time(None) )
@@ -319,6 +313,7 @@ class Application(mrhttp.CApp):
 
   def _appStart(self):
     self.loop.call_soon(self.updateDateString)
+    self.loop.call_soon(self.static_cached_timer)
 
 
   def _run(self, *, host, port, num_workers=None, debug=None):
@@ -434,9 +429,6 @@ class Application(mrhttp.CApp):
     userk = userk + mrhttp.to64( 0x20 | random.getrandbits(5) ) 
 
     skey = userk + k[len(userk):]
-
-    # TODO We could have user id be optional and do this if not given
-    #skey = uuid.uuid4().hex
 
     # Send the session cookie back to the user  
     c = cookies

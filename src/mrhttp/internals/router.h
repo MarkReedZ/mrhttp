@@ -15,10 +15,12 @@ typedef struct {
   bool iscoro;
   bool session;
   bool mrq;
+  bool mrq2;
   bool append_user;
   char mtype;
   int max_byte_size;
 
+  PyObject *cached;
   PyObject *user_key;
   //char *user_key;
   //long user_key_len;
@@ -38,5 +40,6 @@ PyObject *Router_new    (PyTypeObject* self, PyObject *args, PyObject *kwargs);
 int       Router_init   (Router* self, PyObject *args, PyObject *kwargs);
 void      Router_dealloc(Router* self);
 PyObject *Router_setupRoutes(Router* self);
+PyObject* Router_update_cached_route(Router* self, PyObject* item);
 
 Route* router_getRoute(Router* self, Request* request);

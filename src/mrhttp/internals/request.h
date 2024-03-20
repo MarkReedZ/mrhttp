@@ -45,7 +45,6 @@ struct Request {
   PyObject* py_method;
   PyObject* transport;
   PyObject* app;
-  PyObject* py_ip;
   PyObject* py_headers;
   PyObject* py_cookies;
   PyObject* py_body;

@@ -18,12 +18,6 @@ local CRLF = "\r\n"
 
 local FileBody = read_txt_file("tests/lua/test.txt")
 
--- We don't need different file names here because the test should
--- always replace the uploaded file with the new one. This will avoid
--- the problem with directories having too much files and slowing down
--- the application, which is not what we are trying to test here.
--- This will also avoid overloading wrk with more things do to, which
--- can influence the test results.
 local Filename = "test.txt"
 
 local ContentDisposition = "Content-Disposition: form-data; name=\"file\"; filename=\"" .. Filename .. "\""

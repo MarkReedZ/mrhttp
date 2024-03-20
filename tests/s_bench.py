@@ -80,7 +80,7 @@ def testing(r):
 
 @app.route('/404/')
 def notFound(r):
-  return r.NotFound()
+  return app.err404
 
 @app.route('/500/')
 def error500(r):
@@ -110,7 +110,9 @@ def content(r):
 
 @app.route('/form')
 def parseForm(r):
-  return r.form["param2"]
+  if r.form:
+    return r.form["param2"]
+  return "No form"
 
 @app.route('/json')
 def parseJ(r):
@@ -168,6 +170,17 @@ def t2(r):
 def longresp(r):
   return "fart"*128*1000
 
+@app.route('/upload')
+def upload(r):
+  if r.file == None:
+    return "No file uploaded"
+  #for f in r.files:
+    #print(f)
+  name = r.file['name']
+  typ  = r.file['type']
+  body = r.file['body']
+  return name
 
-app.run(cores=1)
+
+app.run(cores=4)
 

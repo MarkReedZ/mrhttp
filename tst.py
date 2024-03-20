@@ -1,34 +1,37 @@
 
-import traceback
+import traceback, mrjson
 from mrhttp import app
 import mrpacker
 
 
 app.config["memcache"] = [ ("127.0.0.1", 11211) ]
+#app.static_cached("www","/path/to/www")
 
 #@app.on('at_start')
 #async def setup():
   #app.c = asyncmrq.Client()
   #await app.c.connect(servers=[("127.0.0.1",7100)])
 
-#@app.route('/',options=['session'])
-@app.route('/',_type="html")
+#@app.route('/',options=['cache'])
+@app.route('/')
 def index(r):
-  print( r.headers )
-  #print( r.ip )
-  return "yay"  
-  #d = r.mrpack
-  #return d["name"]
-  #x = r.form
-  #return x["param2"]
+  return "hello world"  
+
+@app.route('/123456789123456789')
+async def long(r):
+  return "long"
 
 @app.route('/json')
 def json(r):
-  return r.json["name"]
+  return mrjson.dumps({'message': 'Hello, world!'})
 
 @app.route('/mrp',_type="mrp")
 def mrp(r):
   return mrpacker.pack("hello")
+
+@app.route('/{}/tst')
+def firstarg(r,a):
+  return a
 
 
 try:

@@ -328,7 +328,10 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
   if ( !self->closed ) {
 
     Route *r = req->route;
-    if ( r->mrq ) { 
+    if ( r->mrq || r->mrq2 ) { 
+      MrqClient *py_mrq;
+      if ( r->mrq ) py_mrq = self->app->py_mrq;
+      if ( r->mrq2) py_mrq = self->app->py_mrq2;
       int slot = 0;
 
       // Pull slot from the first arg. Must be a number though a string won't break
@@ -374,7 +377,7 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
             memcpy(p, data, data_sz);
             p += data_sz;
             *p++ = ']';
-            rc = MrqClient_pushj( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(p-tmp) );
+            rc = MrqClient_pushj( py_mrq, slot, tmp, (int)(p-tmp) );
             free(tmp);
           } else {
 
@@ -385,7 +388,7 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
             p += req->body_len;
             memcpy(p, data, data_sz);
             p += data_sz;
-            rc = MrqClient_push ( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(p-tmp) );
+            rc = MrqClient_push ( py_mrq, slot, tmp, (int)(p-tmp) );
             free(tmp);
           }
 
@@ -429,9 +432,9 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
         else {
           // Send body to mrq
           if ( req->py_mrpack == NULL ) {
-            MrqClient_pushj( (MrqClient*)self->app->py_mrq, slot, req->body, req->body_len );
+            MrqClient_pushj( py_mrq, slot, req->body, req->body_len );
           } else {
-            MrqClient_push ( (MrqClient*)self->app->py_mrq, slot, req->body, req->body_len );
+            MrqClient_push ( py_mrq, slot, req->body, req->body_len );
           }
         }
       } else {
@@ -513,13 +516,16 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
     }
 
     // if mrq return now as the user is not logged in
-    if ( r->mrq ) {
+    if ( r->mrq || r->mrq2 ) {
       return Protocol_handle_request( self, self->request, r );
     }
 
     //?  PyObject *ret = pipeline_queue(self, (PipelineRequest){true, 0, self->request, task});
   }
-  if ( r->mrq ) { //TODO
+  if ( r->mrq || r->mrq2 ) { 
+    MrqClient *py_mrq;
+    if ( r->mrq ) py_mrq = self->app->py_mrq;
+    if ( r->mrq2) py_mrq = self->app->py_mrq2;
     DBG printf("Route uses mrq\n"); 
     int slot = 0;
     // Pull slot from the first arg. Must be a number
@@ -531,9 +537,9 @@ Protocol* Protocol_on_body(Protocol* self, char* body, size_t body_len) {
 
     // Send body to mrq
     if ( self->request->py_mrpack == NULL ) {
-      MrqClient_pushj( (MrqClient*)self->app->py_mrq, slot, self->request->body, self->request->body_len );
+      MrqClient_pushj( py_mrq, slot, self->request->body, self->request->body_len );
     } else {
-      MrqClient_push ( (MrqClient*)self->app->py_mrq, slot, self->request->body, self->request->body_len );
+      MrqClient_push ( py_mrq, slot, self->request->body, self->request->body_len );
     }
 
     // TODO set a client member to say success/fail? Have to start failing if slow consumer / connection gone.
@@ -556,6 +562,10 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
     if ( self->request == request ) self->request = (Request*)MrhttpApp_get_request( self->app );
   }
 
+  // If we have cached bytes 
+  if ( r->cached ) {
+    if(!protocol_write_response(self, request, r->cached)) goto error;
+  }
   
   if(!(result = protocol_callPageHandler(self, r->func, request)) ) {
 
@@ -656,7 +666,7 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
 
   if(!protocol_write_response(self, request, result)) goto error;
 
-  // TODO We aren't closing the connection if issued a connection: close header.  This is okay behind nginx
+  // TODO We aren't closing the connection if issued a connection: close header.  
   //if ( !request->keep_alive ) Protocol_close(self);
 
   Py_DECREF(result);
@@ -886,6 +896,7 @@ PyObject* protocol_task_done(Protocol* self, PyObject* task)
   PyObject* result = Py_True;
   PipelineRequest *r;
 
+  // TODO?
   // task is the task that just finished.  
   //   If task is at the head of the Q then return the response.
   //     then continue looping through the Q and return a response for anything that is already done
