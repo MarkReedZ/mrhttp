@@ -341,6 +341,7 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
         char *p = req->args[0];
         while (len--) slot = (slot * 10) + (*p++ - '0');
         slot &= 0xff;
+        DBG_MRQ printf(" mrq slot found in arg: %d\n",slot);
       } else {
         // The slot is the user id embedded in the session key
         unsigned char *p = (unsigned char*)req->session_id;
@@ -361,6 +362,7 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
 
         // push [ user, json ] if append_user is set
         if ( r->append_user ) {
+          DBG_MRQ printf(" mrq appending user data\n");
           // TODO Test using a static buffer
 
           //int rc = MrqClient_push( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(p-tmp) );
@@ -381,7 +383,6 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
             rc = MrqClient_pushj( py_mrq, slot, tmp, (int)(p-tmp) );
             free(tmp);
           } else {
-
             char *tmp = malloc( req->body_len + data_sz + 16 ); // TODO avoid malloc with static buffer
             tmp[0] = 0x42;
             char *p = tmp+1;
@@ -389,6 +390,9 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
             p += req->body_len;
             memcpy(p, data, data_sz);
             p += data_sz;
+            DBG_MRQ printf(" DELME push to workserver:\n");
+            DBG_MRQ printf(" >%.*s<\n", (int)(p-tmp),tmp);
+            DBG_MRQ print_buffer(tmp, (int)(p-tmp));
             rc = MrqClient_push ( py_mrq, slot, tmp, (int)(p-tmp) );
             free(tmp);
           }
@@ -401,40 +405,12 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
 
         }
 
-  // TODO Delete the below and just keep append user? This pulls a user defined key from the json and sends that object
-        /*
-        else if ( r->user_key ) { 
-          //request.user has a dict and we need r->user_key key
-          // TODO or we search for "key": in the char* 
-          PyObject *user = PyObject_GetAttrString((PyObject*)req, "user"  );
-          if ( user ) {
-            PyObject *tmp = PyDict_GetItem( user, r->user_key );
-            // TODO This object could be a long or unicode
-            if ( PyLong_Check(tmp) ) {
-              long v = PyLong_AsLong(tmp);
-              //We want [ 12345, {msg} ]
-              char *tmp = malloc( req->body_len + 32 );
-              tmp[0] = '[';
-              char *s = tmp + 1;
-              do *s++ = (char)(48 + (v % 10ULL)); while(v /= 10ULL);
-              reverse( tmp+1, s-1 );
-              *s = ',';
-              strncpy(s, req->body, req->body_len);
-              s += req->body_len;
-              *s++ = ']';
-              MrqClient_push( (MrqClient*)self->app->py_mrq, slot, tmp, (int)(s-tmp) );
-              free(tmp);
-            }
-  
-          } else {
-            MrqClient_push( (MrqClient*)self->app->py_mrq, slot, req->body, req->body_len );
-          }
-        */  
         else {
           // Send body to mrq
           if ( req->py_mrpack == NULL ) {
             MrqClient_pushj( py_mrq, slot, req->body, req->body_len );
           } else {
+            DBG_MRQ printf(" DELME push to workserver\n");
             MrqClient_push ( py_mrq, slot, req->body, req->body_len );
           }
         }

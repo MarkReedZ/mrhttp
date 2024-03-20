@@ -6,7 +6,7 @@
 #define DBG_RESP if(0)
 
 #define DBG_MEMCAC if(0) 
-#define DBG_MRQ if(0) 
+#define DBG_MRQ if(1) 
 
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)

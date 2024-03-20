@@ -322,15 +322,13 @@ int MrqProtocol_push(MrqProtocol* self, char *d, int dsz) {
   }
 
   self->b[1] = 0x1;
-  //self->b[2] = topic;  
-  //self->b[3] = topic;  
 
   //int *p_len = (int*)(self->bp4);
   *self->bp4 = dsz;
   memcpy(self->bb, d, dsz);
 
   PyObject *bytes = PyBytes_FromStringAndSize(self->b, dsz + 6);
-  //printf("mrq push buytes:\n"); PyObject_Print(bytes, stdout,0); printf("\n"); //DELME
+  DBG_MRQ { printf("mrq push buytes:\n"); PyObject_Print(bytes, stdout,0); printf("\n"); } 
   if(!PyObject_CallFunctionObjArgs(self->write, bytes, NULL)) { Py_XDECREF(bytes); return 1; }
   Py_DECREF(bytes);
 
