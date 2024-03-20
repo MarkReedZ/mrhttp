@@ -50,7 +50,6 @@ app.config["mrq2"] = [("127.0.0.1",7101)]
 
 @app.route('/q/{}/',options=['mrq'])
 def queue(r, arg1):
-  print("DELME arg1",arg1)
   if r.servers_down:
     return "Servers not available, try again later"
   return 'Hello World!'
