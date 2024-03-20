@@ -25,17 +25,18 @@
 # python tst.py 7100
 # python tst.py 7101
 #
-# curl -i --raw http://localhost:8080/q/0/0/ -X POST -d '{"username":"xyz"}'
+# curl -H "Content-Type: application/mrpacker" --data-binary @tests/lua/test.mrp http://localhost:8080/q/0
 # curl -H "Content-Type: application/mrpacker" --data-binary @tests/lua/test.mrp http://localhost:8080/q2/0
 #
+
 # To fetch a user's session and pass it to mrworkserver:
 #
 # Set a session in memcached by logging in:
-#   curl -i --raw http://localhost:8080/
+#   curl -v http://localhost:8080/login
 #   example output:   AeeZjIBxhxDEaTKc69MTge3tq_kqf7Bh
 #
 # Use the session key that was output:
-#   curl -i --raw http://localhost:8080/sq/ -H "Cookie: mrsession=AeeZjIBxhxDEaTKc69MTge3tq_kqf7Bh;" -X POST -d '{"test":"xyz"}'
+#   curl -v http://localhost:8080/sq2/ -H "Cookie: mrsession=AeexlGcHq_dFZd6pJnvjgqu3NhrAS4qu;" -H "Content-Type: application/mrpacker" --data-binary @tests/lua/test.mrp 
 
 import mrhttp
 import mrjson as json
@@ -44,21 +45,28 @@ app = mrhttp.Application()
 app.config["memcache"] = [ ("127.0.0.1", 11211) ]
 
 # We setup 2 clusters of 1 server each
-app.config["mrq"] = [("127.0.0.1",7100)]
+app.config["mrq"]  = [("127.0.0.1",7100)]
 app.config["mrq2"] = [("127.0.0.1",7101)]
 
-@app.route('/q/{}/{}/',options=['mrq'])
-def queue(r, s, t):
+@app.route('/q/{}/',options=['mrq'])
+def queue(r, arg1):
+  print("DELME arg1",arg1)
   if r.servers_down:
     return "Servers not available, try again later"
   return 'Hello World!'
 
-@app.route('/')
-async def login(r):
+@app.route('/q2/{}/',options=['mrq2'])
+def q2(r, arg1):
+  if r.servers_down:
+    return "Servers not available, try again later"
+  return 'Hello World!'
 
+
+@app.route('/login')
+async def login(r):
   user_id = 10999
   user = {"name":"Mark"}
-  return str( app.setUserSessionAndCookies( r, user_id, user, json=True ) ) + "\n"
+  return str( app.setUserSessionAndCookies( r, user_id, user ) ) + "\n"
 
 
 @app.route('/sq/',options=['session','mrq','append_user'])
@@ -69,8 +77,10 @@ def session_queue(r):
     return "Servers not available, try again later"
   return 'Hello World!'
 
-@app.route('/q2/{}',options=['mrq2'])
-def queue2(r, some_id):
+@app.route('/sq2/',options=['session','mrq2','append_user'])
+def sq2(r):
+  if r.user == None:
+    return "Not logged in"
   if r.servers_down:
     return "Servers not available, try again later"
   return 'Hello World!'

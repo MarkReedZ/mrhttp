@@ -78,7 +78,7 @@ PyObject *Router_setupRoutes (Router* self) {
   PyObject *routes  = PyObject_GetAttrString((PyObject*)self, "routes");    
   int l = PyList_Size(sroutes);
 
-  self->staticRoutes = malloc( l * sizeof(Route) );
+  self->staticRoutes = calloc( l , sizeof(Route) );
   self->numStaticRoutes = l;
 
   PyObject *r, *o;
@@ -121,7 +121,7 @@ PyObject *Router_setupRoutes (Router* self) {
   else          l = 0;
   DBG printf(" len routes %d\n", l );
 
-  self->routes = malloc( l * sizeof(Route) );
+  self->routes = calloc( l , sizeof(Route) );
   self->numRoutes = l;
 
   rte = self->routes;

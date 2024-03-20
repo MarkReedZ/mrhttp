@@ -72,6 +72,7 @@ class Application(mrhttp.CApp):
     self._mrq2 = None
     self._mrc = None
     self.static_cached_files = []
+    self.static_cached_update_time = 10
     self.session_backend = "memcached"
     self.uses_session = False
     self.uses_mrq = False
@@ -144,11 +145,12 @@ class Application(mrhttp.CApp):
     for item in self.static_cached_files:
       fn = item[1]
       if os.path.getmtime(fn) > self.static_cached_timestamp:
+        print("DELME timer updating cache of ",fn)
         with open(fn, 'rb') as f:
           b = f.read()
           self.router.update_cached_route( [item[0], b] )
     self.static_cached_timestamp = ts
-    self.loop.call_later(10, self.static_cached_timer) 
+    self.loop.call_later(self.static_cached_update_time, self.static_cached_timer)  # Default 10 seconds
         
        
   #TODO Use brotli'd files - if [path].br exists use that instead
@@ -166,6 +168,7 @@ class Application(mrhttp.CApp):
       if os.path.isdir(fn): continue
       with open(fn, 'rb') as f:
         b = f.read()
+        print("DELME loaded",fn," bytes ",len(b))
       
 
       if not root.startswith('/'): root = '/'+root
