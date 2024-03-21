@@ -112,7 +112,7 @@ PyObject *MrqClient_get(MrqClient* self, PyObject *args) {
   PyObject *getargs;
   if(!PyArg_ParseTuple(args, "iO", &slot, &getargs)) return NULL;
   int srv = server_slotmap[slot&0xFF];
-  if ( srv == -1 ) return NULL;
+  if ( srv == -1 ) Py_RETURN_NONE;
   MrqServer_get( self->servers[srv], getargs); //TODO error check
   return PyLong_FromLong(srv);
 }
@@ -122,7 +122,7 @@ PyObject *MrqClient_set(MrqClient* self, PyObject *args) {
   PyObject *d;
   if(!PyArg_ParseTuple(args, "iO", &slot, &d)) return NULL;
   int srv = server_slotmap[slot&0xFF];
-  if ( srv == -1 ) return NULL;
+  if ( srv == -1 ) Py_RETURN_NONE;
   MrqServer_set( self->servers[srv], d); //TODO error check
   return PyLong_FromLong(srv);
 }
