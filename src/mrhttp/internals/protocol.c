@@ -541,7 +541,9 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
   //}
   // If we have cached bytes 
   if ( r->cached ) {
+    response_setMimeType(r->mtype);
     if(!protocol_write_response(self, request, r->cached)) goto error;
+    return self;
   }
   
   if(!(result = protocol_callPageHandler(self, r->func, request)) ) {
