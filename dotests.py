@@ -113,13 +113,13 @@ async def run_benchmarks():
     opts = ('-H','Cookie: mrsession=43709dd361cc443e976b05714581a7fb; foo=fdsfdasdfasdfdsfasdfsdfsdfasdfas; short=fazc;')
 
     print("  Pipelined")
-    print ("    Hello          ", await run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
+    print ("    Hello (cached) ", await run_wrk(loop, 'http://localhost:8080/cached',lua='tests/lua/q-cached.lua'), "Requests/second" )
     print ("    Hello          ", await run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
     print ("    More hdrs      ", await run_wrk(loop, 'http://localhost:8080/',options=more_headers,lua='tests/lua/pipeline.lua'), "Requests/second" )
     print ("    Sessions       ", await run_wrk(loop, 'http://localhost:8080/s',lua='tests/lua/q-session.lua'), "Requests/second" )
     print ("    File Upload    ", await run_wrk(loop, 'http://localhost:8080/upload',lua='tests/lua/q-upload.lua'), "Requests/second" )
-    print ("    mrpacker       ", await run_wrk(loop, 'http://localhost:8080/mrpacker',lua='tests/lua/q-mrp.lua'), "Requests/second" )
-    print ("    Form           ", await run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/q-form.lua'), "Requests/second" )
+    #print ("    mrpacker       ", await run_wrk(loop, 'http://localhost:8080/mrpacker',lua='tests/lua/q-mrp.lua'), "Requests/second" )
+    #print ("    Form           ", await run_wrk(loop, 'http://localhost:8080/form',lua='tests/lua/q-form.lua'), "Requests/second" )
     if 1:
 
       print("")

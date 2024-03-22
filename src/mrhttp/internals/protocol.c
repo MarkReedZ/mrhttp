@@ -539,12 +539,11 @@ Protocol* Protocol_handle_request(Protocol* self, Request* request, Route* r) {
     if ( self->request == request ) self->request = (Request*)MrhttpApp_get_request( self->app );
   }
 
+  //if ( r->dyncache ) { // Lookup path in dict
+  //}
   // If we have cached bytes 
   if ( r->cached ) {
-    if ( PyBytes_Check( r->cached ) ) {
-      if(!protocol_write_response(self, request, r->cached)) goto error;
-    }
-    // Else dynamic cache 
+    if(!protocol_write_response(self, request, r->cached)) goto error;
   }
   
   if(!(result = protocol_callPageHandler(self, r->func, request)) ) {

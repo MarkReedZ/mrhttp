@@ -12,8 +12,8 @@ app.config["memcache"] = [ ("127.0.0.1", 11211) ]
   #app.c = asyncmrq.Client()
   #await app.c.connect(servers=[("127.0.0.1",7100)])
 
-#@app.route('/',options=['cache'])
-@app.route('/')
+#@app.route('/')
+@app.route('/',options=['cache'])
 def index(r):
   return "hello world"  
 
@@ -35,7 +35,7 @@ def firstarg(r,a):
 
 
 try:
-  app.run(cores=1)
+  app.run(cores=4)
 except Exception as e:
   print("YAY",e)
 

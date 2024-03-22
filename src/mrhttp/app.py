@@ -145,7 +145,6 @@ class Application(mrhttp.CApp):
     for item in self.static_cached_files:
       fn = item[1]
       if os.path.getmtime(fn) > self.static_cached_timestamp:
-        print("DELME timer updating cache of ",fn)
         with open(fn, 'rb') as f:
           b = f.read()
           self.router.update_cached_route( [item[0], b] )

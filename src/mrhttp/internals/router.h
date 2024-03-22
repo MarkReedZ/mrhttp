@@ -21,6 +21,7 @@ typedef struct {
   int max_byte_size;
 
   PyObject *cached;
+  PyObject *dyncache;
   PyObject *user_key;
   //char *user_key;
   //long user_key_len;
