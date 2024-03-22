@@ -1,5 +1,4 @@
 
-
 // PyObject_Print( req->py_user, stdout, 0 ); printf("\n");
 
 
@@ -22,7 +21,7 @@
 // DELME
 static void print_buffer( char* b, int len ) {
   for ( int z = 0; z < len; z++ ) {
-    printf( "%02x ",(int)b[z]);
+    printf( "%02x ",(unsigned int)b[z]);
   }
   printf("\n");
 }
@@ -390,8 +389,7 @@ void Protocol_on_memcached_reply( SessionCallbackData *scd, char *data, int data
             p += req->body_len;
             memcpy(p, data, data_sz);
             p += data_sz;
-            DBG_MRQ printf(" DELME push to workserver:\n");
-            DBG_MRQ printf(" >%.*s<\n", (int)(p-tmp),tmp);
+            DBG_MRQ printf(" pushing to workserver:\n");
             DBG_MRQ print_buffer(tmp, (int)(p-tmp));
             rc = MrqClient_push ( py_mrq, slot, tmp, (int)(p-tmp) );
             free(tmp);

@@ -86,6 +86,7 @@ class MrqClient(mrhttp.CMrqClient):
   async def get(self, slot, o):
     b = mrpacker.pack(o)
     srv = self._get(slot, b)
+    if srv == None: return None
     return await self.servers[srv].q.get()
   
   def lost_connection(self, srv):
