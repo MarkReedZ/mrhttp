@@ -36,7 +36,7 @@ void response_setupResponseBuffer(void) {
   //   Also all 115 and 143s ( updateHeaders )
   s = "HTTP/1.1 200 OK\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
   s = "Content-Length: 1        \r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
-  s = "Server: MrHTTP/0.11\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
+  s = "Server: MrHTTP/0.12\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
   s = "Date: Thu, 05 Apr 2018 22:54:19 GMT\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
   s = "Content-Type: text/html; charset=utf-8\r\n\r\n"; memcpy(p, s, strlen(s)); p += strlen(s);
   DBG_RESP printf("Init resp buffer:\n%.*s", (int)(p-rbuf), rbuf);
@@ -74,7 +74,7 @@ PyObject *response_updateDate(PyObject *date) {
   Py_ssize_t l;
   char *d = PyUnicode_AsUTF8AndSize( date, &l );
   char *p = rbuf;
-  p += strlen("HTTP/1.1 200 OK\r\n") + strlen("Server: MrHTTP/0.11\r\n") + strlen("Content-Length: 1        \r\n");
+  p += strlen("HTTP/1.1 200 OK\r\n") + strlen("Server: MrHTTP/0.12\r\n") + strlen("Content-Length: 1        \r\n");
   p += 6;
   memcpy(p, d, l);
   Py_RETURN_NONE;
@@ -234,10 +234,10 @@ PyObject *response_getErrorResponse(int code, char *reason, char *msg) {
   sprintf( body, "<html><head><title>%d %s</title></head><body><h1>%s</h1><p>%s</p></body></html>", code, reason, reason, msg );
   int blen = strlen(body);   
   
-  sprintf(p, "HTTP/1.1 %d %s\r\nServer: MrHTTP/0.11\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\n", code, reason, blen);
+  sprintf(p, "HTTP/1.1 %d %s\r\nServer: MrHTTP/0.12\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\n", code, reason, blen);
   p += strlen(p);
   memcpy(p, 
-         rbuf + strlen("HTTP/1.1 200 OK\r\n") + strlen("Server: MrHTTP/0.11\r\n") + strlen("Content-Length: 17       \r\n"), 
+         rbuf + strlen("HTTP/1.1 200 OK\r\n") + strlen("Server: MrHTTP/0.12\r\n") + strlen("Content-Length: 17       \r\n"), 
          strlen("Date: Thu, 05 Apr 2018 22:54:19 GMT\r\n"));
   p += strlen("Date: Thu, 05 Apr 2018 22:54:19 GMT\r\n");
 
