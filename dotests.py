@@ -114,6 +114,7 @@ async def run_benchmarks():
 
     print("  Pipelined")
     print ("    Hello          ", await run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
+    print ("    Hello          ", await run_wrk(loop, 'http://localhost:8080/',lua='tests/lua/pipeline.lua'), "Requests/second" )
     print ("    More hdrs      ", await run_wrk(loop, 'http://localhost:8080/',options=more_headers,lua='tests/lua/pipeline.lua'), "Requests/second" )
     print ("    Sessions       ", await run_wrk(loop, 'http://localhost:8080/s',lua='tests/lua/q-session.lua'), "Requests/second" )
     print ("    File Upload    ", await run_wrk(loop, 'http://localhost:8080/upload',lua='tests/lua/q-upload.lua'), "Requests/second" )
