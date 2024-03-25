@@ -38,6 +38,9 @@ app.session_backend = "mrcache"
 @app.route('/')
 def index(r):
   return 'Hello World!'
+@app.route('/cached', options=['cache'])
+def cached_index(r):
+  return 'Hello World!'
 
 @app.route('/print/{}')
 def pr(r,foo):

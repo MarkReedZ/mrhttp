@@ -64,7 +64,9 @@ PyObject* Router_update_cached_route(Router* self, PyObject* item) {
     //DBG printf("request path len %d - %.*s\n", (int)request->path_len, (int)request->path_len, request->path);
     //DBG printf("route path %.*s \n", (int)r->len, r->path);
     if ( plen == r->len && !memcmp(r->path, p, plen) ) {
+      if ( r->cached ) { Py_DECREF(b); }
       r->cached = b;
+      Py_INCREF(b);
       Py_RETURN_NONE; 
     }
   }
@@ -103,9 +105,16 @@ PyObject *Router_setupRoutes (Router* self) {
     o = PyDict_GetItemString( r, "type"  );
     if (o) rte->mtype = PyLong_AsLong(o);
     rte->user_key = PyDict_GetItemString( r, "user_key" );
-    rte->cached   = PyDict_GetItemString( r, "cached" );
+    PyObject *b   = PyDict_GetItemString( r, "cached" );
+    rte->cached   = b; if (b) Py_INCREF(b);
     if ( Py_True == PyDict_GetItemString( r, "cache" ) ) {
-      rte->cached = PyObject_CallFunctionObjArgs(handler, r, NULL);
+      b =  PyObject_CallFunctionObjArgs(handler, r, NULL);
+      rte->cached = b; Py_INCREF(b);
+      if ( !( PyBytes_Check(b) || PyUnicode_Check(b) ) ) {
+        printf(" ERROR - cached route must return a unicode or bytes object\n");
+        printf("   path: "); PyObject_Print(PyDict_GetItemString(r,"path"),stdout,0); printf("\n");
+        Py_DECREF(rte->cached); rte->cached = 0;
+      }
     }
 
     DBG printf(" path %.*s func ptr %p\n", (int)rte->len, rte->path, rte->func);
