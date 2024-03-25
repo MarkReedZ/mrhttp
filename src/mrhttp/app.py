@@ -422,15 +422,16 @@ class Application(mrhttp.CApp):
       k += mrhttp.to64( random.getrandbits(6) )
 
     userk = ""
-    numbits = user_id.bit_length() 
-    if numbits == 0:
-      numbits += 1
-    while numbits > 0:
-      userk = mrhttp.to64( user_id & 0x1F ) + userk
-      user_id >>= 5
-      numbits -= 5
-    userk = userk + mrhttp.to64( 0x20 | random.getrandbits(5) ) 
-
+    if user_id:
+      numbits = user_id.bit_length() 
+      if numbits == 0:
+        numbits += 1
+      while numbits > 0:
+        userk = mrhttp.to64( user_id & 0x1F ) + userk
+        user_id >>= 5
+        numbits -= 5
+      userk = userk + mrhttp.to64( 0x20 | random.getrandbits(5) ) 
+    
     skey = userk + k[len(userk):]
 
     # Send the session cookie back to the user  
