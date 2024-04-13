@@ -1,7 +1,8 @@
 #
 #g++ t.cpp -O3 -msse4.2 -mavx2 -std=c++11 -lbenchmark -lpthread -o t
 #g++ tst.cpp -O3 -msse4.2 -mavx2 -std=c++11 -lbenchmark -lpthread -o tst
-g++ parse.cpp -O3 -msse4.2 -mavx2 -std=c++11 -lbenchmark -lpthread -o parse
+#g++ parse.cpp -O3 -msse4.2 -mavx2 -std=c++11 -lbenchmark -lpthread -o parse
 #g++ string.cpp -O0 -msse4.2 -mavx2 -std=c++11 -lbenchmark -lpthread -o string
 #g++ query.cpp -O0 -msse4.2 -mavx2 -std=c++11 -lbenchmark -lpthread -o query
+g++ rand.cpp -O3 -msse4.2 -mavx2 -std=c++11 -lbenchmark -lpthread -o orand
 
