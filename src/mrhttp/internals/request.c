@@ -671,7 +671,7 @@ PyObject* Request_parse_mp_form(Request* self) {
   static char colon[] = "::" ";;" "==" "\015\015";
   static char semi[] = ";;" "=="; 
     
-  //printf("ct >%.*s<\n", ctlen, ct);
+  DBG printf("ct >%.*s<\n", ctlen, ct);
 
 /*
   char *p = ct;
@@ -679,7 +679,6 @@ PyObject* Request_parse_mp_form(Request* self) {
   char *bnd = NULL;
   int bndlen;
   p = findchar(p, pend, semi, sizeof(semi) - 1, &found);
-  //printf("find >%.*s<\n", 5, p);
   if ( p[2] == 'b' ) {
     bnd = p + 11;
     bndlen = pend-bnd;
@@ -701,6 +700,7 @@ PyObject* Request_parse_mp_form(Request* self) {
     PyTuple_SetItem(ret, 1, Py_None);
     return ret;
   }
+  DBG printf("bnd >%.*s<\n", bndlen, bnd);
 
   int i = 0;
   p = self->body;
@@ -717,6 +717,7 @@ PyObject* Request_parse_mp_form(Request* self) {
 //Content-Disposition: form-data
 //Content-Disposition: form-data; name="fieldName"
 //Content-Disposition: form-data; name="fieldName"; filename="filename.jpg"
+
 
   // We're looping line by line until end of body
   // TODO add a findBoundary function and just search on '-' instead of line by line
@@ -786,7 +787,6 @@ PyObject* Request_parse_mp_form(Request* self) {
     //Content-Type: text/plain; charset=utf-8
     else if ( state == 1 ) {
       if ( p[0] == '\r' ) {
-        //printf("end of state 1\n");
         state = 0;
         body = p+2;
       }
@@ -837,10 +837,7 @@ PyObject* Request_parse_mp_form(Request* self) {
       }    
     }
     
-    //if ( state == 2 ) {
-    //}
-    //p = findchar(p, pend, crlf, sizeof(crlf) - 1, &found);
-    p = my_get_eol(p, pend);
+    p = findchar(p, pend, crlf, sizeof(crlf) - 1, &found);
     p += 2;
   }
 

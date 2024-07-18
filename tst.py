@@ -3,17 +3,7 @@ import traceback, mrjson
 from mrhttp import app
 import mrpacker
 
-
-app.config["memcache"] = [ ("127.0.0.1", 11211) ]
-#app.static_cached("www","/path/to/www")
-
-#@app.on('at_start')
-#async def setup():
-  #app.c = asyncmrq.Client()
-  #await app.c.connect(servers=[("127.0.0.1",7100)])
-
-@app.route('/',_type='text',options=['cache'])
-#@app.route('/',_type='text')
+@app.route('/',_type='text')
 def index(r):
   return "hello world"  
 
@@ -21,11 +11,19 @@ def index(r):
 def json(r):
   return mrjson.dumps({'message': 'Hello, world!'})
 
+@app.route('/upload')
+def upload(r):
+  try:
+    print(r.headers)
+    print(r.file)
+  except:
+    print("ERROR")
+  return "Success"
 
 
 try:
   app.run(cores=1)
 except Exception as e:
-  print("YAY",e)
+  print("Done",e)
 
 

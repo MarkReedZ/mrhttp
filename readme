@@ -1,4 +1,19 @@
 
+
+Fix up the static cache
+
+-app.config["memcache"] = [ ("127.0.0.1", 11211) ]
+-#app.static_cached("www","/path/to/www")
+-
+-#@app.on('at_start')
+-#async def setup():
+-  #app.c = asyncmrq.Client()
+-  #await app.c.connect(servers=[("127.0.0.1",7100)])
+-
+-@app.route('/',_type='text',options=['cache'])
+
+
+
 Updating version:
   setup.py
   src/mrhttp/__init__.py
@@ -36,7 +51,7 @@ attach to child process
 
 Memory issues:  TODO AddressSanitizer false positives on the ranges* see if I can ignore
 CFLAGS='-Wall -O0 -g -fsanitize=address -fno-omit-frame-pointer -fsanitize-recover=address' python setup.py install --force
-ASAN_OPTIONS=halt_on_error=0 LD_PRELOAD=/usr/lib/gcc/x86_64-linux-gnu/7/libasan.so python tst.py
+ASAN_OPTIONS=halt_on_error=0 LD_PRELOAD=/usr/lib/gcc/x86_64-linux-gnu/13/libasan.so python tst.py
 
 
 Telnet and send partial / bad requests
