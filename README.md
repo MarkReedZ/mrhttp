@@ -64,4 +64,9 @@ sudo apt install python3-dev -y
 pip3 install mrhttp
 ```
 
+Building from source
+
+```
+pip install .
+```
 

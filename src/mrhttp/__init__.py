@@ -21,5 +21,5 @@ from .mrcacheclient import MrcacheClient
 from .app import *
 from .internals import randint, escape, to64, from64, timesince
 
-__version__=0.12
+__version__=0.13
 

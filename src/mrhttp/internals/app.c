@@ -213,7 +213,7 @@ void MrhttpApp_setup_error_pages(MrhttpApp* self) {
   char *body = PyUnicode_AsUTF8AndSize( u, &l );
 
   char *resp = malloc( l + 1024 );
-  sprintf(resp, "HTTP/1.1 404 Not Found\r\nServer: MrHTTP/0.12\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %zu\r\n\r\n", l);
+  sprintf(resp, "HTTP/1.1 404 Not Found\r\nServer: MrHTTP/0.13\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %zu\r\n\r\n", l);
   char *p = resp + strlen(resp);
   memcpy(p, body, l);
 
@@ -225,7 +225,7 @@ void MrhttpApp_setup_error_pages(MrhttpApp* self) {
   body = PyUnicode_AsUTF8AndSize( u, &l );
 
   resp = malloc( l + 1024 );
-  sprintf(resp, "HTTP/1.1 400 Bad Request\r\nServer: MrHTTP/0.12\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %zu\r\n\r\n", l);
+  sprintf(resp, "HTTP/1.1 400 Bad Request\r\nServer: MrHTTP/0.13\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %zu\r\n\r\n", l);
   p = resp + strlen(resp);
   memcpy(p, body, l);
 
