@@ -39,11 +39,27 @@ def json(r):
 def mrp(r):
   return mrpacker.pack([1,2,3])
 
+@app.route('/301')
+def redirect301(r):
+  raise mrhttp.HTTPRedirect("/foo")
+  return 'Hello World!'
+
+@app.route('/303')
+def redirect303(r):
+  raise mrhttp.HTTPRedirect("/foo", 303)
+  return 'Hello World!'
+
+
 
 app.run(cores=2)
 
-# curl -i --raw 'http://localhost:8080/' -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
+# curl -i --raw http://localhost:8080/ -H "Cookie: mrsession=43709dd361cc443e976b05714581a7fb;"
 
-# curl -i --raw 'http://localhost:8080/text'
-# curl -i --raw 'http://localhost:8080/json'
-# curl -i --raw 'http://localhost:8080/mrp'
+# curl -i --raw http://localhost:8080/text
+# curl -i --raw http://localhost:8080/json
+# curl -i --raw http://localhost:8080/mrp
+# curl -i --raw http://localhost:8080/301
+# curl -i --raw http://localhost:8080/303
+
+
+
