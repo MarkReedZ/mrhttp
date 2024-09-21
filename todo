@@ -1,149 +1,9 @@
 
-Handle static files - static root route and path. 
-Connection buffer size - after a file upload shrink the buffer back down.  Behind cloudflare connections will remain open forever. Behind nginx its just one connection so who cares.  Out front client connections will close so it doesn't matter?
-
-
-support HEAD 
-
-disconnect
-  Protocol dealloc is never called - python bug?
-  
-
-
-
-
-
-
-
-
-
-
-
-set user sess - fix it!
-
-Change to the new session ids everywhere.  TODO user id in session necessary? No.  Idea was to use MrWorkServers to cache user data .
-Update dotests to setup the memcached/mrq/mrcache servers and set a session id so we find the user 
-
-
-
-
-
-
-
-
-    def _get_address(self):
-        sock = self.transport.get_extra_info('socket')
-
-        if sock.family == socket.AF_INET:
-            self._socket = (self.transport.get_extra_info('peername') or
-                            (None, None))
-            self._ip, self._port = self._socket
-        elif sock.family == socket.AF_INET6:
-            self._socket = (self.transport.get_extra_info('peername') or
-                            (None, None, None, None))
-            self._ip, self._port, *_ = self._socket
-        else:
-            self._ip, self._port = (None, None)
-
-    @property
-    def remote_addr(self):
-        """Attempt to return the original client ip based on X-Forwarded-For.
-
-        :return: original client ip.
-        """
-        if not hasattr(self, '_remote_addr'):
-            forwarded_for = self.headers.get('X-Forwarded-For', '').split(',')
-            remote_addrs = [
-                addr for addr in [
-                    addr.strip() for addr in forwarded_for
-                    ] if addr
-                ]
-            if len(remote_addrs) > 0:
-                self._remote_addr = remote_addrs[0]
-            else:
-                self._remote_addr = ''
-        return self._remote_addr
-
-
-
-subdomains
-redirects?
-bad.py - bad request
-Review tests
-mrpacker
-
-memcached = clean it up
-If MemcachedClient_set servers are down we return NULL and don't setup an exception
-
-dotests disconnect 
-Request_reset - we doing in all necessary places
-
-Make conn/req timeouts as arguments  (20 / 5 right now)
 
 Add tests for memc and mrq failover. ?
-
-
-Add streaming upload
+Add streaming upload?
 https://github.com/huge-success/sanic/tree/master/examples/request_stream
-
-
-
-test for setUserSession with added cookies
-/r/python - Why would you write your web server in anything but python
-
-If we lose the mrq servers we have to tell client 
-
-
-!!
- File "uvloop/handles/basetransport.pyx", line 92, in uvloop.loop.UVBaseTransport._maybe_pause_protocol
-AttributeError: 'internals.MrqProtocol' object has no attribute 'pause_writing'
-protocol.resume_writing() failed
-protocol: <internals.MrqProtocol object at 0x7f1530f86cf0>
-transport: <TCPTransport closed=False reading=True 0x2b62fc8>
-Traceback (most recent call last):
-  File "uvloop/handles/basetransport.pyx", line 108, in uvloop.loop.UVBaseTransport._maybe_resume_protocol
-AttributeError: 'internals.MrqProtocol' object has no attribute 'resume_writing'
-Explained?
-For the asyncio streams-based implementation, StreamReader automatically uses the {pause,resume}_reading methods to transmit backpressure upstream, and StreamWriter provides a friendly wrapper around {pause,resume}_writing to help us accept backpressure from downstream: the drain method – we just have to remember to use it. So in order to fix our proxy to transmit backpressure, all we need to do is to add one line of code to copy_all. Specifically, this line:
-  await drain()
-await dest_writer.drain()
-
-Flow Control
-In the initial echo server example we had await writer.drain() as this paused the coroutine from writing more data to the socket till the client had caught up, it drained the socket. This is useful as until the client catches up the data will be stored in memory, hence a malicious client can make many requests for a lot of data, refuse to receive the data, and allow the server to exhaust its memory.
-
-To combat this the coroutine sending data should await a drain function, that can be added to the protocol,
-
-import asyncio
-class FlowControlServer(asyncio.Protocol):
-    def __init__(self):
-        self._can_write = asyncio.Event()
-        self._can_write.set()
-    def pause_writing(self) -> None:
-        # Will be called whenever the transport crosses the 
-        # high-water mark.
-        self._can_write.clear()
-    def resume_writing(self) -> None:
-        # Will be called whenever the transport drops back below the
-        # low-water mark.
-        self._can_write.set()
-    async def drain(self) -> None:
-        await self._can_write.wait()
-
-WriteTransport.set_write_buffer_limits(high=None, low=None)
-Set the high and low watermarks for write flow control.
-
-These two values (measured in number of bytes) control when the protocol’s protocol.pause_writing() and protocol.resume_writing() methods are called. If specified, the low watermark must be less than or equal to the high watermark. Neither high nor low can be negative.
-
-pause_writing() is called when the buffer size becomes greater than or equal to the high value. If writing has been paused, resume_writing() is called when the buffer size becomes less than or equal to the low value.
-
-The defaults are implementation-specific. If only the high watermark is given, the low watermark defaults to an implementation-specific value less than or equal to the high watermark. Setting high to zero forces low to zero as well, and causes pause_writing() to be called whenever the buffer becomes non-empty. Setting low to zero causes resume_writing() to be called only once the buffer is empty. Use of zero for either limit is generally sub-optimal as it reduces opportunities for doing I/O and computation concurrently.
-
-
-
-
-
-
-
+If we lose the mrq servers we have to tell client ?0
 Wiki doc?
 http://www.django-rest-framework.org/api-guide/requests/
 
@@ -163,14 +23,6 @@ vhosts -- how to do this? I don't like sanic's, maybe do cherrypy's redir
         'api.foo.com':       '/api',
 
 
-
-
-
-
-
-
-
-
 logging 
 
 Stream large file upload
@@ -183,17 +35,3 @@ https://github.com/channelcat/sanic/issues/168
 Write tutorials? github wiki pages
 Flask:
 https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world
-
-
-
-
-
-Look at a mysql C client?  We can do better than aiomysql.  Either libmysqlclient or our own
-https://dev.mysql.com/doc/dev/mysql-server/latest/PAGE_PROTOCOL.html
-https://dev.mysql.com/doc/internals/en/a-mysql-client-logs-in.html
-
-
-If I want to try mrpacker again:
-https://github.com/MarkReedZ/mrhttp/tree/cdaf7d8be3bcb0a88792875678aa2de515020566/src/mrhttp/utils
-
-
