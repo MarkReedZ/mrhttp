@@ -9,7 +9,7 @@ server = None
 def setup():
   print("Begin test_exceptions")
   global server
-  server = tests.common.start_server("tests/s1.py")  
+  server = tests.common.start_server("tests/s_main.py")  
   if not server:
     return 1
   return 0

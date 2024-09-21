@@ -1,10 +1,6 @@
 
-Start this up to run the tests -- have in automatically done?
- mrcache -m 64 -i 16
-  python load_session.py will load the test user session
+Start this up to run the tests . TODO Skip if mrcache is not available
 
-set methods on pages
-test not returning a string from a page ( regular and coro )
-test pipeline coro
+  mrcache -m 64 -i 16
+  python load_session.py  # will load the test user session
 
-redirect.py make tests url and code

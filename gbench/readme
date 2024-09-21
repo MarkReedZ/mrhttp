@@ -8,6 +8,10 @@ Test code first:
 
 https://github.com/google/benchmark
 
+g++ -O3 -march=znver4 -mavx512bf16 -lbenchmark -lpthread -isystem benchmark/include -Lbenchmark/build/src -o bm bm.c
+
+
+
 Install gbench
   sudo apt install cmake
   git clone https://github.com/google/benchmark.git

@@ -40,10 +40,10 @@ def cook2(r):
 
   return 'cookie'
 
-# python requests can't handle this?? Hangs waiting for response curl is fine
+# python requests can't handle this?? Hangs waiting for response.  curl is fine
 #@app.route('/long', _type='text')
 #def longresp(r):
-  #return "fart"*128*1000
+  #return "longresp"*64*1000
 
 app.run(cores=1)
 

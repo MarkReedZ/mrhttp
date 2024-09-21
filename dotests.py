@@ -8,7 +8,10 @@ readme = """
   mrworkserver
     python workserver.py    
     
+
+TODO  Check for mrworkserver and mrcache being up and skip if they aren't available
 """
+
 
 
 import pkgutil, time
@@ -29,10 +32,6 @@ import uvloop
 import psutil
 import atexit
 
-# TODO
-#  Check for mrworkserver and mrcache being up and add the session key so we hit and load the json 43709dd361cc443e976b05714581a7fb
-#     mrcache -m 64 -i 16
-#     python mrworkserver/tst.py
 
 
 async def run_tests():
@@ -155,7 +154,6 @@ async def run_benchmarks():
     await proc.wait()
 
 async def main():
-  print("main")  
   await run_tests()
   await run_benchmarks()
 

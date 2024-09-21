@@ -43,7 +43,6 @@ def test_one():
 
 
 def teardown():
-  print("teardown")
   global server
   stop_server(server)
   #server.terminate()

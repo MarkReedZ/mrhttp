@@ -5,9 +5,10 @@ import socket
 import mrjson as json
 
 app = Application()
-app.config["memcache"] = [ ("127.0.0.1", 11211) ]
-app.config["mrcache"] =  [("127.0.0.1", 7000 )]
-app.session_backend = "mrcache"
+
+#app.config["memcache"] = [ ("127.0.0.1", 11211) ]
+#app.config["mrcache"] =  [("127.0.0.1", 7000 )]
+#app.session_backend = "mrcache"
 
 @app.route('/',_type='text')
 def index(r):
@@ -109,12 +110,6 @@ def parseForm(r):
 def parseFiles(r):
   if r.files == None: return "No files"
   return r.files[0]["body"]
-
-@app.route('/s',options=['session'])
-def session(r):
-  if r.user:
-    return "session"
-  return "session"
 
 @app.route('/noreturn')
 def noreturn(r):
