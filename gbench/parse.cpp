@@ -116,7 +116,7 @@ std::size_t slow_hparse(std::string &text) noexcept
   int last = 0;
   int index = 0;
 
-  for (std::uint64_t i = 0; i < text.length(); i++)
+  for (int i = 0; i < text.length(); i++)
   {
     if ( text[i] == ':' ) {
         keys[index] = text.substr( last, i-last );
@@ -1234,13 +1234,13 @@ static void BM_get_session_avx2(benchmark::State& state) {
 
 
 //BENCHMARK(BM_SlowParse);
-BENCHMARK(BM_sse4_get_eol);
-BENCHMARK(BM_my_get_eol);
-//BENCHMARK(BM_my3_header_parse);
-//BENCHMARK(BM_my2_header_parse);
+//BENCHMARK(BM_sse4_get_eol);
+//BENCHMARK(BM_my_get_eol);
+BENCHMARK(BM_my3_header_parse);
+BENCHMARK(BM_my2_header_parse);
 //BENCHMARK(BM_my_header_parse);
-//BENCHMARK(BM_old_header_parse);
-//BENCHMARK(BM_avx2_header_parse);
+BENCHMARK(BM_old_header_parse);
+BENCHMARK(BM_avx2_header_parse);
 //BENCHMARK(BM_adv_token);
 //BENCHMARK(BM_adv_token_avx2);
 //BENCHMARK(BM_get_session);

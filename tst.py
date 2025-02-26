@@ -1,7 +1,6 @@
 
 import traceback, mrjson
 from mrhttp import app
-import mrpacker
 
 @app.route('/',_type='text')
 def index(r):
