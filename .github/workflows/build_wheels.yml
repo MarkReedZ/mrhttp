@@ -1,6 +1,8 @@
 name: Build and upload to PyPI
 
-on: push
+on:
+    push:
+    workflow_dispatch:
 
 jobs:
   build_wheels:
@@ -21,7 +23,8 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          path: ./wheelhouse/*.whl
+          name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
+          path: wheelhouse/*.whl
 
   build_sdist:
     name: Build source distribution
@@ -34,6 +37,7 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
+          name: cibw-sdist
           path: dist/*.tar.gz
 
   upload_pypi:
@@ -44,15 +48,13 @@ jobs:
       url: https://pypi.org/p/mrhttp 
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
-    if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
+    if: startsWith(github.ref, 'refs/tags/v')  # only publish to PyPI on tag pushes
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          # unpacks default artifact into dist/
-          # if `name: artifact` is omitted, the action will create extra parent dir
-          name: artifact
+          pattern: cibw-*
           path: dist
+          merge-multiple: true
+
 
       - uses: pypa/gh-action-pypi-publish@release/v1
-        # with:
-          # repository-url: https://test.pypi.org/legacy/
