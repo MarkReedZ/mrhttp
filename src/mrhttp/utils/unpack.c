@@ -1,4 +1,5 @@
 
+
 #include "unpack.h"
 #include "py_defines.h"
 #include <time.h>
@@ -46,6 +47,14 @@ PyObject *decode( char *s, char *end) {
     uint32_t l = *p;
     s+=4;
     o = PyUnicode_FromStringAndSize( s, l );
+    s += l;
+  }
+  else if ( *(s) == 0x6B ) {
+    s++;
+    uint32_t *p = (uint32_t*)s;
+    uint32_t l = *p;
+    s+=4;
+    o = PyBytes_FromStringAndSize( s, l );
     s += l;
   }
   else if ( *(s) == 0x61 ) { s += 1; Py_INCREF(Py_True);  o = Py_True; }
